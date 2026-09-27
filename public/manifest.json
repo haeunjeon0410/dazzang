@@ -1,0 +1,12 @@
+{
+  "name": "다짱",
+  "short_name": "다짱",
+  "description": "친구와 주 3회 운동 인증, 못하면 벌금",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff8ec",
+  "theme_color": "#ec4899",
+  "icons": [
+    { "src": "/assets/app-icon.webp", "sizes": "1254x1254", "type": "image/webp", "purpose": "any" }
+  ]
+}

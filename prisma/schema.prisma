@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 1:1 맞짱 방. 초대 링크(inviteToken)로 친구를 초대해서 최대 2명까지 들어옴
+model Room {
+  id          String   @id @default(cuid())
+  inviteToken String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+
+  // 벌금을 모으는 모임 통장 (개인 계좌가 아니라 방 하나당 공용 계좌 하나)
+  groupBankName      String?
+  groupAccountNumber String?
+  groupAccountHolder String?
+
+  users User[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id])
+  name      String
+  createdAt DateTime @default(now())
+
+  checkins      Checkin[]
+  settlements   Settlement[]
+  subscriptions PushSubscription[]
+  excuses       Excuse[]
+}
+
+model Checkin {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  photoUrl  String
+  weekStart DateTime // 해당 인증이 속한 주의 월요일 00:00 (KST)
+  createdAt DateTime @default(now())
+}
+
+// 주간 마감 후 정산 상태만 저장 (횟수/벌금은 Checkin에서 즉시 계산)
+model Settlement {
+  id        String    @id @default(cuid())
+  weekStart DateTime
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  settled   Boolean   @default(false)
+  settledAt DateTime?
+
+  @@unique([weekStart, userId])
+}
+
+// 이번 주 부족한 횟수에 대해 "사정 봐달라기" 요청. 상대방이 허락하면 인증 1회로 인정
+model Excuse {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  weekStart  DateTime
+  reason     String
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}

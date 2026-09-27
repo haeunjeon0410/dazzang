@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 다짱
 
-## Getting Started
+친구랑 1:1로 운동 인증 맞짱 뜨는 개인용 웹앱(PWA). 아이폰 사파리에서 "홈 화면에 추가"하면 앱처럼 사용 가능.
 
-First, run the development server:
+## 규칙
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 방(Room) 하나 = 1:1 맞짱. 방장이 방을 만들고 초대 링크를 친구에게 보내면, 친구가 링크로 들어와 닉네임을 정하고 합류
+- 친구가 여러 명이면 그만큼 방을 여러 개 만들 수 있음 (각 방은 완전히 독립적으로 인증/벌금 관리)
+- 주 3회 인증샷 업로드 (self-report, 타이머 없음), **하루 1장만 인정** — 같은 날 다시 올리면 이전 사진은 자동으로 교체됨
+- 매주 월요일 00:00 ~ 일요일 23:59 (KST)이 한 주. **마감 지나면 그 주에 사진 추가 불가 (소급 불가)**
+- 마감 시점 기준 3회 미만이면 부족한 횟수 x 5,000원 벌금
+- "사정 봐달라기": 부족한 날에 대해 사유 적어서 요청 → 상대방이 허락하면 인증 1회로 인정돼서 벌금 차감
+- 벌금 자동 이체는 불가능(오픈뱅킹 API는 개인이 실계좌 이체 권한을 받을 수 없음) → 앱은 "계좌번호 복사 + 은행 앱 열기"까지만 도와주고, 실제 송금은 본인이 마지막에 직접 확인 후 실행
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 최초 설정
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. 의존성 설치
+   ```bash
+   npm install
+   ```
+2. `.env` 채우기
+   - `DATABASE_URL`은 기본값(`file:./dev.db`) 그대로 둬도 됨
+   - `SESSION_SECRET`, `CRON_SECRET`은 아무 랜덤 문자열로 변경
+   - 웹푸시 키 생성:
+     ```bash
+     npx web-push generate-vapid-keys
+     ```
+     나온 public/private key를 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`(=public key와 동일값)에 채워넣기
+3. DB 생성
+   ```bash
+   npx prisma migrate dev
+   ```
+4. 로컬 실행
+   ```bash
+   npm run dev
+   ```
+5. `http://localhost:3000` 접속 → 닉네임 정하고 "방 만들기" → 뜨는 초대 링크를 친구에게 전달
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 배포 시 주의
 
-## Learn More
+- 이 앱은 SQLite 파일(`prisma/dev.db`)과 인증샷(base64로 DB에 저장)을 한 서버 디스크에 계속 유지해야 함
+- **Vercel 같은 서버리스 호스팅은 배포마다 디스크가 초기화돼서 부적합**. Railway, Render, Fly.io처럼 영구 디스크(볼륨)를 붙일 수 있는 곳에 배포할 것
+- 마감 리마인드(토요일 저녁)와 결과 확정 알림(월요일 새벽)은 앱이 스스로 스케줄링하지 않음. 무료 크론 서비스(예: cron-job.org)에서 아래 URL을 정해진 시각에 호출하도록 등록:
+  - `https://내도메인/api/cron/remind?secret=CRON_SECRET값`  (토요일 저녁, KST)
+  - `https://내도메인/api/cron/finalize?secret=CRON_SECRET값` (월요일 00:05, KST)
+- `public/icons/icon-192.png`, `icon-512.png` 아이콘 파일이 비어있으니 실제 이미지로 교체할 것 (없어도 동작은 함, 홈 화면 아이콘만 비어보임)
 
-To learn more about Next.js, take a look at the following resources:
+## 사용법
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. 방장이 앱 접속 → 닉네임 정하고 "방 만들기"
+2. "초대 링크 공유하기"로 친구에게 링크 전달 (카톡 등)
+3. 친구가 링크 접속 → 닉네임 정하고 참여
+4. 각자 "마감 알림 받기"로 푸시 허용
+5. 운동 후 "오늘 인증하기"로 사진 업로드
+6. "기록" 탭에서 주차별 결과 확인, 벌금 낸 사람은 본인이 직접 "정산완료" 체크
+7. 여러 친구랑 하고 싶으면 "내정보" 탭에서 로그아웃 후 새 방을 또 만들면 됨
