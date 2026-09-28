@@ -4,12 +4,9 @@ import { setSession } from "@/lib/session";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const { name, pin } = await req.json();
+  const { name } = await req.json();
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "닉네임을 입력해주세요" }, { status: 400 });
-  }
-  if (!pin || typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
-    return NextResponse.json({ error: "4자리 숫자 PIN을 입력해주세요" }, { status: 400 });
   }
 
   const room = await prisma.room.findUnique({ where: { inviteToken: token } });
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       await tx.room.update({ where: { id: room.id }, data: { createdAt: room.createdAt } });
       const memberCount = await tx.user.count({ where: { roomId: room.id } });
       if (memberCount >= 2) throw new Error("ROOM_FULL");
-      return tx.user.create({ data: { roomId: room.id, name: name.trim(), pin } });
+      return tx.user.create({ data: { roomId: room.id, name: name.trim() } });
     });
   } catch (error) {
     if (error instanceof Error && error.message === "ROOM_FULL") {
