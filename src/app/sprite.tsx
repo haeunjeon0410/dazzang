@@ -39,7 +39,7 @@ export function Sprite({
   );
 }
 
-export const CHARACTER_SHEET = "/assets/characters.webp?v=8";
+export const CHARACTER_SHEET = "/assets/characters.webp?v=9";
 
 // characters.webp: row 0 = 캐릭터 A(양갈래 스월번), row 1 = 캐릭터 B(긴머리)
 export const CharRow = { A: 0, B: 1 } as const;
