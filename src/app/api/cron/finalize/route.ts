@@ -15,12 +15,15 @@ export async function GET(req: NextRequest) {
   const lastWeekStart = new Date(getWeekStart().getTime() - 7 * 24 * 60 * 60 * 1000);
   const rooms = await prisma.room.findMany({ include: { users: { include: { subscriptions: true } } } });
   const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart } });
+  const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" } });
 
   const allResults: { name: string; count: number; fine: number }[] = [];
 
   for (const room of rooms) {
     const results = room.users.map((u) => {
-      const count = checkins.filter((c) => c.userId === u.id).length;
+      const checkinCount = checkins.filter((c) => c.userId === u.id).length;
+      const excusedCount = approvedExcuses.filter((e) => e.userId === u.id).length;
+      const count = checkinCount + excusedCount;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       return { user: u, count, shortfall, fine: shortfall * FINE_PER_MISS };
     });
