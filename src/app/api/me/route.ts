@@ -19,6 +19,10 @@ export async function GET() {
       groupBankName: user.room.groupBankName,
       groupAccountNumber: user.room.groupAccountNumber,
       groupAccountHolder: user.room.groupAccountHolder,
+      deleteRequestedBy: user.room.deleteRequestedBy,
+      pauseRequestedBy: user.room.pauseRequestedBy,
+      pauseRequestedUntil: user.room.pauseRequestedUntil,
+      pausedUntil: user.room.pausedUntil,
     },
     other: other ? { id: other.id, name: other.name } : null,
   });

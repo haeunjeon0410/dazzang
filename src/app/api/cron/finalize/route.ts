@@ -16,10 +16,14 @@ export async function GET(req: NextRequest) {
   const rooms = await prisma.room.findMany({ include: { users: { include: { subscriptions: true } } } });
   const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" } });
+  const now = new Date();
 
   const allResults: { name: string; count: number; fine: number }[] = [];
 
   for (const room of rooms) {
+    // 지난 주가 정지 기간에 포함되면 마감 스킵
+    if (room.pausedUntil && room.pausedUntil > lastWeekStart) continue;
+
     const results = room.users.map((u) => {
       const checkinCount = checkins.filter((c) => c.userId === u.id).length;
       const excusedCount = approvedExcuses.filter((e) => e.userId === u.id).length;

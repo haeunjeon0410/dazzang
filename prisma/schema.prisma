@@ -18,6 +18,14 @@ model Room {
   groupAccountNumber String?
   groupAccountHolder String?
 
+  // 방 삭제 요청 (상호 동의 방식)
+  deleteRequestedBy String? // 삭제 요청한 userId
+
+  // 일시정지 (상호 동의 방식)
+  pauseRequestedBy    String?   // 정지 요청한 userId
+  pauseRequestedUntil DateTime? // 요청된 정지 종료일
+  pausedUntil         DateTime? // 확정된 정지 종료일 (null이면 정지 아님)
+
   users User[]
 }
 

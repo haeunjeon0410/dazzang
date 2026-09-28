@@ -38,6 +38,10 @@ type Room = {
   groupBankName: string | null;
   groupAccountNumber: string | null;
   groupAccountHolder: string | null;
+  deleteRequestedBy: string | null;
+  pauseRequestedBy: string | null;
+  pauseRequestedUntil: string | null;
+  pausedUntil: string | null;
 };
 
 type WeekSummary = { userId: string; name: string; count: number; shortfall: number; fine: number; settled: boolean };
@@ -67,6 +71,7 @@ export default function Home() {
   const [stats, setStats] = useState<
     { userId: string; name: string; totalCheckins: number; weeksWon: number; totalWeeks: number; totalFine: number }[] | null
   >(null);
+  const [pauseWeeks, setPauseWeeks] = useState(2);
 
   async function loadMe() {
     const res = await fetch("/api/me");
@@ -110,6 +115,19 @@ export default function Home() {
   useEffect(() => {
     if (me) loadWeek();
   }, [me]);
+
+  async function roomAction(action: string, extra?: Record<string, unknown>) {
+    const res = await fetch("/api/room", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || "요청 실패"); return false; }
+    if (data.deleted) { await fetch("/api/logout", { method: "POST" }); location.href = "/"; return true; }
+    await loadMe();
+    return true;
+  }
 
   async function handleCreateRoom(e: React.FormEvent) {
     e.preventDefault();
@@ -315,6 +333,86 @@ export default function Home() {
           </div>
         )}
 
+        {/* 정지 중 배너 */}
+        {room?.pausedUntil && new Date(room.pausedUntil) > new Date() && (
+          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffc72c] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가는 중</p>
+            <p className="text-xs text-[#8a5a1f]">
+              {new Date(room.pausedUntil).toLocaleDateString("ko-KR")}까지 일시정지 중이에요. 인증과 벌금이 없어요.
+            </p>
+            <button
+              onClick={() => { if (confirm("정지를 지금 취소할까요?")) roomAction("cancel-pause"); }}
+              className="w-full rounded-xl bg-white border border-[#ffc72c] py-2 text-sm font-semibold text-[#8a5a1f]"
+            >
+              정지 취소하고 다시 시작하기
+            </button>
+          </div>
+        )}
+
+        {/* 상대방이 삭제 요청한 경우 */}
+        {room?.deleteRequestedBy && room.deleteRequestedBy !== me?.id && (
+          <div className="rounded-2xl bg-[#fff0f6] border border-[#ec4899] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#b4356f]">🗑️ 방 삭제 요청이 왔어요</p>
+            <p className="text-xs text-[#b4779b]">상대방이 방 삭제를 요청했어요. 수락하면 모든 기록이 삭제돼요.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (confirm("정말 방을 삭제할까요? 모든 기록이 사라져요.")) roomAction("confirm-delete"); }}
+                className="flex-1 rounded-xl bg-[#ec4899] py-2 text-sm font-bold text-white"
+              >수락</button>
+              <button
+                onClick={() => roomAction("cancel-delete")}
+                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+              >거절</button>
+            </div>
+          </div>
+        )}
+
+        {/* 내가 삭제 요청한 경우 */}
+        {room?.deleteRequestedBy && room.deleteRequestedBy === me?.id && (
+          <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#4a2540]">🗑️ 방 삭제를 요청했어요</p>
+            <p className="text-xs text-[#b4779b]">상대방이 수락하면 방이 삭제돼요.</p>
+            <button
+              onClick={() => roomAction("cancel-delete")}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+            >요청 취소</button>
+          </div>
+        )}
+
+        {/* 상대방이 정지 요청한 경우 */}
+        {room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil && (
+          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffc72c] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가기 요청이 왔어요</p>
+            <p className="text-xs text-[#8a5a1f]">
+              {room.pauseRequestedUntil
+                ? `${new Date(room.pauseRequestedUntil).toLocaleDateString("ko-KR")}까지 쉬어가자고 요청했어요.`
+                : ""}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => roomAction("confirm-pause")}
+                className="flex-1 rounded-xl bg-[#ffc72c] py-2 text-sm font-bold text-[#4a2540]"
+              >수락</button>
+              <button
+                onClick={() => roomAction("cancel-pause")}
+                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+              >거절</button>
+            </div>
+          </div>
+        )}
+
+        {/* 내가 정지 요청한 경우 */}
+        {room?.pauseRequestedBy && room.pauseRequestedBy === me?.id && !room.pausedUntil && (
+          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffd6e8] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가기를 요청했어요</p>
+            <p className="text-xs text-[#8a5a1f]">상대방이 수락하면 정지가 시작돼요.</p>
+            <button
+              onClick={() => roomAction("cancel-pause")}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+            >요청 취소</button>
+          </div>
+        )}
+
         {weekData && myEntry && otherEntry && (
           <section className="space-y-3">
             <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full">
@@ -421,7 +519,7 @@ export default function Home() {
         )}
       </div>
 
-      {room?.full && (
+      {room?.full && !(room.pausedUntil && new Date(room.pausedUntil) > new Date()) && (
         <label className="fixed right-5 bottom-5 z-40 drop-shadow-lg">
           <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           {uploading ? (
@@ -496,6 +594,46 @@ export default function Home() {
             >
               로그아웃 (새 방 만들기로)
             </button>
+
+            {/* 쉬어가기 요청 */}
+            {!room?.pausedUntil && !room?.pauseRequestedBy && (
+              <div className="rounded-2xl bg-[#fff8e1] border border-[#ffd6e8] p-4 space-y-2">
+                <p className="text-sm font-bold text-[#8a5a1f]">⏸ 잠깐 쉬어갈까요?</p>
+                <p className="text-xs text-[#8a5a1f]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pauseWeeks}
+                    onChange={(e) => setPauseWeeks(Number(e.target.value))}
+                    className="flex-1 rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => (
+                      <option key={w} value={w}>{w}주</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => { setSettingsOpen(false); roomAction("request-pause", { weeks: pauseWeeks }); }}
+                    className="flex-1 rounded-xl bg-[#ffc72c] py-2.5 text-sm font-bold text-[#4a2540]"
+                  >
+                    쉬어가기 요청
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 방 삭제 요청 */}
+            {!room?.deleteRequestedBy && (
+              <button
+                onClick={() => {
+                  if (confirm("방 삭제를 요청할까요?\n상대방이 수락하면 모든 기록이 삭제돼요.")) {
+                    setSettingsOpen(false);
+                    roomAction("request-delete");
+                  }
+                }}
+                className="w-full rounded-xl bg-white border border-red-200 py-3 text-sm font-semibold text-red-400"
+              >
+                🗑️ 방 삭제 요청
+              </button>
+            )}
           </div>
         </div>
       )}
