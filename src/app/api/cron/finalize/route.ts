@@ -16,7 +16,6 @@ export async function GET(req: NextRequest) {
   const rooms = await prisma.room.findMany({ include: { users: { include: { subscriptions: true } } } });
   const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" } });
-  const now = new Date();
 
   const allResults: { name: string; count: number; fine: number }[] = [];
 
