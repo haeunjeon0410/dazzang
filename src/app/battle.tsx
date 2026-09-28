@@ -26,8 +26,8 @@ export function Battle({
   return (
     <div className="rounded-3xl bg-white border border-[#ffd6e8] shadow-sm overflow-hidden">
       <div className="bg-gradient-to-b from-[#ffe1ee] to-white px-4 pt-6 pb-2">
-        <div className="flex items-end justify-around">
-          <div className="flex flex-col items-center gap-1">
+        <div className="flex items-end justify-around gap-2">
+          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
             <CaptionBubble row={CharRow.A} text={countCaption(myCount)} height={62} />
             <div style={{ transform: `scale(${myScale})` }} className="transition-transform duration-500 ease-out">
               <CharacterSprite row={CharRow.A} pose={myCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL} height={BASE_HEIGHT} />
@@ -35,9 +35,9 @@ export function Battle({
           </div>
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/nav/battle.webp" alt="VS" className="w-14 h-14 object-contain mb-8" />
+          <img src="/assets/nav/battle.webp" alt="VS" className="w-14 h-14 shrink-0 object-contain mb-8" />
 
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
             <CaptionBubble row={CharRow.B} text={countCaption(otherCount)} height={62} />
             <div style={{ transform: `scale(${otherScale})` }} className="transition-transform duration-500 ease-out">
               <CharacterSprite

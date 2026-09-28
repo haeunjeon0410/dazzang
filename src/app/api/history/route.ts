@@ -9,7 +9,7 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const me = await prisma.user.findUnique({ where: { id: userId } });
+  const me = await prisma.user.findUnique({ where: { id: userId }, include: { room: true } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
@@ -42,6 +42,9 @@ export async function GET() {
         settled: settlement?.settled ?? false,
       };
     });
+
+    // 방이 생기기 전 주는 애초에 존재할 수 없으니 건너뛴다
+    if (deadline <= me.room.createdAt) continue;
 
     // 아무도 인증 기록이 없는 아주 오래된 빈 주는 건너뛴다
     if (summary.every((s) => s.count === 0) && i > 2) continue;

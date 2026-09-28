@@ -65,6 +65,7 @@ export default function Home() {
   const [weekData, setWeekData] = useState<{ weekStart: string; deadline: string; summary: Summary[] } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
   const [groupForm, setGroupForm] = useState({ groupBankName: "", groupAccountNumber: "", groupAccountHolder: "" });
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -199,7 +200,7 @@ export default function Home() {
 
   async function shareInvite() {
     const url = inviteUrl();
-    const text = `같이 운동 인증 맞짱 뜨자! 초대 코드: ${room?.inviteToken}`;
+    const text = `같이 운동 인증 맞짱 뜨자!\n초대 코드: ${room?.inviteToken}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: "다짱 초대", text, url });
@@ -317,7 +318,9 @@ export default function Home() {
               <img src="/assets/nav/total.webp" alt="" className="w-6 h-6 object-contain" />
             </button>
             <button
-              onClick={() => subscribeToPush().then((ok) => alert(ok ? "알림이 설정됐어요" : "알림 설정 실패"))}
+              onClick={() =>
+                subscribeToPush().then((result) => alert(result.ok ? "알림이 설정됐어요" : result.reason || "알림 설정 실패"))
+              }
               className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
               aria-label="마감 알림 받기"
             >
@@ -451,9 +454,9 @@ export default function Home() {
                 <p className="text-sm font-bold text-[#4a2540]">
                   지금 마감되면 모임 통장에 {myEntry.fine.toLocaleString()}원 보내야 해요
                 </p>
-                <p className="text-xs text-[#b4779b]">
+                <button onClick={() => setGroupAccountOpen(true)} className="text-xs text-[#b4779b] underline">
                   {room.groupBankName} {room.groupAccountNumber} ({room.groupAccountHolder})
-                </p>
+                </button>
                 <div className="flex gap-2">
                   <button onClick={copyAccount} className="flex-1 rounded-xl bg-[#ffe1ee] py-2 text-sm font-semibold text-[#b4356f]">
                     계좌번호 복사
@@ -470,7 +473,7 @@ export default function Home() {
                 <p className="text-sm font-bold text-[#4a2540]">
                   지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원
                 </p>
-                <button onClick={() => setSettingsOpen(true)} className="text-xs text-[#ec4899] underline">
+                <button onClick={() => setGroupAccountOpen(true)} className="text-xs text-[#ec4899] underline">
                   모임 통장을 등록하면 여기서 바로 송금 정보가 떠요
                 </button>
               </div>
@@ -510,13 +513,11 @@ export default function Home() {
                         </span>
                         {s.fine > 0 ? (
                           s.settled ? (
-                            <button onClick={() => toggleSettled(week.weekStart, s.userId, s.settled)}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src="/assets/nav/check-button.webp" alt="정산완료" className="h-8 w-auto" />
-                            </button>
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src="/assets/nav/check-button.webp" alt="정산완료" className="h-8 w-auto" />
                           ) : (
                             <button
-                              onClick={() => toggleSettled(week.weekStart, s.userId, s.settled)}
+                              onClick={() => { if (confirm("정산하셨나요?")) toggleSettled(week.weekStart, s.userId, s.settled); }}
                               className="flex items-center gap-2"
                             >
                               <span className="text-xs font-bold text-[#b4356f]">{s.fine.toLocaleString()}원</span>
@@ -579,42 +580,6 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
-              <p className="text-sm font-bold text-[#4a2540]">모임 통장 (벌금 보낼 곳)</p>
-              <p className="text-xs text-[#b4779b]">둘이 같이 쓰는 계좌 하나만 등록하면, 벌금 있을 때 홈 화면에 바로 떠요</p>
-              <input
-                placeholder="은행명 (예: 카카오뱅크)"
-                value={groupForm.groupBankName}
-                onChange={(e) => setGroupForm((a) => ({ ...a, groupBankName: e.target.value }))}
-                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
-              />
-              <input
-                placeholder="계좌번호"
-                value={groupForm.groupAccountNumber}
-                onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountNumber: e.target.value }))}
-                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
-              />
-              <input
-                placeholder="예금주"
-                value={groupForm.groupAccountHolder}
-                onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountHolder: e.target.value }))}
-                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
-              />
-              <button onClick={saveGroupAccount} className="w-full rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white">
-                저장
-              </button>
-            </div>
-
-            <button
-              onClick={async () => {
-                await fetch("/api/logout", { method: "POST" });
-                location.href = "/";
-              }}
-              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-3 text-sm font-semibold text-[#c2679c]"
-            >
-              로그아웃 (새 방 만들기로)
-            </button>
-
             {/* 쉬어가기 요청 */}
             {!room?.pausedUntil && !room?.pauseRequestedBy && (
               <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
@@ -654,6 +619,62 @@ export default function Home() {
                 방 삭제 요청
               </button>
             )}
+
+            <button
+              onClick={async () => {
+                await fetch("/api/logout", { method: "POST" });
+                location.href = "/";
+              }}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-3 text-sm font-semibold text-[#c2679c]"
+            >
+              로그아웃 (새 방 만들기로)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {groupAccountOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setGroupAccountOpen(false)}>
+          <div
+            className="w-full max-w-md bg-white rounded-3xl p-5 space-y-4 relative shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setGroupAccountOpen(false)}
+              className="absolute right-4 top-4 w-8 h-8 flex items-center justify-center rounded-full bg-[#ffeef5] text-[#c2679c] font-bold"
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+            <p className="font-bold text-[#4a2540]">모임 통장 (벌금 보낼 곳)</p>
+
+            <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
+              <p className="text-xs text-[#b4779b]">둘이 같이 쓰는 계좌 하나만 등록하면, 벌금 있을 때 홈 화면에 바로 떠요</p>
+              <input
+                placeholder="은행명 (예: 카카오뱅크)"
+                value={groupForm.groupBankName}
+                onChange={(e) => setGroupForm((a) => ({ ...a, groupBankName: e.target.value }))}
+                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+              />
+              <input
+                placeholder="계좌번호"
+                value={groupForm.groupAccountNumber}
+                onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountNumber: e.target.value }))}
+                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+              />
+              <input
+                placeholder="예금주"
+                value={groupForm.groupAccountHolder}
+                onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountHolder: e.target.value }))}
+                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+              />
+              <button
+                onClick={async () => { await saveGroupAccount(); setGroupAccountOpen(false); }}
+                className="w-full rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white"
+              >
+                저장
+              </button>
+            </div>
           </div>
         </div>
       )}

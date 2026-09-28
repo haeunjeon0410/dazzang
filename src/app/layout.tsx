@@ -30,6 +30,8 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: "#ec4899",
+  // 인풋 포커스할 때 iOS 사파리가 자동으로 화면을 확대하는 걸 막음 (사정 봐달라기 등 입력창)
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

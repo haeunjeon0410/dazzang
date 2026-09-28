@@ -82,9 +82,13 @@ export function CaptionBubble({
   height?: number;
   className?: string;
 }) {
-  const width = Math.round(height * BUBBLE_RATIO[row]);
+  // 폭이 좁은 화면에서도 절대 옆으로 넘치지 않도록, 가로폭에 맞춰 말풍선이 줄어들고
+  // (aspect-ratio로 비율 유지) height는 "최대 크기"와 글씨 크기 기준으로만 사용한다
   return (
-    <div className={`relative shrink-0 ${className ?? ""}`} style={{ width, height }}>
+    <div
+      className={`relative w-full min-w-0 ${className ?? ""}`}
+      style={{ aspectRatio: BUBBLE_RATIO[row], maxHeight: height }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={BUBBLE_SRC[row]} alt="" className="w-full h-full object-contain" />
       <div className="absolute inset-y-0 left-[32%] right-[18%] flex items-center overflow-hidden">
