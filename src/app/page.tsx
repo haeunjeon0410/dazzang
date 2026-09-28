@@ -346,8 +346,11 @@ export default function Home() {
 
   return (
     <>
-      <div className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-24">
-        <header className="flex items-center justify-between pt-4">
+      <div
+        className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-24"
+        style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
+      >
+        <header className="flex items-center justify-between pt-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
           <h1 className="text-xl font-black text-[#ec4899]">
             다짱 <span className="text-[#4a2540] font-bold text-base">· {me.name}님</span>
           </h1>
@@ -585,7 +588,13 @@ export default function Home() {
       </div>
 
       {room?.full && !(room.pausedUntil && new Date(room.pausedUntil) > new Date()) && (
-        <label className="fixed right-5 bottom-5 z-40 drop-shadow-lg">
+        <label
+          className="fixed z-40 drop-shadow-lg"
+          style={{
+            right: "calc(1.25rem + env(safe-area-inset-right))",
+            bottom: "calc(1.25rem + env(safe-area-inset-bottom))",
+          }}
+        >
           <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           {uploading ? (
             <span className="flex items-center justify-center w-24 h-10 rounded-full bg-[#ffc72c] text-sm font-bold text-[#4a2540]">
