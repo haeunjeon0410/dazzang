@@ -86,6 +86,8 @@ export default function JoinRoom() {
         <img src="/assets/poster.webp" alt="" className="w-full h-auto" />
         <p className="text-center text-sm text-[#c2679c]">누구인가요?</p>
 
+        {full && <p className="rounded-xl bg-[#ffe1ee] px-3 py-2 text-center text-sm font-semibold text-[#b4356f]">이 방은 이미 2명으로 가득 찼어요.</p>}
+
         <div className="space-y-2">
           {members.map((m) => (
             <button

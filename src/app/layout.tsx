@@ -13,6 +13,19 @@ export const metadata: Metadata = {
   title: "다짱",
   description: "친구와 주 3회 운동 인증, 못하면 벌금",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/assets/app-icon-192.png",
+    apple: "/assets/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "다짱",
+  },
+  other: {
+    // 구형 iOS Safari는 이 접두사 붙은 태그만 인식하는 경우가 있어서 같이 넣어둠
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport = {

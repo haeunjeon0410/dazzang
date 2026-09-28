@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { subscribeToPush } from "./push-setup";
 import { Battle } from "./battle";
 import { WeekCalendar } from "./calendar";
@@ -55,9 +56,10 @@ const BANK_SCHEMES: Record<string, string> = {
 const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
 
 export default function Home() {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [room, setRoom] = useState<Room | null>(null);
-  const [nickname, setNickname] = useState("");
+  const [roomCode, setRoomCode] = useState("");
   const [loginError, setLoginError] = useState("");
   const [creating, setCreating] = useState(false);
   const [weekData, setWeekData] = useState<{ weekStart: string; deadline: string; summary: Summary[] } | null>(null);
@@ -131,24 +133,34 @@ export default function Home() {
 
   async function handleCreateRoom(e: React.FormEvent) {
     e.preventDefault();
-    if (!nickname.trim()) return;
     setLoginError("");
     setCreating(true);
     try {
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nickname }),
+        body: JSON.stringify({}),
       });
       if (!res.ok) {
         const data = await res.json();
         setLoginError(data.error || "방 만들기 실패");
         return;
       }
-      await loadMe();
+      const data = await res.json();
+      router.push(`/join/${data.inviteToken}`);
     } finally {
       setCreating(false);
     }
+  }
+
+  function handleJoinRoom(e: React.FormEvent) {
+    e.preventDefault();
+    const code = roomCode.trim().toUpperCase();
+    if (!code) {
+      setLoginError("방 코드를 입력해주세요");
+      return;
+    }
+    router.push(`/join/${encodeURIComponent(code)}`);
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -179,18 +191,25 @@ export default function Home() {
     return `${location.origin}/join/${room.inviteToken}`;
   }
 
+  async function copyRoomCode() {
+    if (!room?.inviteToken) return;
+    await navigator.clipboard.writeText(room.inviteToken);
+    alert("방 코드가 복사됐어요");
+  }
+
   async function shareInvite() {
     const url = inviteUrl();
+    const text = `같이 운동 인증 맞짱 뜨자! 초대 코드: ${room?.inviteToken}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "다짱 초대", text: "같이 운동 인증 맞짱 뜨자!", url });
+        await navigator.share({ title: "다짱 초대", text, url });
         return;
       } catch {
         // 공유 취소 시 복사로 대체
       }
     }
-    await navigator.clipboard.writeText(url);
-    alert("초대 링크가 복사됐어요");
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    alert("초대 문구가 복사됐어요");
   }
 
   function openBankApp() {
@@ -248,32 +267,28 @@ export default function Home() {
   if (!me) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <form
-          onSubmit={handleCreateRoom}
-          className="w-full max-w-xs space-y-4 bg-white/90 backdrop-blur rounded-3xl border border-[#ffd6e8] shadow-lg p-6"
-        >
+        <div className="w-full max-w-xs space-y-4 bg-white/90 backdrop-blur rounded-3xl border border-[#ffd6e8] shadow-lg p-6">
           <h1 className="text-3xl font-black text-center text-[#ec4899] tracking-tight">다짱</h1>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/assets/poster.webp" alt="" className="w-full h-auto" />
-          <p className="text-center text-sm text-[#c2679c]">
-            친구랑 초대 링크로 방을 만들어요.
-            <br />내 닉네임을 정해주세요
-          </p>
-          <input
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="내 닉네임"
-            className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] px-4 py-3 text-center text-lg"
-          />
+          <p className="text-center text-sm text-[#c2679c]">방 코드로 친구와 함께 시작해보세요.</p>
+          <form onSubmit={handleJoinRoom} className="space-y-2">
+            <input
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              placeholder="방 코드"
+              maxLength={20}
+              autoCapitalize="characters"
+              className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] px-4 py-3 text-center text-lg tracking-widest"
+            />
+            <button className="w-full rounded-xl bg-[#ec4899] py-3 font-bold text-white shadow-md shadow-[#ec4899]/30">방 코드로 입장하기</button>
+          </form>
+          <div className="flex items-center gap-3 text-xs text-[#d9a9c4]"><span className="h-px flex-1 bg-[#ffd6e8]" /><span>또는</span><span className="h-px flex-1 bg-[#ffd6e8]" /></div>
+          <form onSubmit={handleCreateRoom}>
+            <button disabled={creating} className="w-full rounded-xl bg-white border-2 border-[#ec4899] py-3 font-bold text-[#ec4899] disabled:opacity-50">{creating ? "방 만드는 중..." : "방 만들기"}</button>
+          </form>
           {loginError && <p className="text-[#ec4899] text-sm text-center">{loginError}</p>}
-          <button
-            disabled={creating}
-            className="w-full rounded-xl bg-[#ec4899] py-3 font-bold text-white shadow-md shadow-[#ec4899]/30 disabled:opacity-50"
-          >
-            {creating ? "만드는 중..." : "방 만들기"}
-          </button>
-          <p className="text-center text-xs text-[#c2679c]">이미 초대 링크를 받았다면, 그 링크로 들어가주세요</p>
-        </form>
+        </div>
       </div>
     );
   }
@@ -325,9 +340,12 @@ export default function Home() {
             <CharacterSprite row={CharRow.A} pose={CharPose.SAD} height={88} />
             <div className="flex-1 space-y-2">
               <p className="text-sm font-bold text-[#b4356f]">친구가 아직 안 들어왔어요</p>
-              <p className="text-xs text-[#b4779b]">아래 초대 링크를 카톡으로 보내서 초대해주세요</p>
+              <p className="text-xs text-[#b4779b]">아래 초대 코드를 카톡으로 보내거나, 코드를 눌러 복사해주세요</p>
+              <button onClick={copyRoomCode}>
+                <p className="text-center text-2xl font-black tracking-[0.25em] text-[#ec4899]">{room.inviteToken}</p>
+              </button>
               <button onClick={shareInvite} className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white">
-                초대 링크 공유하기
+                초대 공유하기
               </button>
             </div>
           </div>
@@ -335,14 +353,14 @@ export default function Home() {
 
         {/* 정지 중 배너 */}
         {room?.pausedUntil && new Date(room.pausedUntil) > new Date() && (
-          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffc72c] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가는 중</p>
-            <p className="text-xs text-[#8a5a1f]">
+          <div className={`${CARD} space-y-2`}>
+            <p className="text-sm font-bold text-[#4a2540]">쉬어가는 중</p>
+            <p className="text-xs text-[#b4779b]">
               {new Date(room.pausedUntil).toLocaleDateString("ko-KR")}까지 일시정지 중이에요. 인증과 벌금이 없어요.
             </p>
             <button
               onClick={() => { if (confirm("정지를 지금 취소할까요?")) roomAction("cancel-pause"); }}
-              className="w-full rounded-xl bg-white border border-[#ffc72c] py-2 text-sm font-semibold text-[#8a5a1f]"
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
             >
               정지 취소하고 다시 시작하기
             </button>
@@ -351,26 +369,26 @@ export default function Home() {
 
         {/* 상대방이 삭제 요청한 경우 */}
         {room?.deleteRequestedBy && room.deleteRequestedBy !== me?.id && (
-          <div className="rounded-2xl bg-[#fff0f6] border border-[#ec4899] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#b4356f]">🗑️ 방 삭제 요청이 왔어요</p>
+          <div className="rounded-2xl bg-[#ffe1ee] border border-[#ffc72c] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#b4356f]">방 삭제 요청이 왔어요</p>
             <p className="text-xs text-[#b4779b]">상대방이 방 삭제를 요청했어요. 수락하면 모든 기록이 삭제돼요.</p>
             <div className="flex gap-2">
               <button
                 onClick={() => { if (confirm("정말 방을 삭제할까요? 모든 기록이 사라져요.")) roomAction("confirm-delete"); }}
-                className="flex-1 rounded-xl bg-[#ec4899] py-2 text-sm font-bold text-white"
-              >수락</button>
+                className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold"
+              >허락하기</button>
               <button
                 onClick={() => roomAction("cancel-delete")}
-                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
-              >거절</button>
+                className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b]"
+              >거절하기</button>
             </div>
           </div>
         )}
 
         {/* 내가 삭제 요청한 경우 */}
         {room?.deleteRequestedBy && room.deleteRequestedBy === me?.id && (
-          <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#4a2540]">🗑️ 방 삭제를 요청했어요</p>
+          <div className={`${CARD} space-y-2`}>
+            <p className="text-sm font-bold text-[#4a2540]">방 삭제를 요청했어요</p>
             <p className="text-xs text-[#b4779b]">상대방이 수락하면 방이 삭제돼요.</p>
             <button
               onClick={() => roomAction("cancel-delete")}
@@ -381,9 +399,9 @@ export default function Home() {
 
         {/* 상대방이 정지 요청한 경우 */}
         {room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil && (
-          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffc72c] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가기 요청이 왔어요</p>
-            <p className="text-xs text-[#8a5a1f]">
+          <div className="rounded-2xl bg-[#ffe1ee] border border-[#ffc72c] p-4 space-y-2">
+            <p className="text-sm font-bold text-[#b4356f]">쉬어가기 요청이 왔어요</p>
+            <p className="text-xs text-[#b4779b]">
               {room.pauseRequestedUntil
                 ? `${new Date(room.pauseRequestedUntil).toLocaleDateString("ko-KR")}까지 쉬어가자고 요청했어요.`
                 : ""}
@@ -391,21 +409,21 @@ export default function Home() {
             <div className="flex gap-2">
               <button
                 onClick={() => roomAction("confirm-pause")}
-                className="flex-1 rounded-xl bg-[#ffc72c] py-2 text-sm font-bold text-[#4a2540]"
-              >수락</button>
+                className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold"
+              >허락하기</button>
               <button
                 onClick={() => roomAction("cancel-pause")}
-                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
-              >거절</button>
+                className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b]"
+              >거절하기</button>
             </div>
           </div>
         )}
 
         {/* 내가 정지 요청한 경우 */}
         {room?.pauseRequestedBy && room.pauseRequestedBy === me?.id && !room.pausedUntil && (
-          <div className="rounded-2xl bg-[#fff8e1] border border-[#ffd6e8] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#8a5a1f]">⏸ 쉬어가기를 요청했어요</p>
-            <p className="text-xs text-[#8a5a1f]">상대방이 수락하면 정지가 시작돼요.</p>
+          <div className={`${CARD} space-y-2`}>
+            <p className="text-sm font-bold text-[#4a2540]">쉬어가기를 요청했어요</p>
+            <p className="text-xs text-[#b4779b]">상대방이 수락하면 정지가 시작돼요.</p>
             <button
               onClick={() => roomAction("cancel-pause")}
               className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
@@ -523,7 +541,9 @@ export default function Home() {
         <label className="fixed right-5 bottom-5 z-40 drop-shadow-lg">
           <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           {uploading ? (
-            <span className="flex items-center justify-center w-24 h-10 rounded-full bg-[#ffc72c] text-lg">⏳</span>
+            <span className="flex items-center justify-center w-24 h-10 rounded-full bg-[#ffc72c] text-sm font-bold text-[#4a2540]">
+              업로드 중...
+            </span>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src="/assets/nav/verify-button.webp" alt="인증하기" className="h-10 w-auto" />
@@ -597,9 +617,9 @@ export default function Home() {
 
             {/* 쉬어가기 요청 */}
             {!room?.pausedUntil && !room?.pauseRequestedBy && (
-              <div className="rounded-2xl bg-[#fff8e1] border border-[#ffd6e8] p-4 space-y-2">
-                <p className="text-sm font-bold text-[#8a5a1f]">⏸ 잠깐 쉬어갈까요?</p>
-                <p className="text-xs text-[#8a5a1f]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
+              <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
+                <p className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</p>
+                <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
                 <div className="flex items-center gap-2">
                   <select
                     value={pauseWeeks}
@@ -612,7 +632,7 @@ export default function Home() {
                   </select>
                   <button
                     onClick={() => { setSettingsOpen(false); roomAction("request-pause", { weeks: pauseWeeks }); }}
-                    className="flex-1 rounded-xl bg-[#ffc72c] py-2.5 text-sm font-bold text-[#4a2540]"
+                    className="flex-1 rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white"
                   >
                     쉬어가기 요청
                   </button>
@@ -629,9 +649,9 @@ export default function Home() {
                     roomAction("request-delete");
                   }
                 }}
-                className="w-full rounded-xl bg-white border border-red-200 py-3 text-sm font-semibold text-red-400"
+                className="w-full rounded-xl bg-white border border-[#ffd6e8] py-3 text-sm font-semibold text-[#ec4899]"
               >
-                🗑️ 방 삭제 요청
+                방 삭제 요청
               </button>
             )}
           </div>
