@@ -6,7 +6,9 @@ import { getWeekStart, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
 // 외부 스케줄러가 매주 월요일 00:05 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const authHeader = req.headers.get("authorization");
+  const authorized = secret === process.env.CRON_SECRET || authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  if (!authorized) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -12,23 +12,23 @@
 - "사정 봐달라기": 부족한 날에 대해 사유 적어서 요청 → 상대방이 허락하면 인증 1회로 인정돼서 벌금 차감
 - 벌금 자동 이체는 불가능(오픈뱅킹 API는 개인이 실계좌 이체 권한을 받을 수 없음) → 앱은 "계좌번호 복사 + 은행 앱 열기"까지만 도와주고, 실제 송금은 본인이 마지막에 직접 확인 후 실행
 
-## 최초 설정
+## 최초 설정 (로컬 개발)
 
 1. 의존성 설치
    ```bash
    npm install
    ```
 2. `.env` 채우기
-   - `DATABASE_URL`은 기본값(`file:./dev.db`) 그대로 둬도 됨
+   - `DATABASE_URL`: Postgres 연결 문자열 (아래 "배포" 항목에서 만드는 Neon 프로젝트 값을 로컬에서도 그대로 사용하면 됨)
    - `SESSION_SECRET`, `CRON_SECRET`은 아무 랜덤 문자열로 변경
    - 웹푸시 키 생성:
      ```bash
      npx web-push generate-vapid-keys
      ```
      나온 public/private key를 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`(=public key와 동일값)에 채워넣기
-3. DB 생성
+3. DB 마이그레이션 적용
    ```bash
-   npx prisma migrate dev
+   npx prisma migrate dev --name init
    ```
 4. 로컬 실행
    ```bash
@@ -36,14 +36,19 @@
    ```
 5. `http://localhost:3000` 접속 → 닉네임 정하고 "방 만들기" → 뜨는 초대 링크를 친구에게 전달
 
-## 배포 시 주의
+## 배포 (완전 무료 구성: Vercel + Neon)
 
-- 이 앱은 SQLite 파일(`prisma/dev.db`)과 인증샷(base64로 DB에 저장)을 한 서버 디스크에 계속 유지해야 함
-- **Vercel 같은 서버리스 호스팅은 배포마다 디스크가 초기화돼서 부적합**. Railway, Render, Fly.io처럼 영구 디스크(볼륨)를 붙일 수 있는 곳에 배포할 것
-- 마감 리마인드(토요일 저녁)와 결과 확정 알림(월요일 새벽)은 앱이 스스로 스케줄링하지 않음. 무료 크론 서비스(예: cron-job.org)에서 아래 URL을 정해진 시각에 호출하도록 등록:
-  - `https://내도메인/api/cron/remind?secret=CRON_SECRET값`  (토요일 저녁, KST)
-  - `https://내도메인/api/cron/finalize?secret=CRON_SECRET값` (월요일 00:05, KST)
-- `public/icons/icon-192.png`, `icon-512.png` 아이콘 파일이 비어있으니 실제 이미지로 교체할 것 (없어도 동작은 함, 홈 화면 아이콘만 비어보임)
+인증샷을 base64로 DB에 저장하기 때문에 서버 디스크가 필요 없음 → 서버리스(Vercel)에 그대로 올려도 됨.
+
+1. **DB**: [neon.com](https://neon.com)에서 무료 프로젝트 생성 → Connection string(`postgresql://...`) 복사
+2. **배포**: [vercel.com](https://vercel.com)에서 GitHub으로 로그인 → "Add New Project" → `haeunjeon0410/dazzang` 레포 Import
+3. Vercel 프로젝트 Settings → Environment Variables에 아래 값 등록 (Production/Preview/Development 전부 체크):
+   - `DATABASE_URL` = Neon에서 복사한 연결 문자열
+   - `SESSION_SECRET`, `CRON_SECRET` = 랜덤 문자열
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = `npx web-push generate-vapid-keys`로 생성한 값
+4. Deploy 클릭 → 빌드 중 `prisma migrate deploy`가 자동 실행되어 Neon에 테이블이 생성됨
+5. 마감 리마인드(토요일 저녁 KST)와 결과 확정(월요일 00:05 KST)은 `vercel.json`에 등록된 Vercel Cron이 자동으로 호출함 (별도 설정 불필요)
+6. 완료되면 `https://프로젝트명.vercel.app` 주소를 아이폰 사파리에서 열어 "홈 화면에 추가"
 
 ## 사용법
 

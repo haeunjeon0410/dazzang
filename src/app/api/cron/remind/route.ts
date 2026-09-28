@@ -6,7 +6,9 @@ import { getWeekStart, REQUIRED_COUNT } from "@/lib/week";
 // 외부 스케줄러(Vercel Cron 등)가 매주 토요일 저녁에 호출 -> 이번 주 부족 인원에게 리마인드
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const authHeader = req.headers.get("authorization");
+  const authorized = secret === process.env.CRON_SECRET || authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  if (!authorized) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

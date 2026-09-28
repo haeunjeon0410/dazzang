@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/remind", "schedule": "0 11 * * 6" },
+    { "path": "/api/cron/finalize", "schedule": "5 15 * * 0" }
+  ]
+}
