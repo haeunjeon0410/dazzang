@@ -37,6 +37,14 @@ export function getDayRange(date: Date = new Date()): { start: Date; end: Date }
   return { start, end };
 }
 
+// 오늘부터 이번 주 일요일까지 남은 일수 (오늘 포함). 월=7 ... 일=1
+export function getDaysLeftInWeek(date: Date = new Date()): number {
+  const kst = toKst(date);
+  const day = kst.getUTCDay(); // 0=일 1=월 ... 6=토
+  const isoDay = day === 0 ? 7 : day; // 1=월 ... 7=일
+  return 8 - isoDay;
+}
+
 export function formatWeekLabel(weekStart: Date): string {
   const kst = toKst(weekStart);
   const end = new Date(kst.getTime() + 6 * 24 * 60 * 60 * 1000);

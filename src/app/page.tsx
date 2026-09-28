@@ -57,6 +57,28 @@ const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
 // 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
 const OWNER_CODE = "000000";
 
+// 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
+const WEEK_SEEN_KEY = "dajjang_seen_week_results";
+
+function getSeenWeeks(): Set<string> {
+  try {
+    const raw = localStorage.getItem(WEEK_SEEN_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markWeekSeen(weekStart: string) {
+  try {
+    const seen = getSeenWeeks();
+    seen.add(weekStart);
+    localStorage.setItem(WEEK_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    // localStorage 접근 불가하면 그냥 무시 (팝업이 다시 뜨는 정도)
+  }
+}
+
 export default function Home() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
@@ -77,6 +99,7 @@ export default function Home() {
     { userId: string; name: string; totalCheckins: number; weeksWon: number; totalWeeks: number; totalFine: number }[] | null
   >(null);
   const [pauseWeeks, setPauseWeeks] = useState(2);
+  const [weekResultPopup, setWeekResultPopup] = useState<PastWeek | null>(null);
 
   async function loadMe() {
     const res = await fetch("/api/me");
@@ -104,6 +127,20 @@ export default function Home() {
     if (!res.ok) return;
     const data = await res.json();
     setPastWeeks(data.weeks);
+
+    const lastWeek = data.weeks[0];
+    if (lastWeek && !getSeenWeeks().has(lastWeek.weekStart)) {
+      setWeekResultPopup(lastWeek);
+    }
+  }
+
+  function closeWeekResultPopup(goToSettlement: boolean) {
+    if (weekResultPopup) markWeekSeen(weekResultPopup.weekStart);
+    setWeekResultPopup(null);
+    if (goToSettlement) {
+      setHistoryOpen(true);
+      if (!pastWeeks) loadHistory();
+    }
   }
 
   async function loadStats() {
@@ -118,7 +155,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (me) loadWeek();
+    if (me) {
+      loadWeek();
+      loadHistory();
+    }
   }, [me]);
 
   async function roomAction(action: string, extra?: Record<string, unknown>) {
@@ -722,6 +762,49 @@ export default function Home() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {weekResultPopup && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => closeWeekResultPopup(false)}>
+          <div
+            className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const mine = weekResultPopup.summary.find((s) => s.userId === me?.id);
+              const myFineExists = !!mine && mine.fine > 0;
+              return (
+                <>
+                  <CharacterSprite
+                    row={CharRow.A}
+                    pose={myFineExists ? CharPose.SAD : CharPose.WIN}
+                    height={76}
+                    className="mx-auto"
+                  />
+                  <p className="font-bold text-[#4a2540]">
+                    {new Date(weekResultPopup.weekStart).toLocaleDateString("ko-KR")} 주 결과가 나왔어요
+                  </p>
+                  <div className="space-y-1 text-sm bg-[#fff0f6] rounded-xl p-3">
+                    {weekResultPopup.summary.map((s) => (
+                      <div key={s.userId} className="flex items-center justify-between">
+                        <span className="font-semibold text-[#4a2540]">{s.name}</span>
+                        <span className={s.fine > 0 ? "text-[#ec4899] font-bold" : "text-[#2f9e44] font-bold"}>
+                          {s.count}/3{s.fine > 0 ? ` · 벌금 ${s.fine.toLocaleString()}원` : " · 완료"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => closeWeekResultPopup(myFineExists)}
+                    className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white"
+                  >
+                    {myFineExists ? "정산하러 가기" : "확인"}
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
