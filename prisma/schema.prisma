@@ -34,6 +34,7 @@ model User {
   roomId    String
   room      Room     @relation(fields: [roomId], references: [id])
   name      String
+  pin       String? // 재로그인(닉네임 재선택) 시 본인 확인용 4자리 PIN. 처음 로그인할 때 없으면 그때 입력한 값으로 등록됨
   createdAt DateTime @default(now())
 
   checkins      Checkin[]

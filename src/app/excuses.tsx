@@ -17,11 +17,34 @@ const STATUS_LABEL: Record<Excuse["status"], string> = {
   REJECTED: "거절됨",
 };
 
+// 요청 결과(허락/거절) 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
+const SEEN_KEY = "dajjang_seen_excuse_results";
+
+function getSeenIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function markSeen(id: string) {
+  try {
+    const seen = getSeenIds();
+    seen.add(id);
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    // localStorage 접근 불가하면 그냥 무시 (팝업이 다시 뜨는 정도)
+  }
+}
+
 export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
   const [mine, setMine] = useState<Excuse[]>([]);
   const [incoming, setIncoming] = useState<Excuse[]>([]);
   const [reason, setReason] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [resultPopup, setResultPopup] = useState<Excuse | null>(null);
 
   async function load() {
     const res = await fetch("/api/excuses");
@@ -29,6 +52,15 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
     const data = await res.json();
     setMine(data.mine);
     setIncoming(data.incoming);
+
+    const seen = getSeenIds();
+    const unseenResult = (data.mine as Excuse[]).find((e) => e.status !== "PENDING" && !seen.has(e.id));
+    if (unseenResult) setResultPopup(unseenResult);
+  }
+
+  function closeResultPopup() {
+    if (resultPopup) markSeen(resultPopup.id);
+    setResultPopup(null);
   }
 
   useEffect(() => {
@@ -159,6 +191,29 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {resultPopup && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closeResultPopup}>
+          <div
+            className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CharacterSprite
+              row={CharRow.A}
+              pose={resultPopup.status === "APPROVED" ? CharPose.WIN : CharPose.SAD}
+              height={76}
+              className="mx-auto"
+            />
+            <p className="font-bold text-[#4a2540]">
+              {resultPopup.status === "APPROVED" ? "사정 봐달라기 요청이 허락됐어요!" : "사정 봐달라기 요청이 거절됐어요"}
+            </p>
+            <p className="text-xs text-[#b4779b]">&quot;{resultPopup.reason}&quot;</p>
+            <button onClick={closeResultPopup} className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white">
+              확인
+            </button>
           </div>
         </div>
       )}

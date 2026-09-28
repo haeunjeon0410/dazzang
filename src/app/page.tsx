@@ -54,6 +54,8 @@ const BANK_SCHEMES: Record<string, string> = {
 };
 
 const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
+// 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
+const OWNER_CODE = "000000";
 
 export default function Home() {
   const router = useRouter();
@@ -159,6 +161,10 @@ export default function Home() {
     const code = roomCode.trim().toUpperCase();
     if (!code) {
       setLoginError("방 코드를 입력해주세요");
+      return;
+    }
+    if (code === OWNER_CODE) {
+      router.push("/me");
       return;
     }
     router.push(`/join/${encodeURIComponent(code)}`);
@@ -620,15 +626,18 @@ export default function Home() {
               </button>
             )}
 
-            <button
-              onClick={async () => {
-                await fetch("/api/logout", { method: "POST" });
-                location.href = "/";
-              }}
-              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-3 text-sm font-semibold text-[#c2679c]"
-            >
-              로그아웃 (새 방 만들기로)
-            </button>
+            <div className="pt-3 border-t border-[#ffd6e8] space-y-1">
+              <button
+                onClick={async () => {
+                  await fetch("/api/logout", { method: "POST" });
+                  location.href = "/";
+                }}
+                className="w-full rounded-xl bg-[#ffeef5] py-3 text-sm font-semibold text-[#c2679c]"
+              >
+                로그아웃 (새 방 만들기로)
+              </button>
+              <p className="text-center text-[11px] text-[#d9a9c4]">기록은 그대로 남고, 로그인 화면으로만 돌아가요</p>
+            </div>
           </div>
         </div>
       )}
