@@ -28,17 +28,17 @@ export async function GET() {
     });
 
     const summary = users.map((u) => {
-      const count =
-        checkins.filter((c) => c.userId === u.id).length +
-        approvedExcuses.filter((e) => e.userId === u.id).length;
+      const count = checkins.filter((c) => c.userId === u.id).length;
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {
         userId: u.id,
         name: u.name,
         count,
+        pardoned,
         shortfall,
-        fine: shortfall * FINE_PER_MISS,
+        fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
         settled: settlement?.settled ?? false,
       };
     });

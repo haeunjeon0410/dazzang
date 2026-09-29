@@ -28,17 +28,17 @@ export async function GET(req: NextRequest) {
 
   const summary = users.map((u) => {
     const mine = checkins.filter((c) => c.userId === u.id);
-    const excusedCount = approvedExcuses.filter((e) => e.userId === u.id).length;
-    const count = mine.length + excusedCount;
+    // 사정 봐달라기가 허락되면 인증 1회로 치환되는 게 아니라, 그 주 벌금 자체가 통째로 사면된다
+    const pardoned = approvedExcuses.some((e) => e.userId === u.id);
+    const count = mine.length;
     const shortfall = Math.max(0, REQUIRED_COUNT - count);
     return {
       userId: u.id,
       name: u.name,
       count,
-      realCount: mine.length,
-      excusedCount,
+      pardoned,
       shortfall,
-      fine: shortfall * FINE_PER_MISS,
+      fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
       checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
     };
   });

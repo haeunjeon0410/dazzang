@@ -24,9 +24,10 @@ export async function GET(req: NextRequest) {
     // 정지 중인 방이면 알림 스킵
     if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
 
-    const count =
-      checkins.filter((c) => c.userId === user.id).length +
-      approvedExcuses.filter((e) => e.userId === user.id).length;
+    // 이미 이번 주 벌금이 사면됐으면 더 이상 조를 필요 없음
+    if (approvedExcuses.some((e) => e.userId === user.id)) continue;
+
+    const count = checkins.filter((c) => c.userId === user.id).length;
     const remaining = Math.max(0, REQUIRED_COUNT - count);
     if (remaining === 0) continue;
 

@@ -24,16 +24,18 @@ export async function GET() {
       const key = c.weekStart.toISOString();
       byWeek.set(key, (byWeek.get(key) ?? 0) + 1);
     }
-    for (const e of approvedExcuses.filter((e) => e.userId === u.id)) {
-      const key = e.weekStart.toISOString();
-      byWeek.set(key, (byWeek.get(key) ?? 0) + 1);
-    }
+    // 사정 봐달라기가 허락된 주는 인증 횟수에 더해지는 게 아니라 그 주 벌금이 통째로 사면된다
+    const pardonedWeeks = new Set(
+      approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
+    );
+    const allWeekKeys = new Set([...byWeek.keys(), ...pardonedWeeks]);
 
     let weeksWon = 0;
     let totalFine = 0;
-    for (const count of byWeek.values()) {
+    for (const key of allWeekKeys) {
+      const count = byWeek.get(key) ?? 0;
       if (count >= REQUIRED_COUNT) weeksWon++;
-      else totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
+      else if (!pardonedWeeks.has(key)) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
     }
 
     return {
@@ -41,7 +43,7 @@ export async function GET() {
       name: u.name,
       totalCheckins: myCheckins.length,
       weeksWon,
-      totalWeeks: byWeek.size,
+      totalWeeks: allWeekKeys.size,
       totalFine,
     };
   });

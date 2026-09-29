@@ -24,15 +24,17 @@ export async function GET(req: NextRequest) {
     if (room.pausedUntil && room.pausedUntil > lastWeekStart) continue;
 
     const results = room.users.map((u) => {
-      const checkinCount = checkins.filter((c) => c.userId === u.id).length;
-      const excusedCount = approvedExcuses.filter((e) => e.userId === u.id).length;
-      const count = checkinCount + excusedCount;
+      const count = checkins.filter((c) => c.userId === u.id).length;
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
-      return { user: u, count, shortfall, fine: shortfall * FINE_PER_MISS };
+      return { user: u, count, pardoned, shortfall, fine: pardoned ? 0 : shortfall * FINE_PER_MISS };
     });
 
     const body = results
-      .map((r) => `${r.user.name}: ${r.count}/${REQUIRED_COUNT}회, 벌금 ${r.fine.toLocaleString()}원`)
+      .map((r) => {
+        const pardonNote = r.pardoned && r.count < REQUIRED_COUNT ? " (사정 봐달라기로 벌금 사면)" : "";
+        return `${r.user.name}: ${r.count}/${REQUIRED_COUNT}회${pardonNote}, 벌금 ${r.fine.toLocaleString()}원`;
+      })
       .join(" / ");
 
     for (const r of results) {
