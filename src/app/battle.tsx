@@ -1,6 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { CharacterSprite, CharRow, CharPose, CaptionBubble, countCaption } from "./sprite";
+
+const POKED_KEY = "dajjang_poked_on";
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function todayKstDateStr(): string {
+  return new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
+}
 
 export function Battle({
   myCount,
@@ -17,6 +25,27 @@ export function Battle({
   myFine: number;
   otherFine: number;
 }) {
+  const [poked, setPoked] = useState(() => {
+    try {
+      return localStorage.getItem(POKED_KEY) === todayKstDateStr();
+    } catch {
+      return false;
+    }
+  });
+
+  async function poke() {
+    if (poked) return;
+    if (!confirm("상대방을 격려할까요?")) return;
+    const res = await fetch("/api/poke", { method: "POST" });
+    if (!res.ok) return;
+    setPoked(true);
+    try {
+      localStorage.setItem(POKED_KEY, todayKstDateStr());
+    } catch {
+      // ignore
+    }
+  }
+
   const diff = myCount - otherCount;
   // 차이 1당 12%씩 커지고 작아짐, 0.7~1.5 범위로 제한
   const myScale = Math.min(1.5, Math.max(0.7, 1 + diff * 0.12));
@@ -39,13 +68,19 @@ export function Battle({
 
           <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
             <CaptionBubble row={CharRow.B} text={countCaption(otherCount)} height={62} />
-            <div style={{ transform: `scale(${otherScale})` }} className="transition-transform duration-500 ease-out">
+            <button
+              onClick={poke}
+              disabled={poked}
+              className={`transition-transform duration-500 ease-out ${poked ? "opacity-60" : ""}`}
+              style={{ transform: `scale(${otherScale})` }}
+              aria-label={`${otherName} 격려하기`}
+            >
               <CharacterSprite
                 row={CharRow.B}
                 pose={otherCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL}
                 height={BASE_HEIGHT}
               />
-            </div>
+            </button>
           </div>
         </div>
         <p className="text-center text-xs text-[#d9a9c4] mt-2 font-medium">
