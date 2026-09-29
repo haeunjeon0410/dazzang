@@ -32,17 +32,23 @@ export function Battle({
       return false;
     }
   });
+  const [pokeConfirmOpen, setPokeConfirmOpen] = useState(false);
+  const [poking, setPoking] = useState(false);
 
-  async function poke() {
-    if (poked) return;
-    if (!confirm("상대방을 격려할까요?")) return;
-    const res = await fetch("/api/poke", { method: "POST" });
-    if (!res.ok) return;
-    setPoked(true);
+  async function sendPoke() {
+    setPoking(true);
     try {
-      localStorage.setItem(POKED_KEY, todayKstDateStr());
-    } catch {
-      // ignore
+      const res = await fetch("/api/poke", { method: "POST" });
+      if (!res.ok) return;
+      setPoked(true);
+      setPokeConfirmOpen(false);
+      try {
+        localStorage.setItem(POKED_KEY, todayKstDateStr());
+      } catch {
+        // ignore
+      }
+    } finally {
+      setPoking(false);
     }
   }
 
@@ -69,7 +75,7 @@ export function Battle({
           <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
             <CaptionBubble row={CharRow.B} text={countCaption(otherCount)} height={62} />
             <button
-              onClick={poke}
+              onClick={() => setPokeConfirmOpen(true)}
               disabled={poked}
               className={`transition-transform duration-500 ease-out ${poked ? "opacity-60" : ""}`}
               style={{ transform: `scale(${otherScale})` }}
@@ -100,6 +106,37 @@ export function Battle({
           </div>
         ))}
       </div>
+
+      {pokeConfirmOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setPokeConfirmOpen(false)}
+        >
+          <div
+            className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
+            <p className="font-bold text-[#4a2540]">{otherName}님을 격려할까요?</p>
+            <p className="text-xs text-[#b4779b]">어떤 메시지가 갈지는 비밀이에요</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPokeConfirmOpen(false)}
+                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#c2679c]"
+              >
+                취소
+              </button>
+              <button
+                disabled={poking}
+                onClick={sendPoke}
+                className="flex-1 rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {poking ? "보내는 중..." : "보내기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
