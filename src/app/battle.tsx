@@ -116,24 +116,17 @@ export function Battle({
             className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
             <p className="font-bold text-[#4a2540]">{otherName}님을 격려할까요?</p>
-            <p className="text-xs text-[#b4779b]">어떤 메시지가 갈지는 비밀이에요</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPokeConfirmOpen(false)}
-                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#c2679c]"
-              >
-                취소
-              </button>
-              <button
-                disabled={poking}
-                onClick={sendPoke}
-                className="flex-1 rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {poking ? "보내는 중..." : "보내기"}
-              </button>
-            </div>
+            <button disabled={poking} onClick={sendPoke} className="block mx-auto disabled:opacity-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/nav/encourage-button.webp" alt="격려하기" className="h-16 w-auto" />
+            </button>
+            <button
+              onClick={() => setPokeConfirmOpen(false)}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#c2679c]"
+            >
+              취소
+            </button>
           </div>
         </div>
       )}
