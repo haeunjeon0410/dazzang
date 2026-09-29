@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       excusedCount,
       shortfall,
       fine: shortfall * FINE_PER_MISS,
-      checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt })),
+      checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
     };
   });
 

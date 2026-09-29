@@ -48,6 +48,7 @@ model Checkin {
   user      User     @relation(fields: [userId], references: [id])
   photoUrl  String
   weekStart DateTime // 해당 인증이 속한 주의 월요일 00:00 (KST)
+  liked     Boolean  @default(false) // 상대방이 칭찬(좋아요) 눌렀는지
   createdAt DateTime @default(now())
 }
 

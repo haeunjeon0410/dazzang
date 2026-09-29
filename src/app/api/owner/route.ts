@@ -12,11 +12,18 @@ export async function POST(req: NextRequest) {
   }
 
   const rooms = await prisma.room.findMany({
-    include: { users: { select: { id: true, name: true } } },
+    include: { users: { select: { id: true, name: true, createdAt: true }, orderBy: { createdAt: "asc" } } },
     orderBy: { createdAt: "asc" },
   });
 
+  // 각 방에서 가장 먼저 들어온 사람(=방 만든 사람인 나)만 로그인 가능하게 하고,
+  // 나머지는 이름만 보여준다 (실수로 친구 계정으로 로그인하는 걸 방지)
   return NextResponse.json({
-    rooms: rooms.map((r) => ({ id: r.id, inviteToken: r.inviteToken, users: r.users })),
+    rooms: rooms.map((r) => ({
+      id: r.id,
+      inviteToken: r.inviteToken,
+      me: r.users[0] ? { id: r.users[0].id, name: r.users[0].name } : null,
+      others: r.users.slice(1).map((u) => u.name),
+    })),
   });
 }

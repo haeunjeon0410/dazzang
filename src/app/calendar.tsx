@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type CheckinItem = { id: string; photoUrl: string; createdAt: string };
+type CheckinItem = { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean };
 type PersonSummary = { userId: string; name: string; checkins: CheckinItem[] };
 
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -14,8 +14,26 @@ function kstDayIndex(dateStr: string): number {
   return day === 0 ? 6 : day - 1; // 0=월 ... 6=일
 }
 
-export function WeekCalendar({ weekStart, people }: { weekStart: string; people: PersonSummary[] }) {
+export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; people: PersonSummary[]; meId: string }) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [likeOverrides, setLikeOverrides] = useState<Record<string, boolean>>({});
+
+  function isLiked(c: CheckinItem) {
+    return likeOverrides[c.id] ?? c.liked;
+  }
+
+  async function toggleLike(checkin: CheckinItem) {
+    setLikeBusy(true);
+    try {
+      const res = await fetch(`/api/checkins/${checkin.id}/like`, { method: "POST" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setLikeOverrides((prev) => ({ ...prev, [checkin.id]: data.liked }));
+    } finally {
+      setLikeBusy(false);
+    }
+  }
 
   const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
   const dayDates = Array.from({ length: 7 }, (_, i) => {
@@ -48,13 +66,20 @@ export function WeekCalendar({ weekStart, people }: { weekStart: string; people:
               <button
                 key={i}
                 onClick={() => c && setSelected(c)}
-                className={`aspect-square rounded-md flex items-center justify-center text-[10px] overflow-hidden ${
+                className={`relative aspect-square rounded-md flex items-center justify-center text-[10px] overflow-hidden ${
                   c ? "bg-[#ff8fc0]" : "bg-[#ffe1ee] text-[#c2679c]"
                 }`}
               >
                 {c ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.photoUrl} alt="" className="w-full h-full object-cover" />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={c.photoUrl} alt="" className="w-full h-full object-cover" />
+                    {isLiked(c) && (
+                      <span className="absolute top-0 right-0 text-[10px] leading-none bg-white/90 rounded-bl px-0.5 text-[#ec4899]">
+                        ♥
+                      </span>
+                    )}
+                  </>
                 ) : (
                   "-"
                 )}
@@ -69,12 +94,23 @@ export function WeekCalendar({ weekStart, people }: { weekStart: string; people:
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6"
           onClick={() => setSelected(null)}
         >
-          <div className="max-w-sm w-full">
+          <div className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selected.photoUrl} alt="인증샷" className="w-full rounded-xl" />
             <p className="text-center text-white text-sm mt-2">
               {new Date(selected.createdAt).toLocaleString("ko-KR")}
             </p>
+            {selected.userId !== meId && (
+              <button
+                disabled={likeBusy}
+                onClick={() => toggleLike(selected)}
+                className={`mt-3 w-full rounded-xl py-2.5 text-sm font-bold ${
+                  isLiked(selected) ? "bg-white text-[#ec4899]" : "bg-[#ec4899] text-white"
+                } disabled:opacity-50`}
+              >
+                {isLiked(selected) ? "♥ 좋아요 취소" : "♡ 좋아요 누르기"}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -29,7 +29,7 @@ type Summary = {
   count: number;
   shortfall: number;
   fine: number;
-  checkins: { id: string; photoUrl: string; createdAt: string }[];
+  checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
 type Me = { id: string; name: string };
@@ -39,7 +39,6 @@ type Room = {
   groupBankName: string | null;
   groupAccountNumber: string | null;
   groupAccountHolder: string | null;
-  deleteRequestedBy: string | null;
   pauseRequestedBy: string | null;
   pauseRequestedUntil: string | null;
   pausedUntil: string | null;
@@ -91,7 +90,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
-  const [groupForm, setGroupForm] = useState({ groupBankName: "", groupAccountNumber: "", groupAccountHolder: "" });
+  const [groupForm, setGroupForm] = useState({ groupBankName: "", groupAccountNumber: "" });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [pastWeeks, setPastWeeks] = useState<PastWeek[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -111,7 +110,6 @@ export default function Home() {
       setGroupForm({
         groupBankName: data.room.groupBankName ?? "",
         groupAccountNumber: data.room.groupAccountNumber ?? "",
-        groupAccountHolder: data.room.groupAccountHolder ?? "",
       });
     }
   }
@@ -169,7 +167,6 @@ export default function Home() {
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error || "요청 실패"); return false; }
-    if (data.deleted) { await fetch("/api/logout", { method: "POST" }); location.href = "/"; return true; }
     await loadMe();
     return true;
   }
@@ -419,36 +416,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 상대방이 삭제 요청한 경우 */}
-        {room?.deleteRequestedBy && room.deleteRequestedBy !== me?.id && (
-          <div className="rounded-2xl bg-[#ffe1ee] border border-[#ffc72c] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#b4356f]">방 삭제 요청이 왔어요</p>
-            <p className="text-xs text-[#b4779b]">상대방이 방 삭제를 요청했어요. 수락하면 모든 기록이 삭제돼요.</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { if (confirm("정말 방을 삭제할까요? 모든 기록이 사라져요.")) roomAction("confirm-delete"); }}
-                className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold"
-              >허락하기</button>
-              <button
-                onClick={() => roomAction("cancel-delete")}
-                className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b]"
-              >거절하기</button>
-            </div>
-          </div>
-        )}
-
-        {/* 내가 삭제 요청한 경우 */}
-        {room?.deleteRequestedBy && room.deleteRequestedBy === me?.id && (
-          <div className={`${CARD} space-y-2`}>
-            <p className="text-sm font-bold text-[#4a2540]">방 삭제를 요청했어요</p>
-            <p className="text-xs text-[#b4779b]">상대방이 수락하면 방이 삭제돼요.</p>
-            <button
-              onClick={() => roomAction("cancel-delete")}
-              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
-            >요청 취소</button>
-          </div>
-        )}
-
         {/* 상대방이 정지 요청한 경우 */}
         {room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil && (
           <div className="rounded-2xl bg-[#ffe1ee] border border-[#ffc72c] p-4 space-y-2">
@@ -504,7 +471,7 @@ export default function Home() {
                   지금 마감되면 모임 통장에 {myEntry.fine.toLocaleString()}원 보내야 해요
                 </p>
                 <button onClick={() => setGroupAccountOpen(true)} className="text-xs text-[#b4779b] underline">
-                  {room.groupBankName} {room.groupAccountNumber} ({room.groupAccountHolder})
+                  {room.groupBankName} {room.groupAccountNumber}
                 </button>
                 <div className="flex gap-2">
                   <button onClick={copyAccount} className="flex-1 rounded-xl bg-[#ffe1ee] py-2 text-sm font-semibold text-[#b4356f]">
@@ -530,6 +497,7 @@ export default function Home() {
 
             <WeekCalendar
               weekStart={weekData.weekStart}
+              meId={me.id}
               people={[
                 { userId: myEntry.userId, name: "나", checkins: myEntry.checkins },
                 { userId: otherEntry.userId, name: otherEntry.name, checkins: otherEntry.checkins },
@@ -660,21 +628,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* 방 삭제 요청 */}
-            {!room?.deleteRequestedBy && (
-              <button
-                onClick={() => {
-                  if (confirm("방 삭제를 요청할까요?\n상대방이 수락하면 모든 기록이 삭제돼요.")) {
-                    setSettingsOpen(false);
-                    roomAction("request-delete");
-                  }
-                }}
-                className="w-full rounded-xl bg-white border border-[#ffd6e8] py-3 text-sm font-semibold text-[#ec4899]"
-              >
-                방 삭제 요청
-              </button>
-            )}
-
             <div className="pt-3 border-t border-[#ffd6e8] space-y-1">
               <button
                 onClick={async () => {
@@ -718,12 +671,6 @@ export default function Home() {
                 placeholder="계좌번호"
                 value={groupForm.groupAccountNumber}
                 onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountNumber: e.target.value }))}
-                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
-              />
-              <input
-                placeholder="예금주"
-                value={groupForm.groupAccountHolder}
-                onChange={(e) => setGroupForm((a) => ({ ...a, groupAccountHolder: e.target.value }))}
                 className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
               />
               <button
