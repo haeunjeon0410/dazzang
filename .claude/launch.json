@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "dazzang-dev", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "C:/Users/gram14/Desktop/haeun/camp/diet-check-app", "run", "dev", "--", "-p", "3010"], "port": 3010 }
+  ]
+}

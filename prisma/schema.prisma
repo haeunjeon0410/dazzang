@@ -35,6 +35,8 @@ model User {
   room      Room     @relation(fields: [roomId], references: [id])
   name      String
   createdAt DateTime @default(now())
+  // 대결 카드 말풍선 멘트 (인덱스 0~3 = 인증 0회/1회/2회/3회 이상). 빈 칸이면 기본 멘트 사용
+  captions  String[] @default([])
 
   checkins      Checkin[]
   settlements   Settlement[]
