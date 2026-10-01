@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
+import { REQUIRED_COUNT, FINE_PER_MISS, isWeekFinalized } from "@/lib/week";
 
 // 통산전적: 전체 기간 누적 인증 횟수 / 승리한 주 수 / 누적 벌금
 export async function GET() {
@@ -28,7 +28,10 @@ export async function GET() {
     const pardonedWeeks = new Set(
       approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
     );
-    const allWeekKeys = new Set([...byWeek.keys(), ...pardonedWeeks]);
+    // 승리/벌금은 마감된 주만 센다 (진행 중인 이번 주는 아직 결과가 아님)
+    const allWeekKeys = new Set(
+      [...byWeek.keys(), ...pardonedWeeks].filter((key) => isWeekFinalized(new Date(key))),
+    );
 
     let weeksWon = 0;
     let totalFine = 0;

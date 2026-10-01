@@ -118,7 +118,7 @@ export function Battle({
             <button
               onClick={() => setPokeConfirmOpen(true)}
               disabled={poked}
-              className={`transition-transform duration-500 ease-out ${poked ? "opacity-60" : ""}`}
+              className="transition-transform duration-500 ease-out"
               style={{ transform: `scale(${otherScale})` }}
               aria-label={`${otherName} 격려하기`}
             >
