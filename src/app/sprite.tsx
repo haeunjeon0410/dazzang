@@ -65,10 +65,10 @@ export function CharacterSprite({
 // 체크인 횟수에 따라 달라지는 귀여운 멘트 말풍선
 const BUBBLE_SRC = { [CharRow.A]: "/assets/bubbles/bubble-a.webp", [CharRow.B]: "/assets/bubbles/bubble-b.webp" } as const;
 const BUBBLE_RATIO = { [CharRow.A]: 353 / 103, [CharRow.B]: 382 / 103 } as const;
-const CAPTION_MIN_FONT = 9;
-// 멘트가 길면 이 크기까지만 글씨를 줄인다 (더 작으면 안 읽힘)
-// 한 줄로 넣었을 때 이것보다 작아지면 두 줄로 나눈다
-const CAPTION_ONE_LINE_MIN_FONT = CAPTION_MIN_FONT;
+// 멘트가 길면 글씨를 줄이되, 한 줄로 이것보다 작아지면 두 줄로 나눠서 크게 보여준다
+const CAPTION_TWO_LINE_BELOW = 13;
+// 두 줄로도 이것보다는 작게 줄이지 않는다 (더 작으면 안 읽힘)
+const CAPTION_MIN_FONT = 10;
 let measureCanvas: HTMLCanvasElement | undefined;
 
 export function CaptionBubble({
@@ -87,51 +87,37 @@ export function CaptionBubble({
 
   // 멘트가 말풍선보다 길면 알아서 맞춘다 (화면 폭이 바뀌어도 다시 맞춤)
   // 1) 한 줄로 넣어도 글씨가 충분히 크면 한 줄 + 살짝 축소
-  // 2) 그래도 길면 두 줄로 나눠서, 말풍선 높이 안에 들어가는 가장 큰 글씨로
+  // 2) 그래도 길면 띄어쓰기 기준으로 두 줄로 나눠서, 말풍선 안에 들어가는 가장 큰 글씨로
   useLayoutEffect(() => {
     const box = boxRef.current;
     const el = textRef.current;
     if (!box || !el) return;
-    const base = Math.max(13, height * 0.26);
     const fit = () => {
-      el.style.whiteSpace = "nowrap";
-      el.style.wordBreak = "";
-      el.style.overflowWrap = "";
-      el.style.lineHeight = "1";
-      el.style.display = "block";
-      el.style.removeProperty("-webkit-line-clamp");
-      el.style.removeProperty("-webkit-box-orient");
-      el.style.fontSize = `${base}px`;
+      const base = Math.min(height * 0.28, box.clientHeight * 0.5);
+      Object.assign(el.style, { whiteSpace: "nowrap", wordBreak: "", overflowWrap: "", lineHeight: "", paddingInline: "", fontSize: `${base}px` });
+
       // 말줄임 처리된 화면 폭이 아니라 canvas로 글자 자체의 폭을 잰다 (경계에서 잘리지 않게 5% 여유)
       const cs = getComputedStyle(el);
       const ctx = (measureCanvas ??= document.createElement("canvas")).getContext("2d");
       if (!ctx) return;
       ctx.font = `${cs.fontWeight} ${base}px ${cs.fontFamily}`;
       const natural = ctx.measureText(text).width;
-      const avail = Math.max(0, box.clientWidth - 12);
+      const avail = box.clientWidth * 0.95;
       if (natural <= avail) return;
 
       const oneLine = Math.floor(((base * avail) / natural) * 2) / 2;
-      if (oneLine >= CAPTION_MIN_FONT) {
+      if (oneLine >= CAPTION_TWO_LINE_BELOW) {
         el.style.fontSize = `${oneLine}px`;
         return;
       }
 
-      el.style.whiteSpace = "normal";
-      el.style.wordBreak = "keep-all";
-      el.style.overflowWrap = "anywhere";
-      el.style.display = "-webkit-box";
-      el.style.setProperty("-webkit-line-clamp", "2");
-      el.style.setProperty("-webkit-box-orient", "vertical");
-      el.style.lineHeight = "0.9";
-      const maxH = box.clientHeight * 0.62;
-      for (let size = Math.min(base, oneLine * 2); size >= CAPTION_MIN_FONT; size -= 0.5) {
+      // 두 줄: 말풍선 테두리/꼬리 빼고 안쪽 높이(약 64%)에 들어갈 때까지 줄인다
+      Object.assign(el.style, { whiteSpace: "normal", wordBreak: "keep-all", overflowWrap: "anywhere", lineHeight: "1", paddingInline: "3%" });
+      const maxH = box.clientHeight * 0.64;
+      for (let size = base; size >= CAPTION_MIN_FONT; size -= 0.5) {
         el.style.fontSize = `${size}px`;
         if (el.scrollHeight <= maxH && el.scrollWidth <= el.clientWidth) return;
       }
-
-      // 두 줄: 말풍선 테두리/꼬리 빼고 안쪽 높이(약 68%)에 들어갈 때까지 줄인다
-      el.style.whiteSpace = "normal";
     };
     fit();
     document.fonts?.ready.then(fit);
@@ -151,7 +137,7 @@ export function CaptionBubble({
       <img src={BUBBLE_SRC[row]} alt="" className="w-full h-full object-contain" />
       <div
         ref={boxRef}
-        className="absolute inset-y-0 left-[36%] right-[16%] flex items-center overflow-hidden px-1.5 py-1.5"
+        className="absolute inset-y-0 left-[36%] right-[16%] flex items-center overflow-hidden"
       >
         <p
           ref={textRef}

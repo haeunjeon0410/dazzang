@@ -13,7 +13,7 @@ export async function GET() {
   const other = await prisma.user.findFirst({ where: { roomId: user.roomId, id: { not: userId } } });
 
   return NextResponse.json({
-    user: { id: user.id, name: user.name, captions: user.captions },
+    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "" },
     room: {
       inviteToken: user.room.inviteToken,
       full: !!other,
@@ -25,7 +25,7 @@ export async function GET() {
       pauseRequestedUntil: user.room.pauseRequestedUntil,
       pausedUntil: user.room.pausedUntil,
     },
-    other: other ? { id: other.id, name: other.name, captions: other.captions } : null,
+    other: other ? { id: other.id, name: other.name, caption: other.captions[0] ?? "" } : null,
   });
 }
 
@@ -33,8 +33,9 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, captions, caption } = await req.json();
+  const { name, caption } = await req.json();
 
+  // 말풍선 멘트 수정 (User.captions[0]에 하나만 저장, 비우면 인증 횟수별 기본 멘트)
   if (caption !== undefined) {
     if (typeof caption !== "string") {
       return NextResponse.json({ error: "멘트 형식이 올바르지 않아요" }, { status: 400 });
@@ -43,20 +44,7 @@ export async function PATCH(req: Request) {
     if (trimmed.length > CAPTION_MAX_LEN) {
       return NextResponse.json({ error: `멘트는 ${CAPTION_MAX_LEN}자까지 쓸 수 있어요` }, { status: 400 });
     }
-    await prisma.user.update({ where: { id: userId }, data: { captions: [trimmed, trimmed, trimmed, trimmed] } });
-    return NextResponse.json({ ok: true });
-  }
-
-  // 말풍선 멘트 수정 (0회/1회/2회/3회 4칸)
-  if (captions !== undefined) {
-    if (!Array.isArray(captions) || captions.length !== 4 || captions.some((c) => typeof c !== "string")) {
-      return NextResponse.json({ error: "멘트 형식이 올바르지 않아요" }, { status: 400 });
-    }
-    const trimmed = (captions as string[]).map((c) => c.trim());
-    if (trimmed.some((c) => c.length > CAPTION_MAX_LEN)) {
-      return NextResponse.json({ error: `멘트는 ${CAPTION_MAX_LEN}자까지 쓸 수 있어요` }, { status: 400 });
-    }
-    await prisma.user.update({ where: { id: userId }, data: { captions: trimmed } });
+    await prisma.user.update({ where: { id: userId }, data: { captions: trimmed ? [trimmed] : [] } });
     return NextResponse.json({ ok: true });
   }
 

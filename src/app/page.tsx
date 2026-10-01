@@ -32,7 +32,7 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; captions?: string[] };
+type Me = { id: string; name: string; caption?: string };
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -81,7 +81,7 @@ function markWeekSeen(weekStart: string) {
 export default function Home() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const [otherCaptions, setOtherCaptions] = useState<string[] | undefined>(undefined);
+  const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
   const [room, setRoom] = useState<Room | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -106,7 +106,7 @@ export default function Home() {
     const data = await res.json();
     setMe(data.user);
     setRoom(data.room ?? null);
-    setOtherCaptions(data.other?.captions);
+    setOtherCaption(data.other?.caption);
     if (data.user) setNameForm(data.user.name ?? "");
     if (data.room) {
       setGroupForm({
@@ -465,9 +465,9 @@ export default function Home() {
               otherName={otherEntry.name}
               myFine={myEntry.fine}
               otherFine={otherEntry.fine}
-              myCaptions={me.captions}
-              otherCaptions={otherCaptions}
-              onCaptionsSaved={loadMe}
+              myCaption={me.caption}
+              otherCaption={otherCaption}
+              onCaptionSaved={loadMe}
             />
 
             {myEntry.fine > 0 && hasGroupAccount && (
