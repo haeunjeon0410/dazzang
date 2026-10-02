@@ -170,7 +170,7 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={selected.photoUrl} alt="인증샷" className="w-full rounded-xl" />
             <p className="text-center text-white text-sm mt-2">
-              {new Date(selected.createdAt).toLocaleString("ko-KR")}
+              {new Date(selected.createdAt).toLocaleString("ko-KR")} 촬영
             </p>
             {selected.userId !== meId && (
               <button

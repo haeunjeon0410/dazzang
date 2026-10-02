@@ -23,6 +23,22 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.75): Promise
   return canvas.toDataURL("image/jpeg", quality);
 }
 
+// 사진 조작 방지: 사진에 찍힌 촬영 시각(EXIF)을 읽는다. 압축(canvas)하면 EXIF가 지워지므로 원본 파일에서 읽어야 한다.
+// EXIF 시각은 시간대 없는 "현지 시각"이라 한국 시간(KST)으로 해석한다. 날짜 정보가 없으면 null (= 오늘로 인정)
+async function readTakenAt(file: File): Promise<string | null> {
+  try {
+    const { default: exifr } = await import("exifr");
+    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"], reviveValues: false });
+    const raw: unknown = exif?.DateTimeOriginal ?? exif?.CreateDate;
+    const m = typeof raw === "string" && raw.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    const [, y, mo, d, h, mi, sec] = m.map(Number);
+    return new Date(Date.UTC(y, mo - 1, d, h - 9, mi, sec)).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 type Summary = {
   userId: string;
   name: string;
@@ -214,11 +230,11 @@ export default function Home() {
     if (!file) return;
     setUploading(true);
     try {
-      const dataUrl = await compressImage(file);
+      const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
       const res = await fetch("/api/checkins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photoDataUrl: dataUrl }),
+        body: JSON.stringify({ photoDataUrl: dataUrl, takenAt }),
       });
       if (!res.ok) {
         const data = await res.json();
