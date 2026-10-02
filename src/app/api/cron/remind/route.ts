@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToSubscriptions } from "@/lib/push";
 import { getWeekStart, getDaysLeftInWeek, REQUIRED_COUNT } from "@/lib/week";
 
-// 외부 스케줄러(Vercel Cron 등)가 매일 저녁 호출 -> "이제부터 남은 날 매일 해야만 벌금을 피할 수 있는"
+// 외부 스케줄러(Vercel Cron 등)가 매일 저녁 7시(KST) 호출 -> "이제부터 남은 날 매일 해야만 벌금을 피할 수 있는"
 // 사람에게만 알림을 보낸다. 예: 이번 주 0회면 금요일부터(남은 날 3일=부족 3회) 매일 알림이 감.
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
