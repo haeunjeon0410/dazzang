@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
+import { EXCUSE_REPLY_MAX_LEN } from "@/lib/excuse";
 
 type Excuse = {
   id: string;
   reason: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
+  reply: string | null;
   createdAt: string;
   user: { name: string };
 };
@@ -45,6 +47,8 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
   const [reason, setReason] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [resultPopup, setResultPopup] = useState<Excuse | null>(null);
+  // 받은 요청별 답장 입력값 (선택)
+  const [replies, setReplies] = useState<Record<string, string>>({});
 
   async function load() {
     const res = await fetch("/api/excuses");
@@ -88,9 +92,10 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
     const res = await fetch(`/api/excuses/${id}/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approve }),
+      body: JSON.stringify({ approve, reply: replies[id] ?? "" }),
     });
     if (res.ok) {
+      setReplies((prev) => ({ ...prev, [id]: "" }));
       await load();
       onResolved?.();
     } else {
@@ -116,6 +121,13 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
               <p className="text-[#4a2540]">
                 <span className="font-bold">{e.user.name}</span>: {e.reason}
               </p>
+              <input
+                value={replies[e.id] ?? ""}
+                onChange={(ev) => setReplies((prev) => ({ ...prev, [e.id]: ev.target.value }))}
+                maxLength={EXCUSE_REPLY_MAX_LEN}
+                placeholder="답장 (선택)"
+                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-1.5 text-base text-[#4a2540] placeholder:text-[#d9a9c4] focus:outline-none focus:border-[#c2679c]"
+              />
               <div className="flex gap-2">
                 <button
                   onClick={() => respond(e.id, true)}
@@ -187,6 +199,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
                 {mine.map((e) => (
                   <p key={e.id}>
                     내 요청 &quot;{e.reason}&quot; - {STATUS_LABEL[e.status]}
+                    {e.reply && <> · 답장 &quot;{e.reply}&quot;</>}
                   </p>
                 ))}
               </div>
@@ -211,6 +224,11 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
               {resultPopup.status === "APPROVED" ? "사정 봐달라기 요청이 허락됐어요!" : "사정 봐달라기 요청이 거절됐어요"}
             </p>
             <p className="text-xs text-[#b4779b]">&quot;{resultPopup.reason}&quot;</p>
+            {resultPopup.reply && (
+              <p className="rounded-xl bg-[#ffeef5] px-3 py-2 text-sm text-[#4a2540]">
+                <span className="font-bold text-[#c2679c]">친구 답장</span> {resultPopup.reply}
+              </p>
+            )}
             <button onClick={closeResultPopup} className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white">
               확인
             </button>

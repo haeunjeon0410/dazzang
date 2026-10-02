@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { sendPushToSubscriptions } from "@/lib/push";
+import { EXCUSE_REPLY_MAX_LEN } from "@/lib/excuse";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const { id } = await params;
-  const { approve } = await req.json();
+  const { approve, reply } = await req.json();
+  // 답장은 선택. 비어 있으면 null로 저장
+  if (reply !== undefined && reply !== null && typeof reply !== "string") {
+    return NextResponse.json({ error: "답장 형식이 올바르지 않아요" }, { status: 400 });
+  }
+  const replyText = typeof reply === "string" ? reply.trim() : "";
+  if (replyText.length > EXCUSE_REPLY_MAX_LEN) {
+    return NextResponse.json({ error: `답장은 ${EXCUSE_REPLY_MAX_LEN}자까지 쓸 수 있어요` }, { status: 400 });
+  }
 
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -27,14 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const updated = await prisma.excuse.update({
     where: { id },
-    data: { status: approve ? "APPROVED" : "REJECTED", resolvedAt: new Date() },
+    data: { status: approve ? "APPROVED" : "REJECTED", resolvedAt: new Date(), reply: replyText || null },
   });
 
   const requester = await prisma.user.findUnique({ where: { id: excuse.userId }, include: { subscriptions: true } });
   if (requester) {
     await sendPushToSubscriptions(requester.subscriptions, {
       title: approve ? "사정 봐달라기 요청이 허락됐어요" : "사정 봐달라기 요청이 거절됐어요",
-      body: excuse.reason,
+      body: replyText ? `${me.name}: "${replyText}"` : excuse.reason,
     });
   }
 

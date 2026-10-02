@@ -74,6 +74,7 @@ model Excuse {
   weekStart  DateTime
   reason     String
   status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reply      String?   // 허락/거절하면서 상대방이 남긴 답장 (선택)
   createdAt  DateTime  @default(now())
   resolvedAt DateTime?
 }
