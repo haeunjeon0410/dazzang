@@ -471,7 +471,7 @@ export default function Home() {
         {weekData && myEntry && otherEntry && (
           <section className="space-y-3">
             <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full">
-              이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 일요일 밤 12시 마감
+              이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감
             </p>
 
             <Battle

@@ -6,9 +6,11 @@ import { countCaption, CAPTION_MAX_LEN } from "@/lib/captions";
 
 const POKED_KEY = "dajjang_poked_on";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// 하루는 오전 6시에 바뀐다 (lib/week.ts와 동일)
+const DAY_RESET_MS = 6 * 60 * 60 * 1000;
 
 function todayKstDateStr(): string {
-  return new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
+  return new Date(Date.now() + KST_OFFSET_MS - DAY_RESET_MS).toISOString().slice(0, 10);
 }
 
 export function Battle({

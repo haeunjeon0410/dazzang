@@ -7,10 +7,12 @@ type PersonSummary = { userId: string; name: string; checkins: CheckinItem[] };
 
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// 하루는 오전 6시에 바뀐다 (lib/week.ts와 동일). 새벽 2시 인증은 전날 칸
+const DAY_RESET_MS = 6 * 60 * 60 * 1000;
 const SEEN_LIKES_KEY = "dajjang_seen_likes";
 
 function kstDayIndex(dateStr: string): number {
-  const kst = new Date(new Date(dateStr).getTime() + KST_OFFSET_MS);
+  const kst = new Date(new Date(dateStr).getTime() + KST_OFFSET_MS - DAY_RESET_MS);
   const day = kst.getUTCDay(); // 0=일 ... 6=토
   return day === 0 ? 6 : day - 1; // 0=월 ... 6=일
 }

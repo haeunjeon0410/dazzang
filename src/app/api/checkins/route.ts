@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // 항상 서버 현재 시각 기준 "이번 주"에 찍은 사진만 받는다 (지난주 사진으로 소급 불가)
   const weekStart = getWeekStart(now);
-  if (shotAt.getTime() < weekStart.getTime()) {
+  if (getWeekStart(shotAt).getTime() < weekStart.getTime()) {
     const kst = new Date(shotAt.getTime() + 9 * 60 * 60 * 1000);
     return NextResponse.json(
       { error: `이번 주에 찍은 사진만 인증할 수 있어요 (이 사진은 ${kst.getUTCMonth() + 1}/${kst.getUTCDate()}에 찍은 사진이에요)` },
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 하루 1장만 인정: 찍은 날에 이미 올린 게 있으면 지우고 새로 올린 걸로 교체
+  // 하루 1장만 인정(오전 6시 기준): 찍은 날에 이미 올린 게 있으면 지우고 새로 올린 걸로 교체
   const { start, end } = getDayRange(shotAt);
   await prisma.checkin.deleteMany({
     where: { userId, createdAt: { gte: start, lte: end } },
