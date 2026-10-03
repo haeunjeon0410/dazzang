@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const requester = await prisma.user.findUnique({ where: { id: excuse.userId }, include: { subscriptions: true } });
   if (requester) {
     await sendPushToSubscriptions(requester.subscriptions, {
-      title: approve ? "사정 봐달라기 요청이 허락됐어요" : "사정 봐달라기 요청이 거절됐어요",
+      title: approve ? "사정 봐달라하기 요청이 허락됐어요" : "사정 봐달라하기 요청이 거절됐어요",
       body: replyText ? `${me.name}: "${replyText}"` : excuse.reason,
     });
   }

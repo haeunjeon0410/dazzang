@@ -46,6 +46,9 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
   const [incoming, setIncoming] = useState<Excuse[]>([]);
   const [reason, setReason] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  // 한 달에 한 번만 쓸 수 있어서, 이번 달에 이미 보냈는지 / 보내기 전 안내 팝업을 띄웠는지
+  const [usedThisMonth, setUsedThisMonth] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [resultPopup, setResultPopup] = useState<Excuse | null>(null);
   // 받은 요청별 답장 입력값 (선택)
   const [replies, setReplies] = useState<Record<string, string>>({});
@@ -56,6 +59,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
     const data = await res.json();
     setMine(data.mine);
     setIncoming(data.incoming);
+    setUsedThisMonth(!!data.usedThisMonth);
 
     const seen = getSeenIds();
     const unseenResult = (data.mine as Excuse[]).find((e) => e.status !== "PENDING" && !seen.has(e.id));
@@ -73,6 +77,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
 
   async function submit() {
     if (!reason.trim()) return;
+    setConfirmOpen(false);
     const res = await fetch("/api/excuses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -114,7 +119,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
           <p className="text-sm font-bold text-[#b4356f] flex items-center gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/nav/excuse.webp" alt="" className="w-6 h-6 object-contain" />
-            사정 봐달라기 요청이 왔어요
+            사정 봐달라하기 요청이 왔어요
           </p>
           {pendingIncoming.map((e) => (
             <div key={e.id} className="text-sm space-y-2">
@@ -182,17 +187,28 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
               <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} />
               <p className="font-bold text-[#4a2540]">사정 봐달라고 요청하기</p>
             </div>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="예: 이번 주 여행 가서 운동 못했어요, 대신 다음 주 4번 할게요"
-              className="w-full rounded-xl bg-[#ffeef5] border border-[#ffd6e8] px-3 py-2 text-sm"
-              rows={3}
-              autoFocus
-            />
-            <button onClick={submit} className="w-full rounded-xl bg-[#ec4899] py-3 text-sm font-bold text-white">
-              친구에게 요청 보내기
-            </button>
+            {usedThisMonth ? (
+              <p className="rounded-xl bg-[#ffeef5] px-3 py-3 text-sm text-[#b4356f]">
+                이번 달엔 이미 사정 봐달라하기를 썼어요
+              </p>
+            ) : (
+              <>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="예: 이번 주 여행 가서 운동 못했어요, 대신 다음 주 4번 할게요"
+                  className="w-full rounded-xl bg-[#ffeef5] border border-[#ffd6e8] px-3 py-2 text-base"
+                  rows={3}
+                  autoFocus
+                />
+                <button
+                  onClick={() => reason.trim() && setConfirmOpen(true)}
+                  className="w-full rounded-xl bg-[#ec4899] py-3 text-sm font-bold text-white"
+                >
+                  친구에게 요청 보내기
+                </button>
+              </>
+            )}
 
             {mine.length > 0 && (
               <div className="text-xs text-[#d9a9c4] space-y-1 pt-2 border-t border-[#ffd6e8]">
@@ -204,6 +220,30 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {confirmOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setConfirmOpen(false)}>
+          <div
+            className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-center font-bold text-[#4a2540]">보내기 전에 확인해주세요</p>
+            <ul className="space-y-1.5 rounded-xl bg-[#ffeef5] px-4 py-3 text-sm text-[#4a2540]">
+              <li>· 사정 봐달라하기는 <b>한 달에 한 번만</b> 쓸 수 있어요</li>
+              <li>· 친구가 받아들이면 <b>이번 주 벌금이 전액 면제</b>돼요</li>
+            </ul>
+            <button onClick={submit} className="w-full rounded-xl bg-[#ec4899] py-3 text-sm font-bold text-white">
+              보낼게요
+            </button>
+            <button
+              onClick={() => setConfirmOpen(false)}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#c2679c]"
+            >
+              다시 생각해볼게요
+            </button>
           </div>
         </div>
       )}
@@ -221,7 +261,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
               className="mx-auto"
             />
             <p className="font-bold text-[#4a2540]">
-              {resultPopup.status === "APPROVED" ? "사정 봐달라기 요청이 허락됐어요!" : "사정 봐달라기 요청이 거절됐어요"}
+              {resultPopup.status === "APPROVED" ? "사정 봐달라하기 요청이 허락됐어요!" : "사정 봐달라하기 요청이 거절됐어요"}
             </p>
             <p className="text-xs text-[#b4779b]">&quot;{resultPopup.reason}&quot;</p>
             {resultPopup.reply && (

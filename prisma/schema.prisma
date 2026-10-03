@@ -37,6 +37,8 @@ model User {
   createdAt DateTime @default(now())
   // 대결 카드 말풍선에 직접 정한 멘트 ([0]에 하나만 저장). 비어 있으면 인증 횟수별 기본 멘트
   captions  String[] @default([])
+  // 같은 사람의 계정(여러 방)을 묶는 표시. 값이 같은 계정끼리는 한쪽에서 인증하면 다른 쪽에도 똑같이 인증된다
+  linkGroup String?
 
   checkins      Checkin[]
   settlements   Settlement[]
@@ -66,7 +68,7 @@ model Settlement {
   @@unique([weekStart, userId])
 }
 
-// 이번 주 부족한 횟수에 대해 "사정 봐달라기" 요청. 상대방이 허락하면 인증 1회로 인정
+// "사정 봐달라하기" 요청 (한 달에 한 번). 상대방이 허락하면 그 주 벌금이 전액 면제된다
 model Excuse {
   id         String    @id @default(cuid())
   userId     String

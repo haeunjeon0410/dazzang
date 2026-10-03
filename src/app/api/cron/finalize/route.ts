@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     const body = results
       .map((r) => {
-        const pardonNote = r.pardoned && r.count < REQUIRED_COUNT ? " (사정 봐달라기로 벌금 사면)" : "";
+        const pardonNote = r.pardoned && r.count < REQUIRED_COUNT ? " (사정 봐달라하기로 벌금 사면)" : "";
         return `${r.user.name}: ${r.count}/${REQUIRED_COUNT}회${pardonNote}, 벌금 ${r.fine.toLocaleString()}원`;
       })
       .join(" / ");

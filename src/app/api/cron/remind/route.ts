@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     const body =
       remaining > daysLeft
-        ? `${user.name}님 이번 주 ${count}/${REQUIRED_COUNT}회. 이대로면 벌금이 확정돼요. 사정 봐달라기라도 요청해보세요`
+        ? `${user.name}님 이번 주 ${count}/${REQUIRED_COUNT}회. 이대로면 벌금이 확정돼요. 사정 봐달라하기라도 요청해보세요`
         : `${user.name}님 이번 주 ${count}/${REQUIRED_COUNT}회. 오늘부터 남은 ${daysLeft}일 동안 매일 해야 벌금을 피해요!`;
 
     await sendPushToSubscriptions(user.subscriptions, {

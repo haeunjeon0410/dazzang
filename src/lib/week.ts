@@ -45,6 +45,13 @@ export function getDayRange(date: Date = new Date()): { start: Date; end: Date }
   return { start, end: new Date(start.getTime() + DAY_MS - 1) };
 }
 
+// 주어진 시각이 속한 "달"의 시작(매달 1일 오전 6시 KST)을 UTC Date로 반환. 사정 봐달라하기 월 1회 제한에 사용
+export function getMonthStart(date: Date = new Date()): Date {
+  const kst = toResetKst(date);
+  const firstDay = fromKst(new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), 1, 0, 0, 0, 0)));
+  return new Date(firstDay.getTime() + RESET_OFFSET_MS);
+}
+
 // 오늘부터 이번 주 마지막 날(일요일)까지 남은 일수 (오늘 포함). 월=7 ... 일=1
 export function getDaysLeftInWeek(date: Date = new Date()): number {
   const day = toResetKst(date).getUTCDay(); // 0=일 1=월 ... 6=토

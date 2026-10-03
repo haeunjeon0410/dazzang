@@ -24,7 +24,7 @@ export async function GET() {
       const key = c.weekStart.toISOString();
       byWeek.set(key, (byWeek.get(key) ?? 0) + 1);
     }
-    // 사정 봐달라기가 허락된 주는 인증 횟수에 더해지는 게 아니라 그 주 벌금이 통째로 사면된다
+    // 사정 봐달라하기가 허락된 주는 인증 횟수에 더해지는 게 아니라 그 주 벌금이 통째로 사면된다
     const pardonedWeeks = new Set(
       approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
     );
