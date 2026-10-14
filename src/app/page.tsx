@@ -731,7 +731,14 @@ export default function Home() {
 
       {incomingPause && !pauseFalling && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+          <div className="celebrate-pop relative w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+            <button
+              onClick={() => roomAction("cancel-pause")}
+              className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center rounded-full bg-[#ffeef5] text-[#c2679c] font-bold"
+              aria-label="거절하기"
+            >
+              ✕
+            </button>
             <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
             <p className="font-bold text-[#4a2540]">
               {otherEntry ? `${otherEntry.name}님이 ` : ""}쉬어가기를 요청했어요
