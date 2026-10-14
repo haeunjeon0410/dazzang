@@ -291,21 +291,19 @@ export default function Home() {
   // 요청한 쪽: 수락받은 뒤 처음 이 방에 들어오면 같은 연출을 한 번 보여준다
   useEffect(() => {
     if (!pauseFxUnseen || !weekData || pauseFalling) return;
-    let endTimer: ReturnType<typeof setTimeout>;
     const startTimer = setTimeout(() => {
       markPauseEffectSeen(pauseEffectId!);
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const ms = reduceMotion ? 0 : prepareFall(mainRef.current);
       setPauseFalling(true);
-      endTimer = setTimeout(() => {
+      // 연출을 봤다고 기록하는 순간 pauseFxUnseen이 바뀌어 이 effect가 정리(cleanup)된다.
+      // 종료 타이머까지 같이 지우면 pauseFalling이 영원히 true로 남아 PAUSED/흑백이 막히므로 여기선 지우지 않는다
+      setTimeout(() => {
         clearFall(mainRef.current);
         setPauseFalling(false);
       }, ms);
     }, 0);
-    return () => {
-      clearTimeout(startTimer);
-      clearTimeout(endTimer);
-    };
+    return () => clearTimeout(startTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pauseFxUnseen, !!weekData]);
 
