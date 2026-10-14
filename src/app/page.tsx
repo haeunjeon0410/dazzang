@@ -745,14 +745,14 @@ export default function Home() {
                 : ""}
             </p>
             <div className="flex gap-2">
-              <button onClick={confirmPause} className="flex-1 rounded-xl bg-[#2f9e44] py-2.5 text-sm font-bold text-white">
-                허락하기
+              <button onClick={confirmPause} className="flex-1 break-keep rounded-xl bg-[#2f9e44] px-2 py-2.5 text-sm font-bold leading-tight text-white">
+                같이 죽자 💀
               </button>
               <button
                 onClick={() => roomAction("cancel-pause")}
-                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#b4779b]"
+                className="flex-1 break-keep rounded-xl bg-white border border-[#ffd6e8] px-2 py-2.5 text-sm font-semibold leading-tight text-[#b4779b]"
               >
-                거절하기
+                나라도 지킨다 친구야
               </button>
             </div>
           </div>
