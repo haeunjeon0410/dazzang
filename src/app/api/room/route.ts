@@ -54,7 +54,7 @@ export async function PATCH(req: NextRequest) {
     if (other) {
       await sendPushToUser(other, {
         title: "쉬어가기 요청 도착",
-        body: `${me.name} - ${weeks}주 쉬어가도 될지 확인해주세요`,
+        body: `친구에게서 쉬어가기 요청이 왔어요 (${weeks}주)`,
       });
     }
     return NextResponse.json({ ok: true });

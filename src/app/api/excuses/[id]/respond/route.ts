@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (requester) {
     await sendPushToUser(requester, {
       title: approve ? "사정 봐달라하기 요청이 허락됐어요" : "사정 봐달라하기 요청이 거절됐어요",
-      body: replyText ? `${me.name}: "${replyText}"` : `${me.name}님이 ${approve ? "허락" : "거절"}했어요`,
+      body: replyText ? `${me.name}: "${replyText}"` : `친구가 요청을 ${approve ? "허락" : "거절"}했어요`,
     });
   }
 
