@@ -273,7 +273,6 @@ export default function Home() {
       loadWeek();
       loadHistory();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id]);
 
   const incomingPause = !!room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil;

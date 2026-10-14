@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isUserResting, isWeekPaused } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const WEEKS_BACK = 8;
 
@@ -12,7 +12,7 @@ export async function GET() {
   const me = await prisma.user.findUnique({ where: { id: userId }, include: { room: true } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
+  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
   const userIds = users.map((u) => u.id);
   const currentWeekStart = getWeekStart();
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
@@ -41,7 +41,7 @@ export async function GET() {
 
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart) || isWeekPaused(pauses, weekStart);
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {

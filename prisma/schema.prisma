@@ -43,6 +43,18 @@ model RoomPause {
   @@index([roomId])
 }
 
+// 요청한 사람 혼자 쉬는 기간 이력. fromWeek <= 주 < untilWeek 인 주는 이 사용자만 벌금이 없다 (거절이 쌓여도 지난 기간이 유지된다)
+model UserRest {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromWeek  DateTime
+  untilWeek DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model User {
   id        String   @id @default(cuid())
   roomId    String
@@ -54,8 +66,7 @@ model User {
   // 같은 사람의 계정(여러 방)을 묶는 표시. 값이 같은 계정끼리는 한쪽에서 인증하면 다른 쪽에도 똑같이 인증된다
   linkGroup String?
   // 쉬어가기 요청을 친구가 거절("나라도 지킨다")했을 때: 요청한 사람만 이 기간(주 단위) 벌금이 면제된다
-  restFrom  DateTime?
-  restUntil DateTime?
+  rests UserRest[]
 
   checkins      Checkin[]
   settlements   Settlement[]

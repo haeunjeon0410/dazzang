@@ -90,9 +90,8 @@ export async function PATCH(req: NextRequest) {
     // body.exempt === false (X 버튼): 요청 자체를 거절 -> 둘 다 그대로 진행, 면제 없음
     const exempt = body.exempt !== false;
     if (rejected && exempt && before?.pauseRequestedBy && before.pauseRequestedUntil) {
-      await prisma.user.update({
-        where: { id: before.pauseRequestedBy },
-        data: { restFrom: getWeekStart(), restUntil: before.pauseRequestedUntil },
+      await prisma.userRest.create({
+        data: { userId: before.pauseRequestedBy, fromWeek: getWeekStart(), untilWeek: before.pauseRequestedUntil },
       });
     }
 

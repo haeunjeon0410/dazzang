@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { REQUIRED_COUNT, FINE_PER_MISS, isWeekFinalized, isUserResting, isWeekPaused } from "@/lib/week";
+import { REQUIRED_COUNT, FINE_PER_MISS, isWeekFinalized, isWeekPaused } from "@/lib/week";
 
 // 통산전적: 전체 기간 누적 인증 횟수 / 승리한 주 수 / 누적 벌금
 export async function GET() {
@@ -11,7 +11,7 @@ export async function GET() {
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
+  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
   const userIds = users.map((u) => u.id);
 
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
@@ -39,7 +39,7 @@ export async function GET() {
     for (const key of allWeekKeys) {
       const count = byWeek.get(key) ?? 0;
       if (count >= REQUIRED_COUNT) weeksWon++;
-      else if (!pardonedWeeks.has(key) && !isUserResting(u, new Date(key)) && !isWeekPaused(pauses, new Date(key))) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
+      else if (!pardonedWeeks.has(key) && !isWeekPaused(u.rests, new Date(key)) && !isWeekPaused(pauses, new Date(key))) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
     }
 
     return {

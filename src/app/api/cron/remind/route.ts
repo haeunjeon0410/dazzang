@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
-import { getWeekStart, getDaysLeftInWeek, REQUIRED_COUNT, isUserResting } from "@/lib/week";
+import { getWeekStart, getDaysLeftInWeek, REQUIRED_COUNT, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러(Vercel Cron 등)가 매일 저녁 7시(KST) 호출 -> "이제부터 남은 날 매일 해야만 벌금을 피할 수 있는"
 // 사람에게만 알림을 보낸다. 예: 이번 주 0회면 금요일부터(남은 날 3일=부족 3회) 매일 알림이 감.
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const weekStart = getWeekStart();
   const daysLeft = getDaysLeftInWeek();
-  const users = await prisma.user.findMany({ include: { subscriptions: true, room: true } });
+  const users = await prisma.user.findMany({ include: { subscriptions: true, room: true, rests: true } });
   const checkins = await prisma.checkin.findMany({ where: { weekStart } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart, status: "APPROVED" } });
   const now = new Date();
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
 
     // 친구가 거절해서 혼자 쉬는 중인 사람은 벌금이 없으니 알림도 스킵
-    if (isUserResting(user, weekStart)) continue;
+    if (isWeekPaused(user.rests, weekStart)) continue;
 
     // 이미 이번 주 벌금이 사면됐으면 더 이상 조를 필요 없음
     if (approvedExcuses.some((e) => e.userId === user.id)) continue;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getWeekStart, getWeekDeadline, getDayRange, REQUIRED_COUNT, FINE_PER_MISS, isUserResting, isWeekPaused } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, getDayRange, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const weekStart = weekParam ? new Date(weekParam) : getWeekStart();
   const deadline = getWeekDeadline(weekStart);
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
+  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
   const userIds = users.map((u) => u.id);
   const checkins = await prisma.checkin.findMany({
     where: { weekStart, userId: { in: userIds } },
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const summary = users.map((u) => {
     const mine = checkins.filter((c) => c.userId === u.id);
     // 사정 봐달라하기가 허락되면 인증 1회로 치환되는 게 아니라, 그 주 벌금 자체가 통째로 사면된다
-    const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart) || roomPaused;
+    const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || roomPaused;
     const count = mine.length;
     const shortfall = Math.max(0, REQUIRED_COUNT - count);
     return {

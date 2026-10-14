@@ -7,13 +7,20 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ user: null });
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, include: { room: true } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { room: true, rests: true } });
   if (!user) return NextResponse.json({ user: null });
 
   const other = await prisma.user.findFirst({ where: { roomId: user.roomId, id: { not: userId } } });
 
+  // 지금 진행 중인(끝나지 않은) 혼자 쉬는 기간 중 가장 늦게 끝나는 것
+  const now = new Date();
+  const restUntil = user.rests
+    .filter((r) => r.fromWeek <= now && r.untilWeek > now)
+    .map((r) => r.untilWeek)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
   return NextResponse.json({
-    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "", restUntil: user.restUntil },
+    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "", restUntil: restUntil?.toISOString() ?? null },
     room: {
       inviteToken: user.room.inviteToken,
       full: !!other,
