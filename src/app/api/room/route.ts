@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { sendPushToUser } from "@/lib/push";
-import { getWeekStart, formatResumeDate } from "@/lib/week";
+import { getWeekStart, formatResumeDate, formatPauseEnd } from "@/lib/week";
 
 // 모임 통장(공용 계좌) 등록/수정 + 일시정지 요청/확정/취소
 export async function PATCH(req: NextRequest) {
@@ -76,13 +76,22 @@ export async function PATCH(req: NextRequest) {
     // 상대방 요청을 거절했거나, 진행 중인 정지를 취소한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
     const rejected = before?.pauseRequestedBy && before.pauseRequestedBy !== userId && !before.pausedUntil;
     const stoppedActive = !!before?.pausedUntil;
+
+    // 거절해도 요청한 친구는 그 기간 벌금이 없다 (나는 계속 도전, 친구만 쉼)
+    if (rejected && before?.pauseRequestedBy && before.pauseRequestedUntil) {
+      await prisma.user.update({
+        where: { id: before.pauseRequestedBy },
+        data: { restFrom: getWeekStart(), restUntil: before.pauseRequestedUntil },
+      });
+    }
+
     if (rejected || stoppedActive) {
       const other = await findOther();
       if (other) {
         await sendPushToUser(other, {
           title: rejected ? "쉬어가기 요청 거절" : "쉬어가기 취소",
           body: rejected
-            ? `${me.name}님이 쉬어가기 요청을 거절했어요`
+            ? `${me.name}님은 계속 도전해요. 대신 ${before?.pauseRequestedUntil ? `~ ${formatPauseEnd(before.pauseRequestedUntil)}까지 ` : ""}벌금은 없어요`
             : `${me.name}님이 쉬어가기를 취소했어요. 다시 시작이에요!`,
         });
       }

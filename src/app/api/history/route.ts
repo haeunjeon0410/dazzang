@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isUserResting } from "@/lib/week";
 
 const WEEKS_BACK = 8;
 
@@ -29,7 +29,7 @@ export async function GET() {
 
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id);
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {

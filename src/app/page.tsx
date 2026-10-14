@@ -49,7 +49,7 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; caption?: string };
+type Me = { id: string; name: string; caption?: string; restUntil?: string | null };
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -587,6 +587,16 @@ export default function Home() {
         )}
 
         {/* 상대방이 정지 요청한 경우 */}
+        {/* 친구가 쉬어가기를 거절해서 나만 쉬는 중: 그 기간 벌금 없음 */}
+        {me.restUntil && new Date(me.restUntil) > new Date() && !room?.pausedUntil && (
+          <div className={`${CARD} space-y-1`}>
+            <p className="text-sm font-bold text-[#4a2540]">혼자 쉬는 중이에요</p>
+            <p className="text-xs text-[#b4779b]">
+              ~ {formatPauseEnd(new Date(me.restUntil))}까지 벌금이 없어요. 친구는 계속 도전 중이에요!
+            </p>
+          </div>
+        )}
+
         {/* 내가 정지 요청한 경우 */}
         {room?.pauseRequestedBy && room.pauseRequestedBy === me?.id && !room.pausedUntil && (
           <div className={`${CARD} space-y-2`}>

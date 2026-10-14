@@ -13,7 +13,7 @@ export async function GET() {
   const other = await prisma.user.findFirst({ where: { roomId: user.roomId, id: { not: userId } } });
 
   return NextResponse.json({
-    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "" },
+    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "", restUntil: user.restUntil },
     room: {
       inviteToken: user.room.inviteToken,
       full: !!other,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
-import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
+import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS, isUserResting } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 // (마감은 월요일 06:00이지만, 새벽 알림으로 잠 깨우지 않도록 아침 9시에 보낸다)
@@ -42,14 +42,21 @@ export async function GET(req: NextRequest) {
 
     const results = room.users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id);
+      const excused = approvedExcuses.some((e) => e.userId === u.id);
+      const resting = isUserResting(u, lastWeekStart);
+      const pardoned = excused || resting;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
-      return { user: u, count, pardoned, shortfall, fine: pardoned ? 0 : shortfall * FINE_PER_MISS };
+      return { user: u, count, pardoned, excused, shortfall, fine: pardoned ? 0 : shortfall * FINE_PER_MISS };
     });
 
     const body = results
       .map((r) => {
-        const pardonNote = r.pardoned && r.count < REQUIRED_COUNT ? " (사정 봐달라하기로 벌금 사면)" : "";
+        const pardonNote =
+          r.pardoned && r.count < REQUIRED_COUNT
+            ? r.excused
+              ? " (사정 봐달라하기로 벌금 사면)"
+              : " (쉬는 기간이라 벌금 없음)"
+            : "";
         return `${r.user.name}: ${r.count}/${REQUIRED_COUNT}회${pardonNote}, 벌금 ${r.fine.toLocaleString()}원`;
       })
       .join(" / ");

@@ -80,5 +80,14 @@ export function formatPauseEnd(resumeWeekStart: Date): string {
   return `${kst.getUTCFullYear()}.${mm}.${dd}(일)`;
 }
 
+// 이 사용자가 해당 주에 "혼자 쉬는 중"(친구가 쉬어가기를 거절해서 요청자만 벌금 면제)인지
+export function isUserResting(
+  user: { restFrom: Date | null; restUntil: Date | null },
+  weekStart: Date,
+): boolean {
+  if (!user.restFrom || !user.restUntil) return false;
+  return weekStart.getTime() >= user.restFrom.getTime() && weekStart.getTime() < user.restUntil.getTime();
+}
+
 export const REQUIRED_COUNT = 3;
 export const FINE_PER_MISS = 5000;
