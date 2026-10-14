@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { formatPauseEnd } from "@/lib/week";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeToPush } from "./push-setup";
 import { Battle } from "./battle";
@@ -57,6 +58,7 @@ type Room = {
   groupAccountHolder: string | null;
   pauseRequestedBy: string | null;
   pauseRequestedUntil: string | null;
+  pauseReason: string | null;
   pausedUntil: string | null;
 };
 
@@ -73,7 +75,63 @@ const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
 const OWNER_CODE = "000000";
 
 // 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
+const CONFETTI_COLORS = ["#f472b6", "#ec4899", "#ffc72c", "#60a5fa", "#34d399", "#a78bfa"];
+const CONFETTI_PIECES = Array.from({ length: 36 }, (_, i) => ({
+  left: `${(i * 97) % 100}%`,
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  size: 6 + (i % 4) * 2,
+  delay: `${((i * 13) % 20) / 10}s`,
+  dur: `${2.4 + ((i * 7) % 12) / 10}s`,
+  drift: `${((i % 7) - 3) * 24}px`,
+  round: i % 3 === 0,
+}));
+
+// 목표를 채운 주에만 결과 팝업 뒤로 색종이가 떨어진다
+function Confetti() {
+  return (
+    <>
+      {CONFETTI_PIECES.map((p, i) => (
+        <span
+          key={i}
+          className="confetti-piece"
+          style={
+            {
+              left: p.left,
+              width: p.size,
+              height: p.size * (p.round ? 1 : 1.6),
+              borderRadius: p.round ? "50%" : 2,
+              backgroundColor: p.color,
+              "--confetti-delay": p.delay,
+              "--confetti-dur": p.dur,
+              "--confetti-drift": p.drift,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </>
+  );
+}
+
 const WEEK_SEEN_KEY = "dajjang_seen_week_results";
+// 쉬어가기 시작 연출(카드 떨어지고 흑백)을 이 기기에서 이미 봤는지 (방+종료일 단위)
+const PAUSE_SEEN_KEY = "dajjang_seen_pause_effect";
+
+function hasSeenPauseEffect(id: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem(PAUSE_SEEN_KEY) || "[]") as string[]).includes(id);
+  } catch {
+    return false;
+  }
+}
+
+function markPauseEffectSeen(id: string) {
+  try {
+    const seen = JSON.parse(localStorage.getItem(PAUSE_SEEN_KEY) || "[]") as string[];
+    localStorage.setItem(PAUSE_SEEN_KEY, JSON.stringify([...seen.slice(-19), id]));
+  } catch {
+    // localStorage 접근 불가하면 무시 (연출이 다시 나오는 정도)
+  }
+}
 
 function getSeenWeeks(): Set<string> {
   try {
@@ -94,11 +152,49 @@ function markWeekSeen(weekStart: string) {
   }
 }
 
+// 쉬어가기 수락 연출: 제목, 아이콘, 카드들이 시간차를 두고 우수수 떨어진다. 걸리는 시간(ms)을 돌려준다
+const FALL_STEP_MS = 260;
+const FALL_TAIL_MS = 1700;
+
+function prepareFall(container: HTMLElement | null): number {
+  if (!container) return 0;
+  const targets: HTMLElement[] = [];
+  container.querySelectorAll<HTMLElement>("header > h1, .hdr-icons > *").forEach((el) => targets.push(el));
+  for (const child of Array.from(container.children) as HTMLElement[]) {
+    if (child.tagName === "HEADER" || child.hasAttribute("data-keep")) continue;
+    if (child.tagName === "SECTION") targets.push(...(Array.from(child.children) as HTMLElement[]));
+    else targets.push(child);
+  }
+  // 플로팅 인증하기 버튼도 마지막에 같이 떨어진다 (컨테이너 밖에 고정 배치돼 있음)
+  const fab = document.querySelector<HTMLElement>("[data-fab]");
+  if (fab) targets.push(fab);
+  targets.forEach((el, i) => {
+    el.setAttribute("data-fall", "");
+    el.style.setProperty("--fall-delay", `${(i * FALL_STEP_MS) / 1000}s`);
+    el.style.setProperty("--tilt", `${(i % 2 ? 1 : -1) * (3 + (i % 3) * 2)}deg`);
+  });
+  return targets.length * FALL_STEP_MS + FALL_TAIL_MS;
+}
+
+function clearFall(container: HTMLElement | null) {
+  const nodes = Array.from(container?.querySelectorAll<HTMLElement>("[data-fall]") ?? []);
+  const fab = document.querySelector<HTMLElement>("[data-fab]");
+  if (fab) nodes.push(fab);
+  nodes.forEach((el) => {
+    el.removeAttribute("data-fall");
+    el.style.removeProperty("--fall-delay");
+    el.style.removeProperty("--tilt");
+  });
+}
+
 export default function Home() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
   const [room, setRoom] = useState<Room | null>(null);
+  // 쉬어가기를 수락하는 순간: 카드들이 우수수 떨어지고 앱 전체가 흑백으로 변한다
+  const [pauseFalling, setPauseFalling] = useState(false);
+  const mainRef = useRef<HTMLDivElement>(null);
   const [roomCode, setRoomCode] = useState("");
   const [loginError, setLoginError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -115,6 +211,7 @@ export default function Home() {
     { userId: string; name: string; totalCheckins: number; weeksWon: number; totalWeeks: number; totalFine: number }[] | null
   >(null);
   const [pauseWeeks, setPauseWeeks] = useState(2);
+  const [pauseReason, setPauseReason] = useState("");
   const [weekResultPopup, setWeekResultPopup] = useState<PastWeek | null>(null);
 
   async function loadMe() {
@@ -176,6 +273,54 @@ export default function Home() {
       loadHistory();
     }
   }, [me]);
+
+  const incomingPause = !!room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil;
+  const roomPaused = !!room?.pausedUntil && new Date(room.pausedUntil) > new Date();
+  const pauseEffectId = room?.pausedUntil ? `${room.inviteToken}:${room.pausedUntil}` : null;
+  // 아직 이 기기에서 쉬어가기 시작 연출을 못 본 상태 (연출이 끝나기 전에는 흑백/숨김 처리를 미룬다)
+  const pauseFxUnseen = roomPaused && !!pauseEffectId && !hasSeenPauseEffect(pauseEffectId);
+  const isPaused = roomPaused && !pauseFxUnseen;
+
+  // 연출이 모두 끝난 뒤에야 html 전체(배경, 아이콘, 플로팅 버튼 포함)가 흑백이 된다 — 망한 게임 엔딩처럼 마지막에
+  const grayNow = isPaused && !pauseFalling;
+  useEffect(() => {
+    document.documentElement.classList.toggle("paused-app", grayNow);
+    return () => document.documentElement.classList.remove("paused-app");
+  }, [grayNow]);
+
+  // 요청한 쪽: 수락받은 뒤 처음 이 방에 들어오면 같은 연출을 한 번 보여준다
+  useEffect(() => {
+    if (!pauseFxUnseen || !weekData || pauseFalling) return;
+    let endTimer: ReturnType<typeof setTimeout>;
+    const startTimer = setTimeout(() => {
+      markPauseEffectSeen(pauseEffectId!);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const ms = reduceMotion ? 0 : prepareFall(mainRef.current);
+      setPauseFalling(true);
+      endTimer = setTimeout(() => {
+        clearFall(mainRef.current);
+        setPauseFalling(false);
+      }, ms);
+    }, 0);
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(endTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pauseFxUnseen, !!weekData]);
+
+  async function confirmPause() {
+    if (room?.pauseRequestedUntil) markPauseEffectSeen(`${room.inviteToken}:${room.pauseRequestedUntil}`);
+    setPauseFalling(true);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // 팝업이 닫힌 뒤(다음 렌더)에 떨어질 대상을 잡는다
+    await new Promise((r) => setTimeout(r, 50));
+    const ms = reduceMotion ? 0 : prepareFall(mainRef.current);
+    await new Promise((r) => setTimeout(r, ms));
+    await roomAction("confirm-pause");
+    clearFall(mainRef.current);
+    setPauseFalling(false);
+  }
 
   async function roomAction(action: string, extra?: Record<string, unknown>) {
     const res = await fetch("/api/room", {
@@ -362,14 +507,17 @@ export default function Home() {
   return (
     <>
       <div
+        ref={mainRef}
         className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-24"
+        data-falling={pauseFalling ? "true" : undefined}
+        data-paused={isPaused ? "true" : undefined}
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
       >
         <header className="flex items-center justify-between pt-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
           <h1 className="text-xl font-black text-[#ec4899]">
             다짱 <span className="text-[#4a2540] font-bold text-base">· {me.name}님</span>
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="hdr-icons flex items-center gap-2">
             <button
               onClick={() => {
                 setStatsOpen(true);
@@ -418,49 +566,33 @@ export default function Home() {
           </div>
         )}
 
-        {/* 정지 중 배너 */}
-        {room?.pausedUntil && new Date(room.pausedUntil) > new Date() && (
-          <div className={`${CARD} space-y-2`}>
-            <p className="text-sm font-bold text-[#4a2540]">쉬어가는 중</p>
-            <p className="text-xs text-[#b4779b]">
-              {new Date(room.pausedUntil).toLocaleDateString("ko-KR")}까지 일시정지 중이에요. 인증과 벌금이 없어요.
-            </p>
+        {/* 정지 중: 화면 가운데에 PAUSED 카드. 누르면 바로 로그아웃해서 다른 방에 참여할 수 있다 */}
+        {isPaused && !pauseFalling && room?.pausedUntil && (
+          <div data-keep className="paused-overlay" role="status">
             <button
-              onClick={() => { if (confirm("정지를 지금 취소할까요?")) roomAction("cancel-pause"); }}
-              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+              type="button"
+              className="paused-card paused-center"
+              onClick={async () => {
+                await fetch("/api/logout", { method: "POST" });
+                location.href = "/";
+              }}
             >
-              정지 취소하고 다시 시작하기
+              <span className="paused-badge">
+                <span className="blink">⏸</span> PAUSED
+              </span>
+              <span className="paused-until">~ {formatPauseEnd(new Date(room.pausedUntil))}</span>
+              <span className="paused-hint">로그아웃</span>
             </button>
           </div>
         )}
 
         {/* 상대방이 정지 요청한 경우 */}
-        {room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil && (
-          <div className="rounded-2xl bg-[#ffe1ee] border border-[#ffc72c] p-4 space-y-2">
-            <p className="text-sm font-bold text-[#b4356f]">쉬어가기 요청이 왔어요</p>
-            <p className="text-xs text-[#b4779b]">
-              {room.pauseRequestedUntil
-                ? `${new Date(room.pauseRequestedUntil).toLocaleDateString("ko-KR")}까지 쉬어가자고 요청했어요.`
-                : ""}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => roomAction("confirm-pause")}
-                className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold"
-              >허락하기</button>
-              <button
-                onClick={() => roomAction("cancel-pause")}
-                className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b]"
-              >거절하기</button>
-            </div>
-          </div>
-        )}
-
         {/* 내가 정지 요청한 경우 */}
         {room?.pauseRequestedBy && room.pauseRequestedBy === me?.id && !room.pausedUntil && (
           <div className={`${CARD} space-y-2`}>
             <p className="text-sm font-bold text-[#4a2540]">쉬어가기를 요청했어요</p>
             <p className="text-xs text-[#b4779b]">상대방이 수락하면 정지가 시작돼요.</p>
+            {room.pauseReason && <p className="text-sm text-[#4a2540]">사유: {room.pauseReason}</p>}
             <button
               onClick={() => roomAction("cancel-pause")}
               className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
@@ -576,8 +708,9 @@ export default function Home() {
         )}
       </div>
 
-      {room?.full && !(room.pausedUntil && new Date(room.pausedUntil) > new Date()) && (
+      {room?.full && (!isPaused || pauseFalling) && (
         <label
+          data-fab
           className="fixed z-40 drop-shadow-lg"
           style={{
             right: "calc(1.25rem + env(safe-area-inset-right))",
@@ -594,6 +727,36 @@ export default function Home() {
             <img src="/assets/nav/verify-button.webp" alt="인증하기" className="h-10 w-auto" />
           )}
         </label>
+      )}
+
+      {incomingPause && !pauseFalling && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+            <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
+            <p className="font-bold text-[#4a2540]">
+              {otherEntry ? `${otherEntry.name}님이 ` : ""}쉬어가기를 요청했어요
+            </p>
+            {room?.pauseReason && (
+              <p className="rounded-xl bg-[#fff0f6] px-3 py-2 text-sm text-[#4a2540]">&ldquo;{room.pauseReason}&rdquo;</p>
+            )}
+            <p className="text-xs text-[#b4779b]">
+              {room?.pauseRequestedUntil
+                ? `~ ${formatPauseEnd(new Date(room.pauseRequestedUntil))} 까지 쉬어가자는 요청이에요.`
+                : ""}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={confirmPause} className="flex-1 rounded-xl bg-[#2f9e44] py-2.5 text-sm font-bold text-white">
+                허락하기
+              </button>
+              <button
+                onClick={() => roomAction("cancel-pause")}
+                className="flex-1 rounded-xl bg-white border border-[#ffd6e8] py-2.5 text-sm font-semibold text-[#b4779b]"
+              >
+                거절하기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {settingsOpen && (
@@ -625,10 +788,16 @@ export default function Home() {
             </div>
 
             {/* 쉬어가기 요청 */}
-            {!room?.pausedUntil && !room?.pauseRequestedBy && (
+            {!(room?.pausedUntil && new Date(room.pausedUntil) > new Date()) && !room?.pauseRequestedBy && (
               <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
                 <p className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</p>
-                <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
+                <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요. 이번 주부터 세고, 끝나는 주 다음 월요일에 다시 시작해요.</p>
+                <input
+                  placeholder="쉬어가려는 사유 (예: 여행, 시험기간)"
+                  value={pauseReason}
+                  onChange={(e) => setPauseReason(e.target.value)}
+                  className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+                />
                 <div className="flex items-center gap-2">
                   <select
                     value={pauseWeeks}
@@ -640,7 +809,13 @@ export default function Home() {
                     ))}
                   </select>
                   <button
-                    onClick={() => { setSettingsOpen(false); roomAction("request-pause", { weeks: pauseWeeks }); }}
+                    onClick={async () => {
+                      if (!pauseReason.trim()) { alert("쉬어가려는 사유를 적어주세요"); return; }
+                      if (await roomAction("request-pause", { weeks: pauseWeeks, reason: pauseReason })) {
+                        setPauseReason("");
+                        setSettingsOpen(false);
+                      }
+                    }}
                     className="flex-1 rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white"
                   >
                     쉬어가기 요청
@@ -745,8 +920,9 @@ export default function Home() {
 
       {weekResultPopup && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => closeWeekResultPopup(false)}>
+          {weekResultPopup.summary.find((s) => s.userId === me?.id && s.fine === 0 && s.count >= 3) && <Confetti />}
           <div
-            className="w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
+            className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -758,7 +934,7 @@ export default function Home() {
                     row={CharRow.A}
                     pose={myFineExists ? CharPose.SAD : CharPose.WIN}
                     height={76}
-                    className="mx-auto"
+                    className={`mx-auto ${myFineExists ? "" : "celebrate-hop"}`}
                   />
                   <p className="font-bold text-[#4a2540]">
                     {new Date(weekResultPopup.weekStart).toLocaleDateString("ko-KR")} 주 결과가 나왔어요

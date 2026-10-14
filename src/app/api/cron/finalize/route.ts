@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendPushToSubscriptions } from "@/lib/push";
-import { getWeekStart, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
+import { sendPushToUser } from "@/lib/push";
+import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 // (마감은 월요일 06:00이지만, 새벽 알림으로 잠 깨우지 않도록 아침 9시에 보낸다)
@@ -20,7 +20,23 @@ export async function GET(req: NextRequest) {
 
   const allResults: { name: string; count: number; fine: number }[] = [];
 
+  const thisWeekStart = getWeekStart();
+
   for (const room of rooms) {
+    // 쉬어가기가 끝나 이번 주부터 다시 시작하는 방 -> 안내 알림 보내고 정지 상태 정리
+    // (마감 스킵 판단은 아래에서 정리 전 값 room.pausedUntil로 그대로 한다)
+    if (room.pausedUntil && room.pausedUntil <= thisWeekStart) {
+      if (room.pausedUntil.getTime() === thisWeekStart.getTime()) {
+        for (const u of room.users) {
+          await sendPushToUser(u, {
+            title: "쉬어가기 끝! 다시 시작해요",
+            body: `이번 주(${formatResumeDate(thisWeekStart)})부터 다시 시작! 이번 주 ${REQUIRED_COUNT}회 인증 가보자고요`,
+          });
+        }
+      }
+      await prisma.room.update({ where: { id: room.id }, data: { pausedUntil: null, pauseReason: null } });
+    }
+
     // 지난 주가 정지 기간에 포함되면 마감 스킵
     if (room.pausedUntil && room.pausedUntil > lastWeekStart) continue;
 
@@ -38,12 +54,16 @@ export async function GET(req: NextRequest) {
       })
       .join(" / ");
 
+    for (const r of results) allResults.push({ name: r.user.name, count: r.count, fine: r.fine });
+
+    // 모두 목표를 채웠으면 알릴 게 없으니 결과 알림은 생략
+    if (results.every((r) => r.count >= REQUIRED_COUNT)) continue;
+
     for (const r of results) {
-      await sendPushToSubscriptions(r.user.subscriptions, {
+      await sendPushToUser(r.user, {
         title: "지난 주 인증 결과 확정",
         body,
       });
-      allResults.push({ name: r.user.name, count: r.count, fine: r.fine });
     }
   }
 

@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatPauseEnd } from "@/lib/week";
 
 const OWNER_CODE = "000000";
 
-type RoomInfo = { id: string; inviteToken: string; me: { id: string; name: string } | null; others: string[] };
+type RoomInfo = {
+  id: string;
+  inviteToken: string;
+  me: { id: string; name: string } | null;
+  others: string[];
+  pausedUntil: string | null;
+  pauseRequested: boolean;
+};
 
 export default function OwnerHome() {
   const router = useRouter();
@@ -52,8 +60,23 @@ export default function OwnerHome() {
       {rooms?.length === 0 && <p className="text-[#d9a9c4] text-sm">만들어둔 방이 없어요.</p>}
 
       <div className="space-y-3">
-        {rooms?.map((room) => (
-          <div key={room.id} className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4 space-y-2">
+        {rooms?.map((room) => {
+          const paused = !!room.pausedUntil && new Date(room.pausedUntil) > new Date();
+          return (
+          <div
+            key={room.id}
+            className={`rounded-2xl border shadow-sm p-4 space-y-2 ${paused ? "paused-card border-dashed border-2" : "bg-white border-[#ffd6e8]"}`}
+          >
+            {paused && (
+              <p className="paused-badge px-2.5 py-0.5 text-[11px]">
+                <span className="blink">⏸</span> PAUSED · ~ {formatPauseEnd(new Date(room.pausedUntil!))}
+              </p>
+            )}
+            {!paused && room.pauseRequested && (
+              <p className="inline-block rounded-full bg-[#ffc72c] px-2.5 py-0.5 text-[11px] font-bold text-[#6b4a00]">
+                쉬어가기 요청 중
+              </p>
+            )}
             <p className="text-xs text-[#d9a9c4]">
               {room.others.length > 0 ? `친구: ${room.others.join(", ")}` : "친구가 아직 안 들어왔어요"}
             </p>
@@ -68,7 +91,8 @@ export default function OwnerHome() {
               <p className="text-xs text-[#d9a9c4]">빈 방</p>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

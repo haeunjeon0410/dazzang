@@ -20,3 +20,108 @@ body {
   background-attachment: fixed;
   color: var(--foreground);
 }
+
+/* 주간 결과 축하 모션: 색종이가 위에서 떨어지고 캐릭터가 통통 뛴다 */
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--confetti-drift, 0), 105vh, 0) rotate(720deg); opacity: 0.9; }
+}
+@keyframes celebrate-hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-14px) scale(1.06); }
+  60% { transform: translateY(0) scale(0.97); }
+}
+@keyframes celebrate-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+  animation: confetti-fall var(--confetti-dur, 3s) linear var(--confetti-delay, 0s) 2 both;
+}
+.celebrate-hop { animation: celebrate-hop 0.9s ease-in-out 0.2s 3; }
+.celebrate-pop { animation: celebrate-pop 0.35s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece { display: none; }
+  .celebrate-hop, .celebrate-pop { animation: none; }
+}
+
+/* 쉬어가는 방: 게임이 멈춘(PAUSED) 것처럼 흑백 + 사선 줄무늬 + 깜빡이는 PAUSED 표시 */
+@keyframes paused-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.35; }
+}
+/* html 전체에 걸어서 배경, 아이콘, 플로팅 버튼까지 같이 흑백이 된다 */
+html { transition: filter 0.9s ease; }
+html.paused-app { filter: grayscale(1) contrast(0.95); }
+/* 쉬어가기 수락: 제목, 아이콘, 카드가 시간차를 두고 우수수 떨어진다 (순서/기울기는 JS가 --fall-delay, --tilt로 지정) */
+@keyframes card-drop {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  15% { transform: translateY(-10px) rotate(var(--tilt, 3deg)); }
+  100% { transform: translateY(130vh) rotate(calc(var(--tilt, 3deg) * 7)); opacity: 1; }
+}
+[data-fall] {
+  animation: card-drop 1.5s cubic-bezier(0.55, 0, 0.9, 0.45) both;
+  animation-delay: var(--fall-delay, 0s);
+  transform-origin: 25% 0;
+  pointer-events: none;
+}
+.paused-card {
+  background-color: #e5e5e8;
+  background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.045) 0 8px, transparent 8px 16px);
+  border-color: #b5b5bd;
+}
+.paused-badge {
+  display: inline-block;
+  background: #3a3a42;
+  color: #f2f2f4;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+}
+.paused-badge .blink { animation: paused-blink 1.2s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .paused-badge .blink { animation: none; }
+  html { transition: none; }
+  [data-fall] { animation: none; }
+}
+
+/* 쉬어가는 동안은 떨어진 카드들이 돌아오지 않는다 (헤더와 정지 배너만 남고, 기간이 끝나면 원상복귀) */
+[data-paused="true"]:not([data-falling]) > :not([data-keep]) {
+  display: none;
+}
+
+/* 쉬어가는 동안 화면 가운데에 PAUSED 카드 (누르면 로그아웃 확인) */
+.paused-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.paused-center {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 250px;
+  padding: 18px 22px;
+  border: 2px dashed #b5b5bd;
+  border-radius: 16px;
+  font: inherit;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  animation: celebrate-pop 0.9s ease-out both;
+}
+.paused-center .paused-badge { font-size: 16px; padding: 4px 12px; }
+.paused-until { font-size: 16px; font-weight: 700; color: #55555e; }
+.paused-hint { font-size: 11px; color: #85858f; }

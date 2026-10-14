@@ -23,8 +23,9 @@ model Room {
 
   // 일시정지 (상호 동의 방식)
   pauseRequestedBy    String?   // 정지 요청한 userId
-  pauseRequestedUntil DateTime? // 요청된 정지 종료일
-  pausedUntil         DateTime? // 확정된 정지 종료일 (null이면 정지 아님)
+  pauseRequestedUntil DateTime? // 요청된 정지 종료일 (= 다시 시작하는 주의 월요일 00:00 KST 키)
+  pauseReason         String?   // 쉬어가려는 사유
+  pausedUntil         DateTime? // 확정된 정지 종료일 = 다시 시작하는 주의 월요일 (null이면 정지 아님)
 
   users User[]
 }

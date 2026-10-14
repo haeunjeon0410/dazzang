@@ -66,5 +66,19 @@ export function formatWeekLabel(weekStart: Date): string {
   return `${fmt(kst)} ~ ${fmt(end)}`;
 }
 
+// 쉬어가기 종료(재개) 월요일 키를 "10/19(월)" 형태로
+export function formatResumeDate(resumeWeekStart: Date): string {
+  const kst = new Date(resumeWeekStart.getTime() + KST_OFFSET_MS);
+  return `${kst.getUTCMonth() + 1}/${kst.getUTCDate()}(월)`;
+}
+
+// 쉬어가기 마지막 날(재개 월요일 하루 전 일요일)을 "2026.10.25(일)" 형태로
+export function formatPauseEnd(resumeWeekStart: Date): string {
+  const kst = new Date(resumeWeekStart.getTime() + KST_OFFSET_MS - DAY_MS);
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(kst.getUTCDate()).padStart(2, "0");
+  return `${kst.getUTCFullYear()}.${mm}.${dd}(일)`;
+}
+
 export const REQUIRED_COUNT = 3;
 export const FINE_PER_MISS = 5000;

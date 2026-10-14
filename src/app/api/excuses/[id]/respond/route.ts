@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { sendPushToSubscriptions } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 import { EXCUSE_REPLY_MAX_LEN } from "@/lib/excuse";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const requester = await prisma.user.findUnique({ where: { id: excuse.userId }, include: { subscriptions: true } });
   if (requester) {
-    await sendPushToSubscriptions(requester.subscriptions, {
+    await sendPushToUser(requester, {
       title: approve ? "사정 봐달라하기 요청이 허락됐어요" : "사정 봐달라하기 요청이 거절됐어요",
       body: replyText ? `${me.name}: "${replyText}"` : excuse.reason,
     });

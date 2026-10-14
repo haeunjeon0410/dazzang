@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { sendPushToSubscriptions } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 import { getWeekStart, getMonthStart, isWeekFinalized } from "@/lib/week";
 
 // 사정 봐달라하기는 한 달에 한 번만. 대기 중이거나 허락된 요청만 센다 (거절당한 요청은 기회를 쓴 게 아니라서 다시 요청 가능)
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     include: { subscriptions: true },
   });
   if (other) {
-    await sendPushToSubscriptions(other.subscriptions, {
+    await sendPushToUser(other, {
       title: "사정 봐달라하기 요청 도착",
       body: `${requester.name}: "${excuse.reason}" - 허락할지 확인해주세요`,
     });

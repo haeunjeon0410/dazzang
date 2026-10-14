@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { sendPushToSubscriptions } from "@/lib/push";
+import { sendPushToUser } from "@/lib/push";
 
 const POKE_LINES = [
   "나는 했는데, 너는?",
@@ -49,7 +49,7 @@ export async function POST() {
 
   const line = POKE_LINES[Math.floor(Math.random() * POKE_LINES.length)];
 
-  await sendPushToSubscriptions(other.subscriptions, {
+  await sendPushToUser(other, {
     title: "콕!",
     body: line,
   });

@@ -23,6 +23,7 @@ export async function GET() {
       deleteRequestedBy: user.room.deleteRequestedBy,
       pauseRequestedBy: user.room.pauseRequestedBy,
       pauseRequestedUntil: user.room.pauseRequestedUntil,
+      pauseReason: user.room.pauseReason,
       pausedUntil: user.room.pausedUntil,
     },
     other: other ? { id: other.id, name: other.name, caption: other.captions[0] ?? "" } : null,

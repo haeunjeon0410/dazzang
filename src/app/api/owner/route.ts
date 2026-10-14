@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
       inviteToken: r.inviteToken,
       me: r.users[0] ? { id: r.users[0].id, name: r.users[0].name } : null,
       others: r.users.slice(1).map((u) => u.name),
+      pausedUntil: r.pausedUntil,
+      pauseRequested: !!r.pauseRequestedBy,
     })),
   });
 }
