@@ -743,7 +743,7 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="celebrate-pop relative w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
             <button
-              onClick={() => roomAction("cancel-pause")}
+              onClick={() => roomAction("cancel-pause", { exempt: false })}
               className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center rounded-full bg-[#ffeef5] text-[#c2679c] font-bold"
               aria-label="거절하기"
             >

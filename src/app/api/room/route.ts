@@ -86,8 +86,10 @@ export async function PATCH(req: NextRequest) {
     // 상대방 요청을 거절한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
     const rejected = !!before?.pauseRequestedBy && before.pauseRequestedBy !== userId;
 
-    // 거절해도 요청한 친구는 그 기간 벌금이 없다 (나는 계속 도전, 친구만 쉼)
-    if (rejected && before?.pauseRequestedBy && before.pauseRequestedUntil) {
+    // "나라도 지킨다": 거절해도 요청한 친구는 그 기간 벌금이 없다 (나는 계속 도전, 친구만 쉼)
+    // body.exempt === false (X 버튼): 요청 자체를 거절 -> 둘 다 그대로 진행, 면제 없음
+    const exempt = body.exempt !== false;
+    if (rejected && exempt && before?.pauseRequestedBy && before.pauseRequestedUntil) {
       await prisma.user.update({
         where: { id: before.pauseRequestedBy },
         data: { restFrom: getWeekStart(), restUntil: before.pauseRequestedUntil },
@@ -99,7 +101,9 @@ export async function PATCH(req: NextRequest) {
       if (other) {
         await sendPushToUser(other, {
           title: "쉬어가기 요청 거절",
-          body: `${me.name}님은 계속 도전해요. 대신 ${before?.pauseRequestedUntil ? `~ ${formatPauseEnd(before.pauseRequestedUntil)}까지 ` : ""}벌금은 없어요`,
+          body: exempt
+            ? `${me.name}님은 계속 도전해요. 대신 ${before?.pauseRequestedUntil ? `~ ${formatPauseEnd(before.pauseRequestedUntil)}까지 ` : ""}벌금은 없어요`
+            : `${me.name}님이 쉬어가기 요청을 거절했어요. 둘 다 계속 도전해요`,
         });
       }
     }
