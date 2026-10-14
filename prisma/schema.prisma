@@ -27,7 +27,20 @@ model Room {
   pauseReason         String?   // 쉬어가려는 사유
   pausedUntil         DateTime? // 확정된 정지 종료일 = 다시 시작하는 주의 월요일 (null이면 정지 아님)
 
-  users User[]
+  users  User[]
+  pauses RoomPause[]
+}
+
+// 확정된 쉬어가기 이력. fromWeek <= 주 < untilWeek 인 주는 두 사람 모두 벌금이 없다 (모두 주 월요일 00:00 KST 키)
+model RoomPause {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  fromWeek  DateTime
+  untilWeek DateTime
+  createdAt DateTime @default(now())
+
+  @@index([roomId])
 }
 
 model User {

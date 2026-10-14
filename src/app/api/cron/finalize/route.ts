@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
-import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS, isUserResting } from "@/lib/week";
+import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS, isUserResting, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 // (마감은 월요일 06:00이지만, 새벽 알림으로 잠 깨우지 않도록 아침 9시에 보낸다)
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   const lastWeekStart = new Date(getWeekStart().getTime() - 7 * 24 * 60 * 60 * 1000);
-  const rooms = await prisma.room.findMany({ include: { users: { include: { subscriptions: true } } } });
+  const rooms = await prisma.room.findMany({ include: { pauses: true, users: { include: { subscriptions: true } } } });
   const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" } });
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 지난 주가 정지 기간에 포함되면 마감 스킵
-    if (room.pausedUntil && room.pausedUntil > lastWeekStart) continue;
+    if ((room.pausedUntil && room.pausedUntil > lastWeekStart) || isWeekPaused(room.pauses, lastWeekStart)) continue;
 
     const results = room.users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;

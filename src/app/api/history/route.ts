@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isUserResting } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isUserResting, isWeekPaused } from "@/lib/week";
 
 const WEEKS_BACK = 8;
 
@@ -15,6 +15,7 @@ export async function GET() {
   const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
   const userIds = users.map((u) => u.id);
   const currentWeekStart = getWeekStart();
+  const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
 
   const weeks = [];
   for (let i = 1; i <= WEEKS_BACK; i++) {
@@ -29,7 +30,7 @@ export async function GET() {
 
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart);
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart) || isWeekPaused(pauses, weekStart);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {

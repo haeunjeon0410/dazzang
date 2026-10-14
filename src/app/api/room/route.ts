@@ -72,6 +72,13 @@ export async function PATCH(req: NextRequest) {
         pausedUntil: null,
       },
     });
+    // 진행 중이던 정지를 취소하면 이번 주부터는 다시 벌금이 생긴다 (지난 주들의 정지 이력은 유지)
+    if (before?.pausedUntil) {
+      await prisma.roomPause.updateMany({
+        where: { roomId: me.roomId, untilWeek: { gt: getWeekStart() } },
+        data: { untilWeek: getWeekStart() },
+      });
+    }
 
     // 상대방 요청을 거절했거나, 진행 중인 정지를 취소한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
     const rejected = before?.pauseRequestedBy && before.pauseRequestedBy !== userId && !before.pausedUntil;
@@ -112,6 +119,12 @@ export async function PATCH(req: NextRequest) {
         pauseRequestedUntil: null,
       },
     });
+    // 이번 주부터 재개 월요일 전까지를 정지 이력으로 남긴다
+    if (room.pauseRequestedUntil) {
+      await prisma.roomPause.create({
+        data: { roomId: me.roomId, fromWeek: getWeekStart(), untilWeek: room.pauseRequestedUntil },
+      });
+    }
 
     const other = await findOther();
     if (other && room.pauseRequestedUntil) {
