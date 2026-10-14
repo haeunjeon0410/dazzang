@@ -268,11 +268,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (me) {
+    // loadMe가 매번 새 객체를 만들기 때문에 me 전체가 아니라 id로만 감시한다 (쉬어가기 등 액션마다 주/기록을 다시 불러오지 않도록)
+    if (me?.id) {
       loadWeek();
       loadHistory();
     }
-  }, [me]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
 
   const incomingPause = !!room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil;
   const roomPaused = !!room?.pausedUntil && new Date(room.pausedUntil) > new Date();
@@ -452,11 +454,15 @@ export default function Home() {
   }
 
   async function saveGroupAccount() {
-    await fetch("/api/room", {
+    const res = await fetch("/api/room", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(groupForm),
     });
+    if (!res.ok) {
+      alert((await res.json().catch(() => null))?.error || "저장에 실패했어요");
+      return;
+    }
     await loadMe();
     alert("모임 통장이 등록됐어요");
   }
@@ -591,7 +597,7 @@ export default function Home() {
 
         {/* 상대방이 정지 요청한 경우 */}
         {/* 친구가 쉬어가기를 거절해서 나만 쉬는 중: 그 기간 벌금 없음 */}
-        {me.restUntil && new Date(me.restUntil) > new Date() && !room?.pausedUntil && (
+        {me.restUntil && new Date(me.restUntil) > new Date() && !roomPaused && (
           <div className={`${CARD} space-y-1`}>
             <p className="text-sm font-bold text-[#4a2540]">혼자 쉬는 중이에요</p>
             <p className="text-xs text-[#b4779b]">
@@ -808,7 +814,7 @@ export default function Home() {
             </div>
 
             {/* 쉬어가기 요청 */}
-            {!(room?.pausedUntil && new Date(room.pausedUntil) > new Date()) && !room?.pauseRequestedBy && (
+            {!roomPaused && !room?.pauseRequestedBy && (
               <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
                 <p className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</p>
                 <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요. 이번 주부터 세고, 끝나는 주 다음 월요일에 다시 시작해요.</p>
