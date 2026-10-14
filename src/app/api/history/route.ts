@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isUserResting, isWeekPaused } from "@/lib/week";
 
 const WEEKS_BACK = 8;
 
@@ -15,21 +15,33 @@ export async function GET() {
   const users = await prisma.user.findMany({ where: { roomId: me.roomId } });
   const userIds = users.map((u) => u.id);
   const currentWeekStart = getWeekStart();
+  const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
+
+  // 8주치를 주마다 따로 조회하지 않고 한 번에 가져와서 주별로 나눈다
+  const weekStarts = Array.from(
+    { length: WEEKS_BACK },
+    (_, k) => new Date(currentWeekStart.getTime() - (k + 1) * 7 * 24 * 60 * 60 * 1000),
+  );
+  const [allCheckins, allSettlements, allExcuses] = await Promise.all([
+    prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
+    prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
+    prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
+  ]);
 
   const weeks = [];
   for (let i = 1; i <= WEEKS_BACK; i++) {
-    const weekStart = new Date(currentWeekStart.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    const weekStart = weekStarts[i - 1];
     const deadline = getWeekDeadline(weekStart);
 
-    const checkins = await prisma.checkin.findMany({ where: { weekStart, userId: { in: userIds } } });
-    const settlements = await prisma.settlement.findMany({ where: { weekStart, userId: { in: userIds } } });
-    const approvedExcuses = await prisma.excuse.findMany({
-      where: { weekStart, status: "APPROVED", userId: { in: userIds } },
-    });
+    const sameWeek = <T extends { weekStart: Date }>(rows: T[]) =>
+      rows.filter((r) => r.weekStart.getTime() === weekStart.getTime());
+    const checkins = sameWeek(allCheckins);
+    const settlements = sameWeek(allSettlements);
+    const approvedExcuses = sameWeek(allExcuses);
 
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id);
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isUserResting(u, weekStart) || isWeekPaused(pauses, weekStart);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {

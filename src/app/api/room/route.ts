@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { sendPushToUser } from "@/lib/push";
-import { getWeekStart, formatResumeDate } from "@/lib/week";
+import { getWeekStart, formatResumeDate, formatPauseEnd } from "@/lib/week";
 
 // 모임 통장(공용 계좌) 등록/수정 + 일시정지 요청/확정/취소
 export async function PATCH(req: NextRequest) {
@@ -42,6 +42,13 @@ export async function PATCH(req: NextRequest) {
     if (!reason) {
       return NextResponse.json({ error: "쉬어가려는 사유를 입력해주세요" }, { status: 400 });
     }
+    const current = await prisma.room.findUnique({ where: { id: me.roomId } });
+    if (current?.pausedUntil && current.pausedUntil > new Date()) {
+      return NextResponse.json({ error: "이미 쉬어가는 중이에요" }, { status: 400 });
+    }
+    if (current?.pauseRequestedBy && current.pauseRequestedBy !== userId) {
+      return NextResponse.json({ error: "친구가 보낸 쉬어가기 요청에 먼저 답해주세요" }, { status: 400 });
+    }
     // 이번 주(오늘 포함)부터 N주 쉬고 그다음 월요일부터 다시 시작.
     // 예: 금요일에 2주 요청 -> 이번 주 + 다음 주를 쉬고 다다음 주 월요일부터 재개
     const pauseRequestedUntil = new Date(getWeekStart().getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
@@ -61,8 +68,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (action === "cancel-pause") {
-    // 요청 취소 OR 진행 중인 정지 취소 — 양쪽 모두 가능
+    // 대기 중인 요청의 취소/거절만 가능. 쉬어가기는 시작되면 취소할 수 없다
     const before = await prisma.room.findUnique({ where: { id: me.roomId } });
+    if (before?.pausedUntil && before.pausedUntil > new Date()) {
+      return NextResponse.json({ error: "쉬어가기는 시작되면 취소할 수 없어요" }, { status: 400 });
+    }
     await prisma.room.update({
       where: { id: me.roomId },
       data: {
@@ -73,17 +83,23 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    // 상대방 요청을 거절했거나, 진행 중인 정지를 취소한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
-    const rejected = before?.pauseRequestedBy && before.pauseRequestedBy !== userId && !before.pausedUntil;
-    const stoppedActive = !!before?.pausedUntil;
-    if (rejected || stoppedActive) {
+    // 상대방 요청을 거절한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
+    const rejected = !!before?.pauseRequestedBy && before.pauseRequestedBy !== userId;
+
+    // 거절해도 요청한 친구는 그 기간 벌금이 없다 (나는 계속 도전, 친구만 쉼)
+    if (rejected && before?.pauseRequestedBy && before.pauseRequestedUntil) {
+      await prisma.user.update({
+        where: { id: before.pauseRequestedBy },
+        data: { restFrom: getWeekStart(), restUntil: before.pauseRequestedUntil },
+      });
+    }
+
+    if (rejected) {
       const other = await findOther();
       if (other) {
         await sendPushToUser(other, {
-          title: rejected ? "쉬어가기 요청 거절" : "쉬어가기 취소",
-          body: rejected
-            ? `${me.name}님이 쉬어가기 요청을 거절했어요`
-            : `${me.name}님이 쉬어가기를 취소했어요. 다시 시작이에요!`,
+          title: "쉬어가기 요청 거절",
+          body: `${me.name}님은 계속 도전해요. 대신 ${before?.pauseRequestedUntil ? `~ ${formatPauseEnd(before.pauseRequestedUntil)}까지 ` : ""}벌금은 없어요`,
         });
       }
     }
@@ -95,14 +111,30 @@ export async function PATCH(req: NextRequest) {
     if (!room?.pauseRequestedBy || room.pauseRequestedBy === userId) {
       return NextResponse.json({ error: "상대방의 요청만 수락할 수 있어요" }, { status: 403 });
     }
-    await prisma.room.update({
-      where: { id: me.roomId },
+    // 요청 후 시간이 지나 이미 끝난 기간이면 수락할 수 없다 (요청을 정리)
+    if (!room.pauseRequestedUntil || room.pauseRequestedUntil <= getWeekStart()) {
+      await prisma.room.update({
+        where: { id: me.roomId },
+        data: { pauseRequestedBy: null, pauseRequestedUntil: null, pauseReason: null },
+      });
+      return NextResponse.json({ error: "요청한 기간이 이미 지나서 만료됐어요. 다시 요청해달라고 해주세요" }, { status: 400 });
+    }
+    // 더블 탭 등으로 두 번 처리되지 않도록 아직 같은 요청이 남아 있을 때만 확정
+    const confirmed = await prisma.room.updateMany({
+      where: { id: me.roomId, pauseRequestedBy: room.pauseRequestedBy },
       data: {
         pausedUntil: room.pauseRequestedUntil,
         pauseRequestedBy: null,
         pauseRequestedUntil: null,
       },
     });
+    if (confirmed.count === 0) return NextResponse.json({ ok: true });
+    // 이번 주부터 재개 월요일 전까지를 정지 이력으로 남긴다
+    if (room.pauseRequestedUntil) {
+      await prisma.roomPause.create({
+        data: { roomId: me.roomId, fromWeek: getWeekStart(), untilWeek: room.pauseRequestedUntil },
+      });
+    }
 
     const other = await findOther();
     if (other && room.pauseRequestedUntil) {
