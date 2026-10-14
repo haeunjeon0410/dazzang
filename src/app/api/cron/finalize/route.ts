@@ -27,12 +27,14 @@ export async function GET(req: NextRequest) {
     // (마감 스킵 판단은 아래에서 정리 전 값 room.pausedUntil로 그대로 한다)
     if (room.pausedUntil && room.pausedUntil <= thisWeekStart) {
       if (room.pausedUntil.getTime() === thisWeekStart.getTime()) {
-        for (const u of room.users) {
-          await sendPushToUser(u, {
-            title: "쉬어가기 끝! 다시 시작해요",
-            body: `이번 주(${formatResumeDate(thisWeekStart)})부터 다시 시작! 이번 주 ${REQUIRED_COUNT}회 인증 가보자고요`,
-          });
-        }
+        await Promise.allSettled(
+          room.users.map((u) =>
+            sendPushToUser(u, {
+              title: "쉬어가기 끝! 다시 시작해요",
+              body: `이번 주(${formatResumeDate(thisWeekStart)})부터 다시 시작! 이번 주 ${REQUIRED_COUNT}회 인증 가보자고요`,
+            }),
+          ),
+        );
       }
       await prisma.room.update({ where: { id: room.id }, data: { pausedUntil: null, pauseReason: null } });
     }
@@ -66,12 +68,14 @@ export async function GET(req: NextRequest) {
     // 모두 목표를 채웠으면 알릴 게 없으니 결과 알림은 생략
     if (results.every((r) => r.count >= REQUIRED_COUNT)) continue;
 
-    for (const r of results) {
-      await sendPushToUser(r.user, {
-        title: "지난 주 인증 결과 확정",
-        body,
-      });
-    }
+    await Promise.allSettled(
+      results.map((r) =>
+        sendPushToUser(r.user, {
+          title: "지난 주 인증 결과 확정",
+          body,
+        }),
+      ),
+    );
   }
 
   return NextResponse.json({ ok: true, results: allResults });
