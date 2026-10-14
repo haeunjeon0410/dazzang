@@ -310,14 +310,19 @@ export default function Home() {
   }, [pauseFxUnseen, !!weekData]);
 
   async function confirmPause() {
-    if (room?.pauseRequestedUntil) markPauseEffectSeen(`${room.inviteToken}:${room.pauseRequestedUntil}`);
+    const seenId = room?.pauseRequestedUntil ? `${room.inviteToken}:${room.pauseRequestedUntil}` : null;
+    // 서버가 수락을 거부하면(만료 등) 연출 없이 끝낸다 — 예전엔 먼저 떨어지고 나서 실패해서 화면만 망가졌다
     setPauseFalling(true);
+    if (!(await roomAction("confirm-pause"))) {
+      setPauseFalling(false);
+      return;
+    }
+    if (seenId) markPauseEffectSeen(seenId);
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // 팝업이 닫힌 뒤(다음 렌더)에 떨어질 대상을 잡는다
     await new Promise((r) => setTimeout(r, 50));
     const ms = reduceMotion ? 0 : prepareFall(mainRef.current);
     await new Promise((r) => setTimeout(r, ms));
-    await roomAction("confirm-pause");
     clearFall(mainRef.current);
     setPauseFalling(false);
   }
