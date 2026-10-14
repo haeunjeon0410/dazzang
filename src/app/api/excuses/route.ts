@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (other) {
     await sendPushToUser(other, {
       title: "사정 봐달라하기 요청 도착",
-      body: `${requester.name}: "${excuse.reason}" - 허락할지 확인해주세요`,
+      body: `${requester.name} - 허락할지 확인해주세요`,
     });
   }
 
