@@ -13,7 +13,9 @@ function verify(token: string): string | null {
   const [userId, sig] = token.split(".");
   if (!userId || !sig) return null;
   const expected = crypto.createHmac("sha256", SECRET).update(userId).digest("hex");
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  const given = Buffer.from(sig);
+  const want = Buffer.from(expected);
+  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) return null;
   return userId;
 }
 

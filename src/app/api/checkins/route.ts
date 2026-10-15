@@ -27,12 +27,26 @@ export async function GET(req: NextRequest) {
   });
 
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
+  const ribbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds } } });
   const roomPaused = isWeekPaused(pauses, weekStart);
+
+  // 최근 2주 안에 쓴 리본이 면제한 주의 인증 횟수 (면제된 벌금 금액 계산용)
+  const recentCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const recentUsed = ribbons.filter((r) => r.usedWeek && r.usedAt && r.usedAt.getTime() > recentCutoff);
+  const usedWeeks = [...new Set(recentUsed.map((r) => r.usedWeek!.getTime()))].map((t) => new Date(t));
+  const usedWeekCheckins = usedWeeks.length
+    ? await prisma.checkin.findMany({
+        where: { userId: { in: userIds }, weekStart: { in: usedWeeks } },
+        select: { userId: true, weekStart: true },
+      })
+    : [];
 
   const summary = users.map((u) => {
     const mine = checkins.filter((c) => c.userId === u.id);
     // 사정 봐달라하기가 허락되면 인증 1회로 치환되는 게 아니라, 그 주 벌금 자체가 통째로 사면된다
-    const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || roomPaused;
+    const ribbonUsed = ribbons.some((r) => r.userId === u.id && r.usedWeek?.getTime() === weekStart.getTime());
+    const pardoned =
+      approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || roomPaused || ribbonUsed;
     const count = mine.length;
     const shortfall = Math.max(0, REQUIRED_COUNT - count);
     return {
@@ -40,6 +54,22 @@ export async function GET(req: NextRequest) {
       name: u.name,
       count,
       pardoned,
+      ribbonUsed,
+      ribbons: ribbons.filter((r) => r.userId === u.id && !r.usedWeek).length,
+      ribbonIds: ribbons.filter((r) => r.userId === u.id && !r.usedWeek).map((r) => r.id),
+      // 최근 2주 안에 받은 리본: 앱을 열었을 때 한 번 훈장이 붙는 연출을 보여주기 위함
+      recentEarnedRibbonIds: ribbons
+        .filter((r) => r.userId === u.id && r.createdAt.getTime() > Date.now() - 14 * 24 * 60 * 60 * 1000)
+        .map((r) => r.id),
+      // 최근 2주 안에 쓴 리본: 앱을 열었을 때 한 번 훈장이 떨어지고, 어느 주 벌금을 얼마나 면제했는지 알려주기 위함
+      recentUsedRibbons: recentUsed
+        .filter((r) => r.userId === u.id)
+        .map((r) => {
+          const cnt = usedWeekCheckins.filter(
+            (c) => c.userId === u.id && c.weekStart.getTime() === r.usedWeek!.getTime(),
+          ).length;
+          return { id: r.id, usedWeek: r.usedWeek, waivedFine: Math.max(0, REQUIRED_COUNT - cnt) * FINE_PER_MISS };
+        }),
       shortfall,
       fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
       checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),

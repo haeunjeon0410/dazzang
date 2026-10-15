@@ -49,16 +49,75 @@ export async function GET(req: NextRequest) {
       const resting = isWeekPaused(u.rests, lastWeekStart);
       const pardoned = excused || resting;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
-      return { user: u, count, pardoned, excused, shortfall, fine: pardoned ? 0 : shortfall * FINE_PER_MISS };
+      return {
+        user: u,
+        count,
+        pardoned,
+        excused,
+        ribbonUsed: false,
+        shortfall,
+        fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
+      };
     });
+
+    // 리본 획득: 친구가 쉬는 주(혼자 쉬기를 거절당했거나, 사정 봐달라하기가 허락된 주)에
+    // 나는 쉬지 않고 목표(3회)를 채웠으면 리본 1개
+    for (const r of results) {
+      const friendResting = results.some(
+        (o) => o.user.id !== r.user.id && (o.excused || isWeekPaused(o.user.rests, lastWeekStart)),
+      );
+      const meResting = r.excused || isWeekPaused(r.user.rests, lastWeekStart);
+      if (r.count >= REQUIRED_COUNT && friendResting && !meResting) {
+        const created = await prisma.ribbon.createMany({
+          data: [{ userId: r.user.id, weekStart: lastWeekStart }],
+          skipDuplicates: true,
+        });
+        if (created.count > 0) {
+          await sendPushToUser(r.user, {
+            title: "리본 획득!",
+            icon: "/assets/ribbon.webp",
+            body: "친구가 쉬는 동안에도 목표를 채웠어요. 벌금이 생기는 주에 리본이 자동으로 면제해줘요",
+          });
+        }
+      }
+    }
+
+    // 리본 사용: 벌금이 생긴 사람은 가장 오래된 리본 1개로 그 주 벌금을 면제
+    for (const r of results) {
+      if (r.fine <= 0) continue;
+      // 이미 이 주에 리본을 써서 면제한 사람이면(정산을 다시 돌린 경우) 새로 쓰지 않고 면제 상태만 반영
+      const alreadyUsed = await prisma.ribbon.findFirst({ where: { userId: r.user.id, usedWeek: lastWeekStart } });
+      if (alreadyUsed) {
+        r.pardoned = true;
+        r.ribbonUsed = true;
+        r.fine = 0;
+        continue;
+      }
+      const ribbon = await prisma.ribbon.findFirst({
+        where: { userId: r.user.id, usedWeek: null },
+        orderBy: { weekStart: "asc" },
+      });
+      if (!ribbon) continue;
+      const used = await prisma.ribbon.updateMany({
+        where: { id: ribbon.id, usedWeek: null },
+        data: { usedWeek: lastWeekStart, usedAt: new Date() },
+      });
+      if (used.count > 0) {
+        r.pardoned = true;
+        r.ribbonUsed = true;
+        r.fine = 0;
+      }
+    }
 
     const body = results
       .map((r) => {
         const pardonNote =
           r.pardoned && r.count < REQUIRED_COUNT
-            ? r.excused
-              ? " (사정 봐달라하기로 벌금 사면)"
-              : " (쉬는 기간이라 벌금 없음)"
+            ? r.ribbonUsed
+              ? " (리본 사용으로 벌금 면제)"
+              : r.excused
+                ? " (사정 봐달라하기로 벌금 사면)"
+                : " (쉬는 기간이라 벌금 없음)"
             : "";
         return `${r.user.name}: ${r.count}/${REQUIRED_COUNT}회${pardonNote}, 벌금 ${r.fine.toLocaleString()}원`;
       })

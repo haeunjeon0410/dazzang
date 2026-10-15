@@ -22,10 +22,11 @@ export async function GET() {
     { length: WEEKS_BACK },
     (_, k) => new Date(currentWeekStart.getTime() - (k + 1) * 7 * 24 * 60 * 60 * 1000),
   );
-  const [allCheckins, allSettlements, allExcuses] = await Promise.all([
+  const [allCheckins, allSettlements, allExcuses, allRibbons] = await Promise.all([
     prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
+    prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } } }),
   ]);
 
   const weeks = [];
@@ -38,10 +39,12 @@ export async function GET() {
     const checkins = sameWeek(allCheckins);
     const settlements = sameWeek(allSettlements);
     const approvedExcuses = sameWeek(allExcuses);
+    const usedRibbons = allRibbons.filter((r) => r.usedWeek?.getTime() === weekStart.getTime());
 
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart);
+      const ribbonUsed = usedRibbons.some((r) => r.userId === u.id);
+      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart) || ribbonUsed;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       return {
@@ -49,6 +52,9 @@ export async function GET() {
         name: u.name,
         count,
         pardoned,
+        ribbonUsed,
+        // 리본이 대신 내준 벌금 (주간 결과 팝업에서 "리본을 써서 면제" 안내용)
+        waivedFine: ribbonUsed ? shortfall * FINE_PER_MISS : 0,
         shortfall,
         fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
         settled: settlement?.settled ?? false,

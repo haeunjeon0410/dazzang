@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatPauseEnd } from "@/lib/week";
 
-const OWNER_CODE = "000000";
+// 관리자 코드는 화면 코드에 두지 않고, 홈에서 서버가 확인한 코드를 이 탭에서만 기억한다
+function ownerCode(): string {
+  try {
+    return sessionStorage.getItem("dajjang_owner_code") ?? "";
+  } catch {
+    return "";
+  }
+}
 
 type RoomInfo = {
   id: string;
@@ -21,10 +28,14 @@ export default function OwnerHome() {
   const [error, setError] = useState("");
 
   async function load() {
+    if (!ownerCode()) {
+      router.replace("/");
+      return;
+    }
     const res = await fetch("/api/owner", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: OWNER_CODE }),
+      body: JSON.stringify({ code: ownerCode() }),
     });
     if (!res.ok) {
       setError("불러오지 못했어요");
@@ -42,7 +53,7 @@ export default function OwnerHome() {
     const res = await fetch("/api/owner/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: OWNER_CODE, userId }),
+      body: JSON.stringify({ code: ownerCode(), userId }),
     });
     if (!res.ok) {
       setError("로그인 실패");

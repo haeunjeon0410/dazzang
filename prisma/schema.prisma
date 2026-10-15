@@ -55,6 +55,21 @@ model UserRest {
   @@index([userId])
 }
 
+// 친구가 혼자 쉬는 주에 목표(주 3회)를 채운 사람이 받는 리본.
+// 벌금이 생긴 주에 월요일 정산이 자동으로 1개를 써서 그 주 벌금을 면제한다 (가장 오래된 리본부터)
+model Ribbon {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime // 리본을 받은 주
+  usedWeek  DateTime? // 면제에 쓴 주 (null이면 아직 안 씀)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, weekStart])
+  @@index([userId])
+}
+
 model User {
   id        String   @id @default(cuid())
   roomId    String
@@ -67,6 +82,7 @@ model User {
   linkGroup String?
   // 쉬어가기 요청을 친구가 거절("나라도 지킨다")했을 때: 요청한 사람만 이 기간(주 단위) 벌금이 면제된다
   rests UserRest[]
+  ribbons Ribbon[]
 
   checkins      Checkin[]
   settlements   Settlement[]

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { setSession } from "@/lib/session";
+import { clientIp, tooManyRequests } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  if (tooManyRequests(`join:${clientIp(req)}`, 15)) {
+    return NextResponse.json({ error: "너무 많이 시도했어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
+  }
   const { token } = await params;
   const { name } = await req.json();
   if (!name || typeof name !== "string" || !name.trim()) {

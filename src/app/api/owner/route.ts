@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isOwnerCode } from "@/lib/owner";
+import { clientIp, tooManyRequests } from "@/lib/rate-limit";
 
 // 나 혼자만 쓰는 전용 화면용. 여러 방(친구별로)을 한번에 보기 위한 것으로,
 // 코드를 아는 사람만 쓸 수 있게 서버에서도 다시 확인한다.
-const OWNER_CODE = "000000";
-
 export async function POST(req: NextRequest) {
-  const { code } = await req.json();
-  if (code !== OWNER_CODE) {
+  if (tooManyRequests(`owner:${clientIp(req)}`, 10)) {
+    return NextResponse.json({ error: "너무 많이 시도했어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
+  }
+  const { code } = await req.json().catch(() => ({}));
+  if (!isOwnerCode(code)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

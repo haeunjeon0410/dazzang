@@ -46,6 +46,10 @@ type Summary = {
   count: number;
   shortfall: number;
   fine: number;
+  ribbons?: number;
+  recentUsedRibbons?: { id: string; usedWeek: string; waivedFine: number }[];
+  ribbonIds?: string[];
+  recentEarnedRibbonIds?: string[];
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
@@ -62,7 +66,16 @@ type Room = {
   pausedUntil: string | null;
 };
 
-type WeekSummary = { userId: string; name: string; count: number; shortfall: number; fine: number; settled: boolean };
+type WeekSummary = {
+  userId: string;
+  name: string;
+  count: number;
+  shortfall: number;
+  fine: number;
+  settled: boolean;
+  ribbonUsed?: boolean;
+  waivedFine?: number;
+};
 type PastWeek = { weekStart: string; deadline: string; summary: WeekSummary[] };
 
 const BANK_SCHEMES: Record<string, string> = {
@@ -72,7 +85,6 @@ const BANK_SCHEMES: Record<string, string> = {
 
 const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
 // 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
-const OWNER_CODE = "000000";
 
 // 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
 const CONFETTI_COLORS = ["#f472b6", "#ec4899", "#ffc72c", "#60a5fa", "#34d399", "#a78bfa"];
@@ -214,6 +226,8 @@ export default function Home() {
   const [pauseWeeks, setPauseWeeks] = useState(2);
   const [pauseReason, setPauseReason] = useState("");
   const [weekResultPopup, setWeekResultPopup] = useState<PastWeek | null>(null);
+  // 주간 결과 팝업을 띄울지 판단이 끝났는지 (끝나기 전에 훈장 연출이 팝업 뒤에서 먼저 돌지 않도록)
+  const [historyReady, setHistoryReady] = useState(false);
 
   async function loadMe() {
     const res = await fetch("/api/me");
@@ -239,7 +253,10 @@ export default function Home() {
 
   async function loadHistory() {
     const res = await fetch("/api/history");
-    if (!res.ok) return;
+    if (!res.ok) {
+      setHistoryReady(true);
+      return;
+    }
     const data = await res.json();
     setPastWeeks(data.weeks);
 
@@ -247,6 +264,7 @@ export default function Home() {
     if (lastWeek && !getSeenWeeks().has(lastWeek.weekStart)) {
       setWeekResultPopup(lastWeek);
     }
+    setHistoryReady(true);
   }
 
   function closeWeekResultPopup(goToSettlement: boolean) {
@@ -362,14 +380,26 @@ export default function Home() {
     }
   }
 
-  function handleJoinRoom(e: React.FormEvent) {
+  async function handleJoinRoom(e: React.FormEvent) {
     e.preventDefault();
-    const code = roomCode.trim().toUpperCase();
+    const typed = roomCode.trim();
+    const code = typed.toUpperCase();
     if (!code) {
       setLoginError("방 코드를 입력해주세요");
       return;
     }
-    if (code === OWNER_CODE) {
+    // 관리자 코드인지는 서버가 확인한다 (화면 코드에는 관리자 코드를 넣지 않는다)
+    const owner = await fetch("/api/owner", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: typed }),
+    }).catch(() => null);
+    if (owner?.ok) {
+      try {
+        sessionStorage.setItem("dajjang_owner_code", typed);
+      } catch {
+        // 저장이 안 되면 /me에서 다시 입력하게 된다
+      }
       router.push("/me");
       return;
     }
@@ -637,6 +667,13 @@ export default function Home() {
               otherName={otherEntry.name}
               myFine={myEntry.fine}
               otherFine={otherEntry.fine}
+              myRibbons={myEntry.ribbons ?? 0}
+              otherRibbons={otherEntry.ribbons ?? 0}
+              fxEnabled={historyReady && !weekResultPopup}
+              myUsedRibbons={myEntry.recentUsedRibbons ?? []}
+              otherUsedRibbons={otherEntry.recentUsedRibbons ?? []}
+              myEarnedRibbonIds={(myEntry.recentEarnedRibbonIds ?? []).filter((id) => myEntry.ribbonIds?.includes(id))}
+              otherEarnedRibbonIds={(otherEntry.recentEarnedRibbonIds ?? []).filter((id) => otherEntry.ribbonIds?.includes(id))}
               myCaption={me.caption}
               otherCaption={otherCaption}
               mySleeping={!!me.restUntil && new Date(me.restUntil) > new Date()}
@@ -974,11 +1011,31 @@ export default function Home() {
                   </p>
                   <div className="space-y-1 text-sm bg-[#fff0f6] rounded-xl p-3">
                     {weekResultPopup.summary.map((s) => (
-                      <div key={s.userId} className="flex items-center justify-between">
-                        <span className="font-semibold text-[#4a2540]">{s.name}</span>
-                        <span className={s.fine > 0 ? "text-[#ec4899] font-bold" : "text-[#2f9e44] font-bold"}>
-                          {s.count}/3{s.fine > 0 ? ` · 벌금 ${s.fine.toLocaleString()}원` : " · 완료"}
-                        </span>
+                      <div key={s.userId}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-[#4a2540]">{s.name}</span>
+                          {s.ribbonUsed ? (
+                            <span className="font-bold text-[#b4779b]">
+                              {s.count}/3 ·{" "}
+                              <span className="line-through decoration-[#ec4899] decoration-2">
+                                벌금 {(s.waivedFine ?? 0).toLocaleString()}원
+                              </span>
+                            </span>
+                          ) : (
+                            <span className={s.fine > 0 ? "text-[#ec4899] font-bold" : "text-[#2f9e44] font-bold"}>
+                              {s.count}/3{s.fine > 0 ? ` · 벌금 ${s.fine.toLocaleString()}원` : " · 완료"}
+                            </span>
+                          )}
+                        </div>
+                        {s.ribbonUsed && (
+                          <div className="mt-1 flex justify-end">
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-[#ffc2dc] bg-white px-2 py-0.5 text-xs font-bold text-[#b4356f] shadow-sm">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src="/assets/ribbon.webp" alt="" className="h-4 w-4 object-contain" />
+                              리본을 써서 면제됐어요
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

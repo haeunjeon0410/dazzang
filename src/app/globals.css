@@ -157,3 +157,62 @@ html.paused-app { filter: grayscale(1) contrast(0.95); }
   .sleep-z:nth-of-type(2) { right: 14%; top: -8%; }
   .sleep-z:nth-of-type(3) { right: 24%; top: -18%; }
 }
+
+/* 리본 훈장이 떨어지는 연출: 톡 하고 떨어져 나와(튀어오름) → 흔들 → 중력으로 떨어져 → 바닥에서 통통 튀다가 → 사라진다.
+   --dir: 캐릭터 쪽으로 굴러가는 방향 (왼쪽 훈장 1, 오른쪽 훈장 -1) */
+@keyframes ribbon-drop {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; animation-timing-function: ease-out; }
+  7% { transform: translate(0, -9px) rotate(-22deg) scale(1.35); animation-timing-function: ease-in-out; }
+  14% { transform: translate(calc(var(--dir, 1) * 1px), -3px) rotate(14deg) scale(1.2); animation-timing-function: ease-in-out; }
+  21% { transform: translate(calc(var(--dir, 1) * 2px), -5px) rotate(-10deg) scale(1.15); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  44% { transform: translate(calc(var(--dir, 1) * 12px), 64px) rotate(150deg) scale(1); animation-timing-function: ease-out; }
+  52% { transform: translate(calc(var(--dir, 1) * 17px), 40px) rotate(215deg) scale(1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  60% { transform: translate(calc(var(--dir, 1) * 22px), 64px) rotate(260deg) scale(1); animation-timing-function: ease-out; }
+  66% { transform: translate(calc(var(--dir, 1) * 25px), 54px) rotate(285deg) scale(1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  72% { transform: translate(calc(var(--dir, 1) * 27px), 64px) rotate(300deg) scale(1); opacity: 1; }
+  86% { transform: translate(calc(var(--dir, 1) * 28px), 64px) rotate(300deg) scale(1); opacity: 1; }
+  100% { transform: translate(calc(var(--dir, 1) * 28px), 64px) rotate(300deg) scale(1); opacity: 0; }
+}
+.ribbon-fall { animation: ribbon-drop 3s linear 0.8s both; }
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-fall { display: none; }
+}
+
+/* 리본을 얻었을 때: 위에서 날아와 캐릭터 옆에 척 붙는 훈장 + 반짝임 + 안내 배너 */
+@keyframes ribbon-attach {
+  0% { transform: translateY(-46px) scale(2.6) rotate(-30deg); opacity: 0; }
+  35% { opacity: 1; }
+  62% { transform: translateY(2px) scale(0.85) rotate(6deg); opacity: 1; }
+  80% { transform: translateY(-1px) scale(1.28) rotate(-4deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes ribbon-sparkle {
+  0%, 55% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  72% { opacity: 1; transform: scale(1.5) rotate(40deg); }
+  100% { opacity: 0; transform: scale(2.1) rotate(90deg); }
+}
+@keyframes ribbon-toast {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+  10% { opacity: 1; transform: translateY(0) scale(1); }
+  90% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+.ribbon-attach { animation: ribbon-attach 1.1s cubic-bezier(0.3, 0.7, 0.4, 1) 0.5s both; }
+.ribbon-sparkle {
+  position: absolute;
+  inset: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #ffc72c;
+  text-shadow: 0 0 4px #fff;
+  pointer-events: none;
+  animation: ribbon-sparkle 1.1s ease-out 0.5s both;
+}
+.ribbon-toast { animation: ribbon-toast 5s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-attach { animation: none; }
+  .ribbon-sparkle { display: none; }
+  .ribbon-toast { animation: none; }
+}

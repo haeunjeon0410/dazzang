@@ -17,6 +17,7 @@ export async function GET() {
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
   const checkins = await prisma.checkin.findMany({ where: { userId: { in: userIds } } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } });
+  const usedRibbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } });
 
   const stats = users.map((u) => {
     const myCheckins = checkins.filter((c) => c.userId === u.id);
@@ -26,9 +27,11 @@ export async function GET() {
       byWeek.set(key, (byWeek.get(key) ?? 0) + 1);
     }
     // 사정 봐달라하기가 허락된 주는 인증 횟수에 더해지는 게 아니라 그 주 벌금이 통째로 사면된다
-    const pardonedWeeks = new Set(
-      approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
-    );
+    const pardonedWeeks = new Set([
+      ...approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
+      // 리본을 써서 면제한 주도 벌금이 없다
+      ...usedRibbons.filter((r) => r.userId === u.id && r.usedWeek).map((r) => r.usedWeek!.toISOString()),
+    ]);
     // 승리/벌금은 마감된 주만 센다 (진행 중인 이번 주는 아직 결과가 아님)
     const allWeekKeys = new Set(
       [...byWeek.keys(), ...pardonedWeeks].filter((key) => isWeekFinalized(new Date(key))),

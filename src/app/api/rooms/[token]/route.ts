@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { clientIp, tooManyRequests } from "@/lib/rate-limit";
 
 // 초대 링크로 들어왔을 때 방 정보(멤버 목록, 정원 여부) 조회용. 비밀정보 없음
-export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  if (tooManyRequests(`room:${clientIp(req)}`, 30)) {
+    return NextResponse.json({ error: "너무 많이 시도했어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
+  }
   const { token } = await params;
   const room = await prisma.room.findUnique({
     where: { inviteToken: token },
