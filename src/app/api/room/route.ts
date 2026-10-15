@@ -61,6 +61,7 @@ export async function PATCH(req: NextRequest) {
     if (other) {
       await sendPushToUser(other, {
         title: "쉬어가기 요청 도착",
+        icon: "/assets/sleep-icon-192.png",
         body: `친구에게서 쉬어가기 요청이 왔어요 (${weeks}주)`,
       });
     }
@@ -100,6 +101,7 @@ export async function PATCH(req: NextRequest) {
       if (other) {
         await sendPushToUser(other, {
           title: "쉬어가기 요청 거절",
+        icon: "/assets/sleep-icon-192.png",
           body: exempt
             ? `${me.name}님은 계속 도전해요. 대신 ${before?.pauseRequestedUntil ? `~ ${formatPauseEnd(before.pauseRequestedUntil)}까지 ` : ""}벌금은 없어요`
             : `${me.name}님이 쉬어가기 요청을 거절했어요. 둘 다 계속 도전해요`,
@@ -143,6 +145,7 @@ export async function PATCH(req: NextRequest) {
     if (other && room.pauseRequestedUntil) {
       await sendPushToUser(other, {
         title: "쉬어가기 수락!",
+        icon: "/assets/sleep-icon-192.png",
         body: `${me.name}님이 수락했어요. ${formatResumeDate(room.pauseRequestedUntil)}부터 다시 시작해요`,
       });
     }

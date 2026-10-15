@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
           room.users.map((u) =>
             sendPushToUser(u, {
               title: "쉬어가기 끝! 다시 시작해요",
+              icon: "/assets/sleep-icon-192.png",
               body: `이번 주(${formatResumeDate(thisWeekStart)})부터 다시 시작! 이번 주 ${REQUIRED_COUNT}회 인증 가보자고요`,
             }),
           ),

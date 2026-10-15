@@ -10,7 +10,7 @@ if (publicKey && privateKey) {
 
 export async function sendPushToSubscriptions(
   subscriptions: { endpoint: string; p256dh: string; auth: string }[],
-  payload: { title: string; body: string },
+  payload: { title: string; body: string; icon?: string },
 ) {
   await Promise.allSettled(
     subscriptions.map((sub) =>
@@ -29,7 +29,7 @@ export async function sendPushToSubscriptions(
 // 알림이 마지막에 로그인한 계정 방 것만 도착한다. 그래서 연결된 계정들의 구독을 모아 보낸다.
 export async function sendPushToUser(
   user: { id: string; linkGroup: string | null },
-  payload: { title: string; body: string },
+  payload: { title: string; body: string; icon?: string },
 ) {
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {

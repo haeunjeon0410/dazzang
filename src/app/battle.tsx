@@ -13,6 +13,25 @@ function todayKstDateStr(): string {
   return new Date(Date.now() + KST_OFFSET_MS - DAY_RESET_MS).toISOString().slice(0, 10);
 }
 
+// 자는 캐릭터: 천천히 숨 쉬듯 부풀고, 머리 위로 Z가 하나씩 떠올랐다 사라진다
+export function SleepingFigure({ src, height, lift }: { src: string; height: number; lift: number }) {
+  return (
+    <div className="relative" style={{ marginBottom: lift }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="자는 중" style={{ height }} className="sleep-breathe block w-auto" />
+      <span className="sleep-z" style={{ animationDelay: "0s" }} aria-hidden>
+        z
+      </span>
+      <span className="sleep-z" style={{ animationDelay: "0.9s" }} aria-hidden>
+        z
+      </span>
+      <span className="sleep-z" style={{ animationDelay: "1.8s" }} aria-hidden>
+        Z
+      </span>
+    </div>
+  );
+}
+
 export function Battle({
   myCount,
   otherCount,
@@ -22,6 +41,8 @@ export function Battle({
   otherFine,
   myCaption,
   otherCaption,
+  mySleeping,
+  otherSleeping,
   onCaptionSaved,
 }: {
   myCount: number;
@@ -32,6 +53,9 @@ export function Battle({
   otherFine: number;
   myCaption?: string;
   otherCaption?: string;
+  // 혼자 쉬는 중이면 서 있는 캐릭터 대신 자는 모습을 보여준다
+  mySleeping?: boolean;
+  otherSleeping?: boolean;
   onCaptionSaved?: () => void;
 }) {
   const [poked, setPoked] = useState(() => {
@@ -95,6 +119,10 @@ export function Battle({
   const myScale = Math.min(1.5, Math.max(0.7, 1 + diff * 0.12));
   const otherScale = Math.min(1.5, Math.max(0.7, 1 - diff * 0.12));
   const BASE_HEIGHT = 96;
+  // 자는 그림은 여백 없이 잘라둔 이미지라서, 서 있는 캐릭터 스프라이트(위아래 투명 여백 약 11%)와
+  // 보이는 머리 끝~발 끝 범위가 같아지도록 키(0.77)와 바닥 띄우기(0.105)를 직접 눈으로 맞춘 값
+  const SLEEP_HEIGHT = Math.round(BASE_HEIGHT * 0.77);
+  const SLEEP_LIFT = Math.round(BASE_HEIGHT * 0.105);
 
   return (
     <div className="rounded-3xl bg-white border border-[#ffd6e8] shadow-sm overflow-hidden">
@@ -109,7 +137,11 @@ export function Battle({
         <div className="flex items-end justify-around gap-2 mt-2">
           <div className="flex-1 min-w-0 flex flex-col items-center">
             <div style={{ transform: `scale(${myScale})` }} className="transition-transform duration-500 ease-out">
-              <CharacterSprite row={CharRow.A} pose={myCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL} height={BASE_HEIGHT} />
+              {mySleeping ? (
+                <SleepingFigure src="/assets/sleep-a.webp" height={SLEEP_HEIGHT} lift={SLEEP_LIFT} />
+              ) : (
+                <CharacterSprite row={CharRow.A} pose={myCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL} height={BASE_HEIGHT} />
+              )}
             </div>
           </div>
 
@@ -124,11 +156,15 @@ export function Battle({
               style={{ transform: `scale(${otherScale})` }}
               aria-label={`${otherName} 격려하기`}
             >
-              <CharacterSprite
-                row={CharRow.B}
-                pose={otherCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL}
-                height={BASE_HEIGHT}
-              />
+              {otherSleeping ? (
+                <SleepingFigure src="/assets/sleep-b.webp" height={SLEEP_HEIGHT} lift={SLEEP_LIFT} />
+              ) : (
+                <CharacterSprite
+                  row={CharRow.B}
+                  pose={otherCount >= 3 ? CharPose.WIN : CharPose.NEUTRAL}
+                  height={BASE_HEIGHT}
+                />
+              )}
             </button>
           </div>
         </div>

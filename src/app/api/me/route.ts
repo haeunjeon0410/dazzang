@@ -10,7 +10,10 @@ export async function GET() {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { room: true, rests: true } });
   if (!user) return NextResponse.json({ user: null });
 
-  const other = await prisma.user.findFirst({ where: { roomId: user.roomId, id: { not: userId } } });
+  const other = await prisma.user.findFirst({
+    where: { roomId: user.roomId, id: { not: userId } },
+    include: { rests: true },
+  });
 
   // 지금 진행 중인(끝나지 않은) 혼자 쉬는 기간 중 가장 늦게 끝나는 것
   const now = new Date();
@@ -33,7 +36,14 @@ export async function GET() {
       pauseReason: user.room.pauseReason,
       pausedUntil: user.room.pausedUntil,
     },
-    other: other ? { id: other.id, name: other.name, caption: other.captions[0] ?? "" } : null,
+    other: other
+      ? {
+          id: other.id,
+          name: other.name,
+          caption: other.captions[0] ?? "",
+          resting: other.rests.some((r) => r.fromWeek <= now && r.untilWeek > now),
+        }
+      : null,
   });
 }
 

@@ -125,3 +125,35 @@ html.paused-app { filter: grayscale(1) contrast(0.95); }
 .paused-center .paused-badge { font-size: 16px; padding: 4px 12px; }
 .paused-until { font-size: 16px; font-weight: 700; color: #55555e; }
 .paused-hint { font-size: 11px; color: #85858f; }
+
+/* 자는 캐릭터: 숨쉬기 + 떠오르는 zzz */
+@keyframes sleep-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.025, 1.045); }
+}
+@keyframes sleep-z-float {
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.6) rotate(-8deg); }
+  15% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(14px, -30px) scale(1.15) rotate(8deg); }
+}
+.sleep-breathe { transform-origin: 50% 100%; animation: sleep-breathe 3.2s ease-in-out infinite; }
+.sleep-z {
+  position: absolute;
+  right: 4%;
+  top: 2%;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  color: #5b9cf0;
+  text-shadow: 1.5px 0 #fff, -1.5px 0 #fff, 0 1.5px #fff, 0 -1.5px #fff, 1px 1px #fff, -1px -1px #fff, 1px -1px #fff, -1px 1px #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: sleep-z-float 2.7s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sleep-breathe { animation: none; }
+  .sleep-z { animation: none; opacity: 1; }
+  .sleep-z:nth-of-type(2) { right: 14%; top: -8%; }
+  .sleep-z:nth-of-type(3) { right: 24%; top: -18%; }
+}

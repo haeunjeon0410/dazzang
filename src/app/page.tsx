@@ -4,7 +4,7 @@ import { formatPauseEnd } from "@/lib/week";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeToPush } from "./push-setup";
-import { Battle } from "./battle";
+import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
@@ -191,6 +191,7 @@ export default function Home() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
+  const [otherResting, setOtherResting] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   // 쉬어가기를 수락하는 순간: 카드들이 우수수 떨어지고 앱 전체가 흑백으로 변한다
   const [pauseFalling, setPauseFalling] = useState(false);
@@ -220,6 +221,7 @@ export default function Home() {
     setMe(data.user);
     setRoom(data.room ?? null);
     setOtherCaption(data.other?.caption);
+    setOtherResting(!!data.other?.resting);
     if (data.user) setNameForm(data.user.name ?? "");
     if (data.room) {
       setGroupForm({
@@ -585,6 +587,10 @@ export default function Home() {
                 location.href = "/";
               }}
             >
+              <span className="flex items-end justify-center gap-2">
+                <SleepingFigure src="/assets/sleep-a.webp" height={64} lift={0} />
+                <SleepingFigure src="/assets/sleep-b.webp" height={58} lift={0} />
+              </span>
               <span className="paused-badge">
                 <span className="blink">⏸</span> PAUSED
               </span>
@@ -633,6 +639,8 @@ export default function Home() {
               otherFine={otherEntry.fine}
               myCaption={me.caption}
               otherCaption={otherCaption}
+              mySleeping={!!me.restUntil && new Date(me.restUntil) > new Date()}
+              otherSleeping={otherResting}
               onCaptionSaved={loadMe}
             />
 
