@@ -135,6 +135,12 @@ model AiUsage {
   @@unique([userId, day, kind])
 }
 
+// 앱 전체가 이번 달에 AI로 쓴 크레딧 합계 (월 한도를 넘지 않게 하는 용도). month는 KST 기준 "2026-10"
+model AiBudget {
+  month   String @id
+  credits Float  @default(0)
+}
+
 // 주간 마감 후 정산 상태만 저장 (횟수/벌금은 Checkin에서 즉시 계산)
 model Settlement {
   id        String    @id @default(cuid())

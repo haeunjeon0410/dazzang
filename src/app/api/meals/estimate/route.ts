@@ -22,8 +22,9 @@ export async function POST(req: Request) {
     .filter(Boolean);
   if (names.length === 0) return NextResponse.json({ error: "음식 이름이 없어요" }, { status: 400 });
 
-  // 하루 한도를 넘으면 계산하지 않는다 (칼로리는 0으로 저장된다)
-  if (!(await takeAiQuota(userId, "text"))) return NextResponse.json({ kcals: null, limit: true });
+  // 한도를 넘으면 계산하지 않는다 (칼로리는 0으로 저장된다)
+  const quota = await takeAiQuota(userId, "text");
+  if (quota !== "ok") return NextResponse.json({ kcals: null, limit: quota });
   const kcals = await estimateKcals(names);
   return NextResponse.json({ kcals });
 }

@@ -144,8 +144,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ kind: "meal", meal: { id: meal.id, title: meal.title, kcal: meal.kcal } });
   }
 
-  // 하루 한도를 넘으면 AI를 부르지 않고 직접 적게 한다
-  if (!(await takeAiQuota(userId, "photo"))) return NextResponse.json({ kind: "limit" });
+  // 오늘 내 한도나 이번 달 앱 전체 한도를 넘으면 AI를 부르지 않고 직접 적게 한다
+  const quota = await takeAiQuota(userId, "photo");
+  if (quota !== "ok") return NextResponse.json({ kind: "limit", reason: quota });
   const analysis = await analyzeMealPhoto(photoDataUrl);
   if (!analysis) return NextResponse.json({ kind: "unknown" });
   if (!analysis.isFood) return NextResponse.json({ kind: "other" });

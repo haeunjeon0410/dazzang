@@ -1,6 +1,8 @@
 // 실험실 식단 인증: 음식 사진을 숙명여대 API 게이트웨이(OpenAI 호환)의 GPT-6 Luna로 분석해 칼로리를 추정한다.
 // GATEWAY_API_KEY가 없거나 호출이 실패하면 null을 돌려주고, 호출한 쪽은 분석 없이 사진만 저장한다.
 const BASE_URL = (process.env.GATEWAY_BASE_URL || "https://factchat-cloud.mindlogic.ai/v1/gateway").replace(/\/+$/, "");
+import { addCredits } from "@/lib/ai-quota";
+
 const MODEL = process.env.GATEWAY_MODEL || "gpt-6-luna";
 
 export type MealAnalysis = {
@@ -82,7 +84,10 @@ async function callOnce(key: string, dataUrl: string, maxTokens: number): Promis
   if (!res.ok) throw new Error(`gateway ${res.status}`);
   const data = await res.json();
   // 크레딧을 가늠할 수 있도록 토큰 수만 남긴다 (사진이나 내용은 남기지 않는다)
-  if (data?.usage) console.info("[meal] usage", JSON.stringify(data.usage));
+  if (data?.usage) {
+    console.info("[meal] usage", JSON.stringify(data.usage));
+    await addCredits(data.usage.prompt_tokens, data.usage.completion_tokens);
+  }
   const text = data?.choices?.[0]?.message?.content;
   return typeof text === "string" ? text.trim() : "";
 }
@@ -127,7 +132,10 @@ export async function estimateKcals(names: string[]): Promise<number[] | null> {
     });
     if (!res.ok) throw new Error(`gateway ${res.status}`);
     const data = await res.json();
-    if (data?.usage) console.info("[meal] usage", JSON.stringify(data.usage));
+    if (data?.usage) {
+    console.info("[meal] usage", JSON.stringify(data.usage));
+    await addCredits(data.usage.prompt_tokens, data.usage.completion_tokens);
+  }
     const text = data?.choices?.[0]?.message?.content;
     const parsed = typeof text === "string" ? (extractJson(text) as { kcals?: unknown } | null) : null;
     const k = parsed?.kcals;
