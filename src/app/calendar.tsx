@@ -17,6 +17,11 @@ function kstDayIndex(dateStr: string): number {
   return day === 0 ? 6 : day - 1; // 0=월 ... 6=일
 }
 
+// 오늘이 이번 주 몇 번째 칸인지 (0=월 ... 6=일). 표에서 오늘 열을 강조하는 데 쓴다
+export function todayDayIndex(): number {
+  return kstDayIndex(new Date().toISOString());
+}
+
 function getSeenLikes(): Set<string> {
   try {
     const raw = localStorage.getItem(SEEN_LIKES_KEY);
@@ -97,6 +102,7 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
     }
   }
 
+  const todayIdx = todayDayIndex();
   const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
   const dayDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
@@ -105,10 +111,10 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
 
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
-      <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#d9a9c4] mb-2">
+      <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
-          <div key={label}>
+          <div key={label} className={i === todayIdx ? "font-black text-[#ec4899]" : ""}>
             {label}
             <div className="text-[10px]">{dayDates[i]}</div>
           </div>

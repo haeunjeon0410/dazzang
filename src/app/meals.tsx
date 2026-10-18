@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { todayDayIndex } from "./calendar";
 
 type Meal = {
   id: string;
@@ -83,6 +84,7 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
     else setSlide((n) => Math.min(n, shown.length - 2));
   }
 
+  const todayIdx = todayDayIndex();
   const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
   const dayDates = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 24 * 60 * 60 * 1000).getUTCDate());
   // 먹은 순서(아침 → 저녁)로 넘긴다
@@ -92,10 +94,10 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
 
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
-      <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#d9a9c4] mb-2">
+      <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
-          <div key={label}>
+          <div key={label} className={i === todayIdx ? "font-black text-[#ec4899]" : ""}>
             {label}
             <div className="text-[10px]">{dayDates[i]}</div>
           </div>
