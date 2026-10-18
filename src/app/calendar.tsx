@@ -67,7 +67,18 @@ function FloatingHeart({ delay, onDone }: { delay: number; onDone: () => void })
   );
 }
 
-export function WeekCalendar({ people, meId, header }: { people: PersonSummary[]; meId: string; header?: ReactNode }) {
+export function WeekCalendar({
+  people,
+  meId,
+  header,
+  onDeleted,
+}: {
+  people: PersonSummary[];
+  meId: string;
+  header?: ReactNode;
+  // 내 인증샷을 지운 뒤 주간 기록을 다시 읽게 한다
+  onDeleted?: () => void;
+}) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeOverrides, setLikeOverrides] = useState<Record<string, boolean>>({});
@@ -100,6 +111,17 @@ export function WeekCalendar({ people, meId, header }: { people: PersonSummary[]
     } finally {
       setLikeBusy(false);
     }
+  }
+
+  async function deleteCheckin(checkin: CheckinItem) {
+    if (!confirm("이 인증샷을 지울까요?")) return;
+    const res = await fetch(`/api/checkins/${checkin.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      alert((await res.json().catch(() => null))?.error || "지우지 못했어요");
+      return;
+    }
+    setSelected(null);
+    onDeleted?.();
   }
 
   const todayIdx = todayDayIndex();
@@ -170,9 +192,19 @@ export function WeekCalendar({ people, meId, header }: { people: PersonSummary[]
           onClick={() => setSelected(null)}
         >
           <div className="w-full max-w-[19rem] rounded-3xl bg-white p-4 shadow-xl space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="overflow-hidden rounded-2xl border border-[#ffd6e8]">
+            <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={selected.photoUrl} alt="인증샷" className="aspect-square w-full object-cover" />
+              {selected.userId === meId && (
+                // 식단 사진과 같은, 눈에 띄지 않게 구석에 둔 반투명 지우기 버튼
+                <button
+                  onClick={() => deleteCheckin(selected)}
+                  aria-label="인증샷 지우기"
+                  className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-xs text-white/80"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#c2679c]">

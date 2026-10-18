@@ -870,6 +870,7 @@ export default function Home() {
               <WeekCalendar
                 meId={me.id}
                 header={calendarHeader}
+                onDeleted={loadWeek}
                 people={[
                   { userId: myEntry.userId, name: "나", checkins: myEntry.checkins },
                   { userId: otherEntry.userId, name: otherEntry.name, checkins: otherEntry.checkins },
