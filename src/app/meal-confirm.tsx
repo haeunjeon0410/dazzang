@@ -122,7 +122,7 @@ export function MealConfirm({
             {rows.length < 8 && (
               <button
                 onClick={() => setRows((prev) => [...prev, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
-                className="rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
+                className="rounded-lg border border-dashed border-[#de73a5] bg-white px-3 py-1 text-xs font-bold text-[#de73a5]"
               >
                 + 추가
               </button>
