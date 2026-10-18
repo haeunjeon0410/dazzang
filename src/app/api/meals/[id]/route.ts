@@ -15,7 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     data: { title: input.title, kcal: input.kcal, items: input.items, fraction: input.fraction, confirmed: true },
   });
   if (count === 0) return NextResponse.json({ error: "식단을 찾을 수 없습니다" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, title: input.title, kcal: input.kcal });
 }
 
 // 내가 올린 식단 지우기

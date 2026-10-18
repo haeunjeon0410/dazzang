@@ -230,6 +230,13 @@ export default function Home() {
   // 식단 사진을 올리기 전에 AI가 읽은 내용을 확인하고 고치는 창에 띄울 값
   const [mealConfirm, setMealConfirm] = useState<{ photo: string; initial: ConfirmValues; aiRead: boolean } | null>(null);
   const [mealSaving, setMealSaving] = useState(false);
+  // 식단을 저장한 직후 잠깐 떴다 사라지는 알림
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
@@ -496,9 +503,11 @@ export default function Home() {
         alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
         return;
       }
+      const saved = await res.json().catch(() => null);
       setMealConfirm(null);
       setViewMode("diet");
       setMealRefresh((n) => n + 1);
+      setToast(`저장했어요 · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal`);
     } finally {
       setMealSaving(false);
     }
@@ -819,7 +828,7 @@ export default function Home() {
 
 
             {me.labMeal && viewMode === "diet" ? (
-              <MealView meId={me.id} refreshKey={mealRefresh} header={calendarHeader} />
+              <MealView meId={me.id} refreshKey={mealRefresh} header={calendarHeader} onSaved={setToast} />
             ) : (
               <WeekCalendar
                 meId={me.id}
@@ -855,6 +864,16 @@ export default function Home() {
             <img src="/assets/nav/verify-button.webp" alt="인증하기" className="h-10 w-auto" />
           )}
         </label>
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed left-1/2 z-[70] -translate-x-1/2 rounded-full bg-[#4a2540]/90 px-4 py-2 text-sm font-bold text-white shadow-lg"
+          style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
+        >
+          {toast}
+        </div>
       )}
 
       {mealConfirm && (

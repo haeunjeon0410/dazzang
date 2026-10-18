@@ -45,10 +45,13 @@ export function MealView({
   meId,
   refreshKey,
   header,
+  onSaved,
 }: {
   meId: string;
   refreshKey: number;
   header?: ReactNode;
+  // 확인 창에서 저장했을 때 알림 문구를 띄우는 곳 (홈 화면 아래 토스트)
+  onSaved?: (text: string) => void;
 }) {
   const [data, setData] = useState<MealsData | null>(null);
   // 창에 띄울 칸 (누가, 무슨 요일). 사진이 든 목록은 칸을 누를 때만 받아온다
@@ -106,8 +109,10 @@ export function MealView({
         alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
         return;
       }
+      const saved = await res.json().catch(() => null);
       setDraft(null);
       setReload((n) => n + 1);
+      onSaved?.(`저장했어요 · 약 ${(saved?.kcal ?? 0).toLocaleString()} kcal`);
     } finally {
       setDraftBusy(false);
     }
