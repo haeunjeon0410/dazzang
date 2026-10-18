@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { CAPTION_MAX_LEN } from "@/lib/captions";
-import { TIME_RE } from "@/lib/meal-reminder";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -31,9 +30,6 @@ export async function GET() {
       restUntil: restUntil?.toISOString() ?? null,
       labMeal: user.labMeal,
       mealToken: user.labMeal ? user.mealToken : null,
-      mealReminder: user.mealReminder,
-      lunchTime: user.lunchTime,
-      dinnerTime: user.dinnerTime,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
       pendingMeals: user.labMeal ? await prisma.meal.count({ where: { userId: user.id, confirmed: false } }) : 0,
     },
@@ -64,23 +60,7 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption, labMeal, mealReminder, lunchTime, dinnerTime } = await req.json();
-
-  // 식사 알림 켜기/끄기와 점심, 저녁 시간 (한 번에 일부만 보내도 된다)
-  if (mealReminder !== undefined || lunchTime !== undefined || dinnerTime !== undefined) {
-    const data: { mealReminder?: boolean; lunchTime?: string; dinnerTime?: string } = {};
-    if (mealReminder !== undefined) {
-      if (typeof mealReminder !== "boolean") return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
-      data.mealReminder = mealReminder;
-    }
-    for (const [key, v] of [["lunchTime", lunchTime], ["dinnerTime", dinnerTime]] as const) {
-      if (v === undefined) continue;
-      if (typeof v !== "string" || !TIME_RE.test(v)) return NextResponse.json({ error: "시간 형식이 올바르지 않아요" }, { status: 400 });
-      data[key] = v;
-    }
-    await prisma.user.update({ where: { id: userId }, data });
-    return NextResponse.json({ ok: true });
-  }
+  const { name, caption, labMeal } = await req.json();
 
   // 실험실 식단 인증 켜기/끄기
   if (labMeal !== undefined) {

@@ -15,8 +15,6 @@ const CHAT: Line[] = [
   { from: "A", text: "설정 → 실험실에 AI 식단 기능이 생겼어! 🧪\n사진만 올리면 칼로리를 계산해 줘", pose: CharPose.WIN },
   { from: "B", text: "올리기 귀찮은데…", pose: CharPose.SAD },
   { from: "A", text: "동작 버튼 연동하면 훨씬 간단하게 등록돼! 📸", pose: CharPose.NEUTRAL },
-  { from: "B", text: "깜빡하면 어떡해?", pose: CharPose.PLEAD },
-  { from: "A", text: "알림 설정도 할 수 있어 🔔", pose: CharPose.NEUTRAL },
   { from: "B", text: "AI가 틀리게 읽으면?", pose: CharPose.PLEAD },
   { from: "A", text: "메뉴랑 먹은 양을 직접 수정할 수 있어! ✏️", pose: CharPose.WIN },
   { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },

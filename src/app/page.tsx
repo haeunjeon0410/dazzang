@@ -10,7 +10,6 @@ import { ExcusePanel } from "./excuses";
 import { MealView } from "./meals";
 import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 import { ShortcutSetup } from "./shortcut-setup";
-import { MealReminderSetting } from "./meal-reminder-setting";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 import { WhatsNew } from "./whats-new";
 
@@ -66,9 +65,6 @@ type Me = {
   labMeal?: boolean;
   mealToken?: string | null;
   pendingMeals?: number;
-  mealReminder?: boolean;
-  lunchTime?: string;
-  dinnerTime?: string;
 };
 type Room = {
   inviteToken: string;
@@ -1026,14 +1022,6 @@ export default function Home() {
                 />
               </label>
               {me.labMeal && <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />}
-              {me.labMeal && (
-                <MealReminderSetting
-                  enabled={!!me.mealReminder}
-                  lunch={me.lunchTime ?? "12:30"}
-                  dinner={me.dinnerTime ?? "18:30"}
-                  onChanged={loadMe}
-                />
-              )}
             </div>
 
             {/* 쉬어가기 요청 */}
