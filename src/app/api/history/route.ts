@@ -22,11 +22,20 @@ export async function GET() {
     { length: WEEKS_BACK },
     (_, k) => new Date(currentWeekStart.getTime() - (k + 1) * 7 * 24 * 60 * 60 * 1000),
   );
-  const [allCheckins, allSettlements, allExcuses, allRibbons] = await Promise.all([
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const oldest = weekStarts[weekStarts.length - 1];
+  const [allCheckins, allSettlements, allExcuses, allRibbons, allMeals] = await Promise.all([
     prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
     prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } } }),
+    // 실험실 식단 인증을 켠 사람에게만 평균 칼로리를 보여주려고 식단은 칼로리와 시각만 가져온다
+    me.labMeal
+      ? prisma.meal.findMany({
+          where: { userId: { in: userIds }, createdAt: { gte: oldest, lt: currentWeekStart } },
+          select: { userId: true, kcal: true, createdAt: true },
+        })
+      : Promise.resolve([] as { userId: string; kcal: number | null; createdAt: Date }[]),
   ]);
 
   const weeks = [];
@@ -47,7 +56,19 @@ export async function GET() {
       const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart) || ribbonUsed;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
+      // 식단을 올린 날만 세어 하루 평균을 낸다 (하루는 오전 6시에 바뀐다)
+      const dayKcal = new Map<number, number>();
+      for (const m of allMeals) {
+        if (m.userId !== u.id) continue;
+        const day = Math.floor((m.createdAt.getTime() - (weekStart.getTime() + 6 * 60 * 60 * 1000)) / DAY_MS);
+        if (day < 0 || day > 6) continue;
+        dayKcal.set(day, (dayKcal.get(day) ?? 0) + (m.kcal ?? 0));
+      }
+      const avgKcal = dayKcal.size
+        ? Math.round([...dayKcal.values()].reduce((x, y) => x + y, 0) / dayKcal.size)
+        : null;
       return {
+        avgKcal,
         userId: u.id,
         name: u.name,
         count,

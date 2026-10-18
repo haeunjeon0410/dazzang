@@ -67,7 +67,7 @@ function FloatingHeart({ delay, onDone }: { delay: number; onDone: () => void })
   );
 }
 
-export function WeekCalendar({ weekStart, people, meId, header }: { weekStart: string; people: PersonSummary[]; meId: string; header?: ReactNode }) {
+export function WeekCalendar({ people, meId, header }: { people: PersonSummary[]; meId: string; header?: ReactNode }) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeOverrides, setLikeOverrides] = useState<Record<string, boolean>>({});
@@ -103,11 +103,6 @@ export function WeekCalendar({ weekStart, people, meId, header }: { weekStart: s
   }
 
   const todayIdx = todayDayIndex();
-  const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
-  const dayDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
-    return d.getUTCDate();
-  });
 
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
@@ -117,7 +112,6 @@ export function WeekCalendar({ weekStart, people, meId, header }: { weekStart: s
         {DAY_LABELS.map((label, i) => (
           <div key={label} className={i === todayIdx ? "font-black text-[#de73a5]" : ""}>
             {label}
-            <div className="text-[10px]">{dayDates[i]}</div>
           </div>
         ))}
       </div>

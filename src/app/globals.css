@@ -13,7 +13,8 @@
 
 body {
   background-color: var(--background);
-  background-image: url("/assets/bg-room.webp");
+  /* 그림과 무늬가 카드 사이로 너무 또렷하게 비치지 않도록 연한 막을 덮는다 */
+  background-image: linear-gradient(rgba(255, 248, 252, 0.55), rgba(255, 248, 252, 0.55)), url("/assets/bg-room.webp");
   background-size: cover;
   background-position: top center;
   background-repeat: no-repeat;

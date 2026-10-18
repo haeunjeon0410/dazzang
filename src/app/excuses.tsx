@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 import { EXCUSE_REPLY_MAX_LEN } from "@/lib/excuse";
 
@@ -41,7 +41,7 @@ function markSeen(id: string) {
   }
 }
 
-export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
+export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => void; sideButton?: ReactNode }) {
   const [mine, setMine] = useState<Excuse[]>([]);
   const [incoming, setIncoming] = useState<Excuse[]>([]);
   const [reason, setReason] = useState("");
@@ -152,23 +152,23 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
         </div>
       )}
 
-      <button
-        onClick={() => setSheetOpen(true)}
-        className="w-full flex items-center justify-between rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3 text-sm"
-      >
-        <span className="text-[#c2679c] font-semibold flex items-center gap-1.5">
+      <div className={sideButton ? "grid grid-cols-2 gap-2" : "grid grid-cols-1"}>
+        <button
+          onClick={() => setSheetOpen(true)}
+          className="flex items-center gap-1.5 rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-3 py-3 text-left"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/nav/excuse.webp" alt="" className="w-7 h-7 object-contain" />
-          사정 봐달라하기
-        </span>
-        {latestMine ? (
-          <span className="text-xs text-[#c2679c]">
-            최근 요청: {STATUS_LABEL[latestMine.status]}
+          <img src="/assets/nav/excuse.webp" alt="" className="w-7 h-7 flex-none object-contain" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-[#c2679c]">사정 봐달라하기</span>
+            {latestMine && (
+              <span className="block text-[10px] text-[#b4779b]">최근 요청: {STATUS_LABEL[latestMine.status]}</span>
+            )}
           </span>
-        ) : (
-          <span className="text-[#de73a5] text-lg leading-none">›</span>
-        )}
-      </button>
+          {!sideButton && <span className="text-[#de73a5] text-lg leading-none">›</span>}
+        </button>
+        {sideButton}
+      </div>
 
       {sheetOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSheetOpen(false)}>

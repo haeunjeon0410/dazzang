@@ -76,6 +76,8 @@ type WeekSummary = {
   settled: boolean;
   ribbonUsed?: boolean;
   waivedFine?: number;
+  // 실험실 식단 인증을 켠 사람에게만 내려오는 그 주의 하루 평균 칼로리
+  avgKcal?: number | null;
 };
 type PastWeek = { weekStart: string; deadline: string; summary: WeekSummary[] };
 
@@ -227,7 +229,8 @@ export default function Home() {
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
   const [groupForm, setGroupForm] = useState({ groupBankName: "", groupAccountNumber: "" });
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // 트로피 창 안의 탭: 통산전적 | 지난 기록
+  const [statsTab, setStatsTab] = useState<"stats" | "history">("stats");
   const [pastWeeks, setPastWeeks] = useState<PastWeek[] | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [stats, setStats] = useState<
@@ -281,7 +284,9 @@ export default function Home() {
     if (weekResultPopup) markWeekSeen(weekResultPopup.weekStart);
     setWeekResultPopup(null);
     if (goToSettlement) {
-      setHistoryOpen(true);
+      setStatsTab("history");
+      setStatsOpen(true);
+      if (!stats) loadStats();
       if (!pastWeeks) loadHistory();
     }
   }
@@ -630,6 +635,7 @@ export default function Home() {
           <div className="hdr-icons flex items-center gap-2">
             <button
               onClick={() => {
+                setStatsTab("stats");
                 setStatsOpen(true);
                 if (!stats) loadStats();
               }}
@@ -749,6 +755,19 @@ export default function Home() {
               mySleeping={!!me.restUntil && new Date(me.restUntil) > new Date()}
               otherSleeping={otherResting}
               onCaptionSaved={loadMe}
+              footer={
+                myEntry.fine > 0 && !hasGroupAccount ? (
+                  <div className="flex items-center justify-between gap-3 border-t border-[#ffd6e8] px-4 py-2.5">
+                    <p className="text-xs font-semibold text-[#8a5a1f]">지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원</p>
+                    <button
+                      onClick={() => setGroupAccountOpen(true)}
+                      className="flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
+                    >
+                      통장 등록
+                    </button>
+                  </div>
+                ) : undefined
+              }
             />
 
             {myEntry.fine > 0 && hasGroupAccount && (
@@ -770,26 +789,11 @@ export default function Home() {
               </div>
             )}
 
-            {myEntry.fine > 0 && !hasGroupAccount && (
-              // 한 줄로 줄인 안내: 벌금 금액은 위 대결 카드에도 있어서 카드를 낮추고 통장 등록만 오른쪽에 둔다
-              <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3">
-                <p className="text-sm font-bold text-[#4a2540]">
-                  지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원
-                </p>
-                <button
-                  onClick={() => setGroupAccountOpen(true)}
-                  className="flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
-                >
-                  통장 등록
-                </button>
-              </div>
-            )}
 
             {me.labMeal && viewMode === "diet" ? (
-              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} header={calendarHeader} />
+              <MealView meId={me.id} refreshKey={mealRefresh} header={calendarHeader} />
             ) : (
               <WeekCalendar
-                weekStart={weekData.weekStart}
                 meId={me.id}
                 header={calendarHeader}
                 people={[
@@ -800,52 +804,6 @@ export default function Home() {
             )}
 
             <ExcusePanel onResolved={loadWeek} />
-
-            <button
-              onClick={() => {
-                setHistoryOpen((v) => !v);
-                if (!pastWeeks) loadHistory();
-              }}
-              className="w-full flex items-center justify-between rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3 text-sm"
-            >
-              <span className="text-[#c2679c] font-semibold">지난 기록</span>
-              <span className="text-[#de73a5] text-lg leading-none">{historyOpen ? "︿" : "﹀"}</span>
-            </button>
-
-            {historyOpen && (
-              <div className="space-y-3">
-                {pastWeeks?.length === 0 && <p className="text-[#d9a9c4] text-sm text-center">아직 마감된 주가 없어요.</p>}
-                {pastWeeks?.map((week) => (
-                  <div key={week.weekStart} className="rounded-2xl bg-white p-4 border border-[#ffd6e8] shadow-sm space-y-3">
-                    <p className="text-xs text-[#d9a9c4]">{new Date(week.weekStart).toLocaleDateString("ko-KR")} 주</p>
-                    {week.summary.map((s) => (
-                      <div key={s.userId} className="flex items-center justify-between text-sm">
-                        <span className="text-[#4a2540] font-semibold">
-                          {s.name} · {s.count}/3
-                        </span>
-                        {s.fine > 0 ? (
-                          s.settled ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src="/assets/nav/check-button.webp" alt="정산완료" className="h-8 w-auto" />
-                          ) : (
-                            <button
-                              onClick={() => { if (confirm("정산하셨나요?")) toggleSettled(week.weekStart, s.userId, s.settled); }}
-                              className="flex items-center gap-2"
-                            >
-                              <span className="text-xs font-bold text-[#b4356f]">{s.fine.toLocaleString()}원</span>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src="/assets/nav/settle-button.webp" alt="정산하기" className="h-8 w-auto" />
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-[#2f9e44] font-semibold">완료</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
           </section>
         )}
       </div>
@@ -1078,12 +1036,73 @@ export default function Home() {
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/nav/total.webp" alt="" className="w-8 h-8 object-contain" />
-              <p className="font-bold text-[#4a2540]">통산전적</p>
+              <p className="font-bold text-[#4a2540]">{statsTab === "stats" ? "통산전적" : "지난 기록"}</p>
             </div>
 
-            {!stats && <p className="text-sm text-[#b4779b]">불러오는 중...</p>}
+            <div className="grid grid-cols-2 gap-0.5 rounded-full bg-[#fff0f6] border border-[#ffd6e8] p-0.5" role="tablist">
+              {([["stats", "통산전적"], ["history", "지난 기록"]] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  role="tab"
+                  aria-selected={statsTab === tab}
+                  onClick={() => {
+                    setStatsTab(tab);
+                    if (tab === "history" && !pastWeeks) loadHistory();
+                  }}
+                  className={`rounded-full py-1 text-xs font-bold ${
+                    statsTab === tab ? "bg-[#de73a5] text-white shadow-sm" : "text-[#c2679c]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-            {stats && (
+            {statsTab === "stats" && !stats && <p className="text-sm text-[#b4779b]">불러오는 중...</p>}
+
+            {statsTab === "history" && (
+              <div className="max-h-[55vh] overflow-y-auto">
+                <div className="space-y-3">
+                {pastWeeks?.length === 0 && <p className="text-[#d9a9c4] text-sm text-center">아직 마감된 주가 없어요.</p>}
+                {pastWeeks?.map((week) => (
+                  <div key={week.weekStart} className="rounded-2xl bg-white p-4 border border-[#ffd6e8] shadow-sm space-y-3">
+                    <p className="text-xs text-[#d9a9c4]">{new Date(week.weekStart).toLocaleDateString("ko-KR")} 주</p>
+                    {week.summary.map((s) => (
+                      <div key={s.userId} className="flex items-center justify-between text-sm">
+                        <span className="text-[#4a2540] font-semibold">
+                          {s.name}
+                          {s.avgKcal ? (
+                            <span className="ml-1.5 text-xs font-normal text-[#b4779b]">평균 {s.avgKcal.toLocaleString()} kcal</span>
+                          ) : null}
+                          {" · "}
+                          {s.count}/3
+                        </span>
+                        {s.fine > 0 ? (
+                          s.settled ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src="/assets/nav/check-button.webp" alt="정산완료" className="h-8 w-auto" />
+                          ) : (
+                            <button
+                              onClick={() => { if (confirm("정산하셨나요?")) toggleSettled(week.weekStart, s.userId, s.settled); }}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="text-xs font-bold text-[#b4356f]">{s.fine.toLocaleString()}원</span>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src="/assets/nav/settle-button.webp" alt="정산하기" className="h-8 w-auto" />
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-[#2f9e44] font-semibold">완료</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              </div>
+            )}
+
+            {statsTab === "stats" && stats && (
               <div className="grid grid-cols-2 gap-3">
                 {stats.map((s) => (
                   <div key={s.userId} className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 text-center space-y-1">

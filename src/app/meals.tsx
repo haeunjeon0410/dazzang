@@ -23,17 +23,13 @@ type MealsData = {
 };
 
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 // 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 2500kcal 이상이면 가장 진하다
-const HEAT_MAX_KCAL = 2500;
-function heatStyle(kcal: number): { backgroundColor: string; color: string } {
-  const t = Math.min(1, Math.max(0, kcal / HEAT_MAX_KCAL));
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
-  return {
-    backgroundColor: `rgb(${mix(255, 210)}, ${mix(214, 78)}, ${mix(232, 134)})`,
-    color: t > 0.3 ? "#ffffff" : "#b4356f",
-  };
+// 하루 칼로리를 세 단계 색으로만 나눈다 (적게 / 보통 / 많이). 글자색은 늘 같다
+function heatClass(kcal: number): string {
+  if (kcal >= 2000) return "bg-[#eba0c0]";
+  if (kcal >= 1200) return "bg-[#f6c3d8]";
+  return "bg-[#fde3ee]";
 }
 
 function timeLabel(iso: string) {
@@ -44,12 +40,10 @@ function timeLabel(iso: string) {
 // 칸을 누르면 운동 인증샷처럼 창이 떠서 그날 식단을 슬라이드로 넘겨 볼 수 있다 (아침, 점심, 저녁 순)
 export function MealView({
   meId,
-  weekStart,
   refreshKey,
   header,
 }: {
   meId: string;
-  weekStart: string;
   refreshKey: number;
   header?: ReactNode;
 }) {
@@ -136,8 +130,6 @@ export function MealView({
   }
 
   const todayIdx = todayDayIndex();
-  const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
-  const dayDates = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 24 * 60 * 60 * 1000).getUTCDate());
   // 먹은 순서(아침 → 저녁)로 넘긴다
   const shown = (dayMeals ?? [])
     .filter((m) => m.userId === popup?.userId)
@@ -151,7 +143,6 @@ export function MealView({
         {DAY_LABELS.map((label, i) => (
           <div key={label} className={i === todayIdx ? "font-black text-[#de73a5]" : ""}>
             {label}
-            <div className="text-[10px]">{dayDates[i]}</div>
           </div>
         ))}
       </div>
@@ -166,10 +157,9 @@ export function MealView({
               <button
                 key={i}
                 onClick={() => mine.length && openCell(p.id, i)}
-                style={mine.length && kcal > 0 ? heatStyle(kcal) : undefined}
                 className={`aspect-square rounded-md flex items-center justify-center text-xs leading-tight ${
-                  mine.length ? "font-black" : "bg-[#ffe1ee] text-[#c2679c]"
-                } ${mine.length && kcal === 0 ? "bg-[#ffd6e8] text-[#b4356f]" : ""}`}
+                  mine.length ? `font-semibold text-[#7a2a50] ${kcal > 0 ? heatClass(kcal) : "bg-[#fde3ee]"}` : "bg-[#fff0f6] text-[#d9a9c4]"
+                }`}
               >
                 {mine.length ? (kcal > 0 ? kcal.toLocaleString() : `${mine.length}끼`) : "-"}
               </button>
