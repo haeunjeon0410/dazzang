@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { todayDayIndex } from "./calendar";
+import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 
 type Meal = {
   id: string;
@@ -12,6 +13,7 @@ type Meal = {
   title: string | null;
   kcal: number | null;
   items: { name: string; kcal: number }[] | null;
+  fraction?: number;
   createdAt: string;
 };
 
@@ -19,6 +21,7 @@ type MealsData = {
   people: { id: string; name: string }[];
   week: { userId: string; day: number; kcal: number }[];
   day: number;
+  pendingCount?: number;
   meals: Meal[];
 };
 
@@ -53,6 +56,9 @@ export function MealView({
   const [dayMeals, setDayMeals] = useState<Meal[] | null>(null);
   const [slide, setSlide] = useState(0);
   const [reload, setReload] = useState(0);
+  // 단축어로 올라와 아직 확인하지 않은 내 식단 (확인 창에 하나씩 띄운다)
+  const [draft, setDraft] = useState<Meal | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
   // 마우스로 끌어 넘기는 중인지 (터치는 브라우저가 알아서 스와이프를 처리한다)
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -79,6 +85,42 @@ export function MealView({
       alive = false;
     };
   }, [popup, reload]);
+
+  async function openDraft() {
+    const res = await fetch("/api/meals?pending=1");
+    if (!res.ok) return;
+    const d = (await res.json()).drafts as Meal[];
+    if (d.length > 0) setDraft(d[0]);
+  }
+
+  async function saveDraft(values: ConfirmValues) {
+    if (!draft) return;
+    setDraftBusy(true);
+    try {
+      const res = await fetch(`/api/meals/${draft.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
+        return;
+      }
+      setDraft(null);
+      setReload((n) => n + 1);
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
+  async function discardDraft() {
+    if (!draft || !confirm("이 사진을 버릴까요?")) return;
+    const res = await fetch(`/api/meals/${draft.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setDraft(null);
+      setReload((n) => n + 1);
+    }
+  }
 
   function openCell(userId: string, day: number) {
     setDayMeals(null);
@@ -138,6 +180,15 @@ export function MealView({
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
       {header}
+      {(data?.pendingCount ?? 0) > 0 && (
+        <button
+          onClick={openDraft}
+          className="mb-3 flex w-full items-center justify-between rounded-xl bg-[#fff0f6] border border-[#ffc2dc] px-3 py-2 text-xs font-bold text-[#b4356f]"
+        >
+          <span>아이폰으로 올린 식단 {data?.pendingCount}건 확인하기</span>
+          <span className="text-base leading-none">›</span>
+        </button>
+      )}
       <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
@@ -168,6 +219,22 @@ export function MealView({
         </div>
       ))}
 
+      {draft && (
+        <MealConfirm
+          photoUrl={draft.photoUrl}
+          initial={{
+            title: draft.title ?? "",
+            items: draft.items && draft.items.length ? draft.items : [{ name: "", kcal: 0 }],
+            fraction: draft.fraction ?? 1,
+          }}
+          aiRead={draft.analyzed}
+          busy={draftBusy}
+          onSave={saveDraft}
+          onCancel={() => setDraft(null)}
+          onDiscard={discardDraft}
+        />
+      )}
+
       {popup && (
         // 앱의 다른 창(내 정보, 통산전적)과 같은 흰 카드. 바깥을 누르면 닫힌다
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setPopup(null)}>
@@ -195,13 +262,18 @@ export function MealView({
                         <p className="text-[11px] font-semibold text-[#c2679c]">
                           {m.userId === meId ? "나" : m.name} · {timeLabel(m.createdAt)}
                         </p>
-                        <p className="truncate text-lg font-black text-[#4a2540]">{m.analyzed ? m.title : "분석하지 못했어요"}</p>
+                        <p className="truncate text-lg font-black text-[#4a2540]">{m.title ?? "이름 없음"}</p>
+                        {m.fraction != null && m.fraction < 1 && (
+                          <p className="text-[11px] font-semibold text-[#b4779b]">
+                            {m.fraction === 0.75 ? "3/4" : m.fraction === 0.5 ? "절반" : m.fraction === 0.25 ? "1/4" : `${Math.round(m.fraction * 100)}%`}만 먹었어요
+                          </p>
+                        )}
                       </div>
 
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={m.photoUrl} alt="식단" draggable={false} className="aspect-square w-full object-cover" />
-                        {m.analyzed && m.kcal != null && (
+                        {m.kcal != null && (
                           <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#de73a5] px-3 py-1 text-sm font-black text-white shadow-md">
                             약 {m.kcal.toLocaleString()} kcal
                           </span>

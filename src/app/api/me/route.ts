@@ -29,6 +29,7 @@ export async function GET() {
       caption: user.captions[0] ?? "",
       restUntil: restUntil?.toISOString() ?? null,
       labMeal: user.labMeal,
+      mealToken: user.labMeal ? user.mealToken : null,
     },
     room: {
       inviteToken: user.room.inviteToken,

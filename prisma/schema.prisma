@@ -86,6 +86,8 @@ model User {
   // 실험실: 식단 인증(AI 칼로리 분석) 켜기. 켠 사람만 식단 카드가 보이고 올릴 수 있다
   labMeal Boolean @default(false)
   meals   Meal[]
+  // 아이폰 단축어(액션 버튼)로 식단 사진을 올릴 때 쓰는 개인 토큰. 쿠키가 없는 단축어가 "누구의 사진인지" 알려주는 용도
+  mealToken String? @unique
 
   checkins      Checkin[]
   settlements   Settlement[]
@@ -114,6 +116,9 @@ model Meal {
   title     String? // 한 줄 요약 (예: 닭가슴살 샐러드)
   kcal      Int? // 추정 총 칼로리
   items     Json? // [{ name, kcal }]
+  fraction  Float    @default(1) // 먹은 비율 (1=다 먹음, 0.5=절반). kcal은 items 합 × fraction
+  confirmed Boolean  @default(true) // false면 단축어로 올라와 아직 본인이 확인하지 않은 초안. 확인 전에는 친구에게 안 보인다
+  source    String   @default("app") // app | shortcut
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])

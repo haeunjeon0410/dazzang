@@ -8,6 +8,8 @@ import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
 import { MealView } from "./meals";
+import { MealConfirm, type ConfirmValues } from "./meal-confirm";
+import { ShortcutSetup } from "./shortcut-setup";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
@@ -54,7 +56,7 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean };
+type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean; mealToken?: string | null };
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -225,6 +227,9 @@ export default function Home() {
     }
   });
   const [mealRefresh, setMealRefresh] = useState(0);
+  // 식단 사진을 올리기 전에 AI가 읽은 내용을 확인하고 고치는 창에 띄울 값
+  const [mealConfirm, setMealConfirm] = useState<{ photo: string; initial: ConfirmValues; aiRead: boolean } | null>(null);
+  const [mealSaving, setMealSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
@@ -440,19 +445,18 @@ export default function Home() {
           alert(data?.error || "업로드 실패");
           return;
         }
-        if (data?.kind === "meal") {
-          setViewMode("diet");
-          setMealRefresh((n) => n + 1);
+        if (data?.kind === "draft") {
+          // AI가 읽은 값을 바로 올리지 않고 확인 창을 먼저 보여준다
+          setMealConfirm({
+            photo: mealPhoto,
+            initial: { title: data.draft.title, items: data.draft.items, fraction: data.draft.fraction },
+            aiRead: true,
+          });
           return;
         }
         if (data?.kind === "unknown" && viewMode === "diet") {
-          const saved = await fetch("/api/meals", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ photoDataUrl: mealPhoto, mode: "meal" }),
-          });
-          if (!saved.ok) alert((await saved.json().catch(() => null))?.error || "업로드 실패");
-          else setMealRefresh((n) => n + 1);
+          // AI를 못 쓰는 상태: 직접 적을 수 있게 빈 확인 창을 연다
+          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0 }], fraction: 1 }, aiRead: false });
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다
@@ -473,6 +477,27 @@ export default function Home() {
     } finally {
       setUploading(false);
       e.target.value = "";
+    }
+  }
+
+  async function saveMeal(values: ConfirmValues) {
+    if (!mealConfirm) return;
+    setMealSaving(true);
+    try {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoDataUrl: mealConfirm.photo, mode: "save", analyzed: mealConfirm.aiRead, ...values }),
+      });
+      if (!res.ok) {
+        alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
+        return;
+      }
+      setMealConfirm(null);
+      setViewMode("diet");
+      setMealRefresh((n) => n + 1);
+    } finally {
+      setMealSaving(false);
     }
   }
 
@@ -829,6 +854,17 @@ export default function Home() {
         </label>
       )}
 
+      {mealConfirm && (
+        <MealConfirm
+          photoUrl={mealConfirm.photo}
+          initial={mealConfirm.initial}
+          aiRead={mealConfirm.aiRead}
+          busy={mealSaving}
+          onSave={saveMeal}
+          onCancel={() => setMealConfirm(null)}
+        />
+      )}
+
       {incomingPause && !pauseFalling && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="celebrate-pop relative w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
@@ -925,6 +961,7 @@ export default function Home() {
                   className="h-6 w-6 flex-none accent-[#de73a5]"
                 />
               </label>
+              {me.labMeal && <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />}
             </div>
 
             {/* 쉬어가기 요청 */}
