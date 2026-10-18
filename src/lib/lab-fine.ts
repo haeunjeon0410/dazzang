@@ -1,5 +1,5 @@
 // 실험실 몸무게 인증 벌금 계산. 방 두 사람이 합의한 금액(LabFineRule)을 주 단위로 적용한다.
-// - 그 주 몸무게가 바로 전 기록보다 늘었으면 금액 1회 (이번 주 기록이 없거나 비교할 전 기록이 없으면 없음)
+// - 그 주 몸무게 인증을 안 했거나, 바로 전 기록보다 늘었으면 금액 1회 (인증은 했는데 비교할 전 기록이 없으면 없음)
 // - 몸무게 인증을 켠 사람에게만 적용되고, 합의한 다음 주(sinceWeek)부터 적용되어 지난 주는 소급하지 않는다.
 // - 쉬는 주/사정 봐주기/리본으로 면제되는 것은 부르는 쪽에서 운동 벌금과 똑같이 처리한다.
 import { prisma } from "@/lib/prisma";
@@ -46,7 +46,11 @@ export async function labFinesFor(
     for (const id of ids) {
       const mine = logs.filter((l) => l.userId === id && l.weekStart.getTime() <= w.getTime());
       const cur = mine.find((l) => l.weekStart.getTime() === w.getTime());
-      if (!cur) continue;
+      // 그 주에 인증을 안 하면 자동으로 벌금
+      if (!cur) {
+        out.set(labFineKey(id, w), { weight: rule.amount, total: rule.amount });
+        continue;
+      }
       const prev = [...mine].reverse().find((l) => l.weekStart.getTime() < w.getTime());
       if (prev && cur.kg > prev.kg) out.set(labFineKey(id, w), { weight: rule.amount, total: rule.amount });
     }

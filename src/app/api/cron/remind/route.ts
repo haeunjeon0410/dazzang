@@ -48,6 +48,28 @@ export async function GET(req: NextRequest) {
       }),
     );
   }
+
+  // 몸무게 인증: 마감 전날(일요일) 저녁에, 이번 주 몸무게 인증을 안 한 사람에게 알린다. 벌금 약속이 있으면 자동 청구도 알려준다
+  if (daysLeft === 1) {
+    const weightRules = await prisma.labFineRule.findMany({ where: { feature: "weight", amount: { gt: 0 } } });
+    const weightLogs = await prisma.weightLog.findMany({ where: { weekStart }, select: { userId: true } });
+    for (const user of users) {
+      if (!user.labWeight) continue;
+      if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
+      if (isWeekPaused(user.rests, weekStart)) continue;
+      if (approvedExcuses.some((e) => e.userId === user.id)) continue;
+      if (weightLogs.some((l) => l.userId === user.id)) continue;
+      const rule = weightRules.find((r) => r.roomId === user.roomId && r.sinceWeek && r.sinceWeek <= weekStart);
+      pushes.push(
+        sendPushToUser(user, {
+          title: "몸무게 인증 마감 임박!",
+          body: rule
+            ? `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 안 하면 벌금 ${rule.amount.toLocaleString()}원이 자동으로 청구돼요`
+            : `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 인증해 주세요`,
+        }),
+      );
+    }
+  }
   await Promise.allSettled(pushes);
 
   return NextResponse.json({ ok: true });

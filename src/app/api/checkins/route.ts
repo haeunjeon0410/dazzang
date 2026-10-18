@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { labFinesFor, labFineKey, noLabFine, weightTrendsFor } from "@/lib/lab-fine";
+import { settleLastWeekLazily } from "@/lib/week-settle";
 import { getWeekStart, getWeekDeadline, getDayRange, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
@@ -16,6 +17,9 @@ export async function GET(req: NextRequest) {
   const weekParam = req.nextUrl.searchParams.get("weekStart");
   const weekStart = weekParam ? new Date(weekParam) : getWeekStart();
   const deadline = getWeekDeadline(weekStart);
+
+  // 이번 주 화면을 열 때 지난 주 리본(획득/사용)을 바로 반영한다. 마감(월요일 오전 6시)이 지나면 9시 정산 작업을 기다리지 않는다
+  if (!weekParam) await settleLastWeekLazily(me.roomId);
 
   const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
   const userIds = users.map((u) => u.id);

@@ -33,7 +33,7 @@ model Room {
 }
 
 // 실험실 몸무게 인증의 벌금 약속. 방의 두 사람이 합의해야 바뀐다 (한쪽이 제안하고 상대가 수락)
-// - feature는 지금 weight만 쓴다: 이번 주 몸무게가 지난 기록보다 늘었으면 amount원
+// - feature는 지금 weight만 쓴다: 몸무게 인증을 안 했거나 지난 기록보다 늘었으면 amount원
 // - sinceWeek: 이 주(월요일 00:00 KST 키)부터 적용된다. 합의한 다음 주부터라서 지난 주를 소급하지 않는다
 model LabFineRule {
   id             String    @id @default(cuid())

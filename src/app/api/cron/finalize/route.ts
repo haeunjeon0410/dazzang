@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
-import { labFinesFor, labFineKey } from "@/lib/lab-fine";
-import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
+import { labFineKey } from "@/lib/lab-fine";
+import { settleRoomWeek } from "@/lib/week-settle";
+import { getWeekStart, formatResumeDate, REQUIRED_COUNT, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 // (마감은 월요일 06:00이지만, 새벽 알림으로 잠 깨우지 않도록 아침 9시에 보낸다)
@@ -42,73 +43,8 @@ export async function GET(req: NextRequest) {
     // 지난 주가 정지 기간에 포함되면 마감 스킵
     if ((room.pausedUntil && room.pausedUntil > lastWeekStart) || isWeekPaused(room.pauses, lastWeekStart)) continue;
 
-    const labFines = await labFinesFor(room.id, room.users, [lastWeekStart]);
-
-    const results = room.users.map((u) => {
-      const count = checkins.filter((c) => c.userId === u.id).length;
-      const excused = approvedExcuses.some((e) => e.userId === u.id);
-      const resting = isWeekPaused(u.rests, lastWeekStart);
-      const pardoned = excused || resting;
-      const shortfall = Math.max(0, REQUIRED_COUNT - count);
-      return {
-        user: u,
-        count,
-        pardoned,
-        excused,
-        ribbonUsed: false,
-        shortfall,
-        fine: pardoned ? 0 : shortfall * FINE_PER_MISS + (labFines.get(labFineKey(u.id, lastWeekStart))?.total ?? 0),
-      };
-    });
-
-    // 리본 획득: 친구가 쉬는 주(혼자 쉬기를 거절당했거나, 사정 봐달라하기가 허락된 주)에
-    // 나는 쉬지 않고 목표(3회)를 채웠으면 리본 1개
-    for (const r of results) {
-      const friendResting = results.some(
-        (o) => o.user.id !== r.user.id && (o.excused || isWeekPaused(o.user.rests, lastWeekStart)),
-      );
-      const meResting = r.excused || isWeekPaused(r.user.rests, lastWeekStart);
-      if (r.count >= REQUIRED_COUNT && friendResting && !meResting) {
-        const created = await prisma.ribbon.createMany({
-          data: [{ userId: r.user.id, weekStart: lastWeekStart }],
-          skipDuplicates: true,
-        });
-        if (created.count > 0) {
-          await sendPushToUser(r.user, {
-            title: "리본 획득!",
-            icon: "/assets/ribbon.webp",
-            body: "친구가 쉬는 동안에도 목표를 채웠어요. 벌금이 생기는 주에 리본이 자동으로 면제해줘요",
-          });
-        }
-      }
-    }
-
-    // 리본 사용: 벌금이 생긴 사람은 가장 오래된 리본 1개로 그 주 벌금을 면제
-    for (const r of results) {
-      if (r.fine <= 0) continue;
-      // 이미 이 주에 리본을 써서 면제한 사람이면(정산을 다시 돌린 경우) 새로 쓰지 않고 면제 상태만 반영
-      const alreadyUsed = await prisma.ribbon.findFirst({ where: { userId: r.user.id, usedWeek: lastWeekStart } });
-      if (alreadyUsed) {
-        r.pardoned = true;
-        r.ribbonUsed = true;
-        r.fine = 0;
-        continue;
-      }
-      const ribbon = await prisma.ribbon.findFirst({
-        where: { userId: r.user.id, usedWeek: null },
-        orderBy: { weekStart: "asc" },
-      });
-      if (!ribbon) continue;
-      const used = await prisma.ribbon.updateMany({
-        where: { id: ribbon.id, usedWeek: null },
-        data: { usedWeek: lastWeekStart, usedAt: new Date() },
-      });
-      if (used.count > 0) {
-        r.pardoned = true;
-        r.ribbonUsed = true;
-        r.fine = 0;
-      }
-    }
+    // 결과 계산 + 리본 획득/사용 (앱을 열 때 이미 반영됐어도 같은 결과가 나온다)
+    const { results, labFines } = await settleRoomWeek(room.id, room.users, checkins, approvedExcuses, lastWeekStart, true);
 
     const body = results
       .map((r) => {

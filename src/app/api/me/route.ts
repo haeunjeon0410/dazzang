@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { CAPTION_MAX_LEN } from "@/lib/captions";
+import { getWeekStart } from "@/lib/week";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -31,6 +32,8 @@ export async function GET() {
       labMeal: user.labMeal,
       labWeight: user.labWeight,
       labDismissed: user.labDismissed,
+      // 몸무게 인증을 켰는데 이번 주 체중계 인증을 아직 안 했는지 (홈 배너용)
+      weightPending: user.labWeight && (await prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } })) === 0,
       mealToken: user.labMeal ? user.mealToken : null,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
       pendingMeals: user.labMeal ? await prisma.meal.count({ where: { userId: user.id, confirmed: false } }) : 0,

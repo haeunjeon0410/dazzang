@@ -53,6 +53,7 @@ type Me = {
   labMeal?: boolean;
   labWeight?: boolean;
   labDismissed?: string[];
+  weightPending?: boolean;
   mealToken?: string | null;
   pendingMeals?: number;
 };
@@ -240,6 +241,7 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [toast]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [graphOpen, setGraphOpen] = useState(false);
   // 인증하기로 올린 체중계 사진에서 AI가 읽은 몸무게: 사용자가 맞다고 확인해야 기록된다 (token은 서버가 서명한 값)
   const [weightConfirm, setWeightConfirm] = useState<{ kg: number; token: string } | null>(null);
@@ -464,6 +466,8 @@ export default function Home() {
         return;
       }
       setWeightConfirm(null);
+      loadMe();
+      loadWeek();
       setToast(`몸무게 ${weightConfirm.kg}kg로 기록했어요`);
       setGraphOpen(true);
     } finally {
@@ -838,6 +842,37 @@ export default function Home() {
 
         {weekData && myEntry && otherEntry && (
           <section className="space-y-3">
+            {/* 몸무게 인증을 켰는데 이번 주 인증을 아직 안 했으면 맨 위에 알려준다 (다른 카드와 구분되게 노란 픽셀 테두리).
+                마감 하루 전부터는 빨간색으로 바뀌고 자동 벌금을 알려준다 */}
+            {me.labWeight && me.weightPending && (() => {
+              const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0;
+              const lastDay = !!weekData && new Date(weekData.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+              return (
+                <div
+                  role="alert"
+                  className="mt-2 mb-2 flex items-center justify-between gap-3 px-3 py-2.5"
+                  style={{
+                    background: lastDay ? "#ff8f8f" : "#ffe08a",
+                    // 모서리가 깎인 픽셀 테두리
+                    boxShadow: "0 -2px 0 0 #4a2540, 0 2px 0 0 #4a2540, -2px 0 0 0 #4a2540, 2px 0 0 0 #4a2540, inset 0 -3px 0 rgba(74,37,64,0.12)",
+                  }}
+                >
+                  <p className="min-w-0 text-sm font-black leading-snug text-[#4a2540]">
+                    {lastDay
+                      ? `오늘까지 몸무게 인증 안 하면 ${fineAmount > 0 ? `벌금 ${fineAmount.toLocaleString()}원 ` : "벌금이 "}자동 청구!`
+                      : "이번 주 몸무게 인증 아직이에요"}
+                  </p>
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="flex-none bg-white px-3 py-1 text-xs font-black text-[#4a2540]"
+                    style={{ boxShadow: "0 -2px 0 0 #4a2540, 0 2px 0 0 #4a2540, -2px 0 0 0 #4a2540, 2px 0 0 0 #4a2540" }}
+                  >
+                    인증하기
+                  </button>
+                </div>
+              );
+            })()}
+
             <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full">
               이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감
             </p>
@@ -931,7 +966,7 @@ export default function Home() {
             bottom: "calc(1.25rem + env(safe-area-inset-bottom))",
           }}
         >
-          <input type="file" accept="image/*" onChange={handleUpload} className="hidden" />
+          <input ref={uploadInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
           {uploading ? (
             <span className="flex items-center justify-center w-24 h-10 rounded-full bg-[#ffc72c] text-sm font-bold text-[#4a2540]">
               업로드 중...
@@ -964,7 +999,7 @@ export default function Home() {
       )}
 
       {graphOpen && me.labWeight && (
-        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0} onToast={setToast} onClose={() => setGraphOpen(false)} />
+        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0} onClose={() => setGraphOpen(false)} />
       )}
 
       {toast && (
@@ -1113,11 +1148,8 @@ export default function Home() {
                       return;
                     }
                     setMe((m) => (m ? { ...m, labWeight: next } : m));
-                    // 켜면 곧바로 몸무게 창(처음엔 기본 정보)을 띄우니까 설정 창은 닫는다
-                    if (next) {
-                      setSettingsOpen(false);
-                      setGraphOpen(true);
-                    }
+                    // 켜면 설정 창을 닫아서 홈의 몸무게 인증 배너가 바로 보이게 한다 (첫 몸무게도 배너의 인증하기로 올린다)
+                    if (next) setSettingsOpen(false);
                   }}
                   className="h-6 w-6 flex-none accent-[#de73a5]"
                 />
