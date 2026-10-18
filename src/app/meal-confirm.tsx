@@ -42,7 +42,6 @@ export function MealConfirm({
   );
   // 먹은 양을 고르는 중인 음식 (그 음식 위에 토글이 펼쳐진다)
   const [pickIdx, setPickIdx] = useState<number | null>(null);
-  const [calcFailed, setCalcFailed] = useState(false);
   const alive = useRef(true);
 
   // 이름이 바뀌었는데 아직 칼로리를 계산하지 않은 음식
@@ -75,7 +74,6 @@ export function MealConfirm({
         kcals = null;
       }
       if (!alive.current) return;
-      setCalcFailed(kcals === null);
       setRows((prev) =>
         prev.map((r, idx) => {
           const k = asked.findIndex((x) => x.i === idx && x.n === r.name.trim());
@@ -86,7 +84,6 @@ export function MealConfirm({
     return () => clearTimeout(t);
   }, [staleKey]);
 
-  const eaten = rows.reduce((s, r) => s + Math.round((r.kcalKnown ? r.kcal : 0) * r.fraction), 0);
   const canSave = title.trim().length > 0 && !pending && !busy;
   const label = (f: number) => FRACTIONS.find(([v]) => v === f)?.[1] ?? `${Math.round(f * 100)}%`;
 
@@ -172,11 +169,6 @@ export function MealConfirm({
           )}
         </div>
 
-        <div className="rounded-2xl bg-[#fff0f6] px-3 py-2.5 text-center">
-          <p className="text-xl font-black text-[#de73a5]">{pending ? "계산 중..." : `약 ${eaten.toLocaleString()} kcal`}</p>
-          {calcFailed && !pending && <p className="text-[11px] text-[#b4779b]">일부 음식은 칼로리를 계산하지 못했어요</p>}
-        </div>
-
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onCancel} className="rounded-xl bg-[#ffeef5] py-2.5 text-sm font-semibold text-[#c2679c]">
             취소
@@ -194,7 +186,7 @@ export function MealConfirm({
             disabled={!canSave}
             className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
-            {busy ? "저장 중..." : "저장"}
+            {busy ? "저장 중..." : pending ? "계산 중..." : "저장"}
           </button>
         </div>
       </div>
