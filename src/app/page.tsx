@@ -7,6 +7,7 @@ import { subscribeToPush } from "./push-setup";
 import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
+import { MealPanel } from "./meals";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
@@ -53,7 +54,7 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; caption?: string; restUntil?: string | null };
+type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean };
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -720,6 +721,8 @@ export default function Home() {
               ]}
             />
 
+            {me.labMeal && <MealPanel meId={me.id} />}
+
             <ExcusePanel onResolved={loadWeek} />
 
             <button
@@ -855,6 +858,39 @@ export default function Home() {
               <button onClick={saveName} className="w-full rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white">
                 저장
               </button>
+            </div>
+
+            {/* 실험실: 아직 다듬는 중인 기능을 켜고 끈다 */}
+            <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
+              <p className="text-sm font-bold text-[#4a2540]">
+                실험실 <span className="ml-1 rounded-full bg-[#ffc72c] px-2 py-0.5 text-[10px] font-bold text-[#6b4a00]">BETA</span>
+              </p>
+              <label className="flex items-center justify-between gap-3">
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-semibold text-[#4a2540]">식단 인증</span>
+                  <span className="block text-xs text-[#b4779b]">
+                    먹은 걸 찍어 올리면 AI가 칼로리를 어림잡고, 친구와 같이 볼 수 있어요. 벌금과는 상관없어요.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!!me.labMeal}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    setMe((m) => (m ? { ...m, labMeal: next } : m));
+                    const res = await fetch("/api/me", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ labMeal: next }),
+                    });
+                    if (!res.ok) {
+                      alert("저장에 실패했어요");
+                      await loadMe();
+                    }
+                  }}
+                  className="h-6 w-6 flex-none accent-[#ec4899]"
+                />
+              </label>
             </div>
 
             {/* 쉬어가기 요청 */}

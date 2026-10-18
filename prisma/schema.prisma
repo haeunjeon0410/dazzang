@@ -83,6 +83,9 @@ model User {
   // 쉬어가기 요청을 친구가 거절("나라도 지킨다")했을 때: 요청한 사람만 이 기간(주 단위) 벌금이 면제된다
   rests UserRest[]
   ribbons Ribbon[]
+  // 실험실: 식단 인증(AI 칼로리 분석) 켜기. 켠 사람만 식단 카드가 보이고 올릴 수 있다
+  labMeal Boolean @default(false)
+  meals   Meal[]
 
   checkins      Checkin[]
   settlements   Settlement[]
@@ -98,6 +101,23 @@ model Checkin {
   weekStart DateTime // 해당 인증이 속한 주의 월요일 00:00 (KST)
   liked     Boolean  @default(false) // 상대방이 칭찬(좋아요) 눌렀는지
   createdAt DateTime @default(now()) // 사진 촬영 시각(EXIF). 촬영 정보가 없으면 업로드 시각
+}
+
+// 실험실 식단 인증. 주 3회 운동 인증/벌금과는 별개로, 친구와 공유만 한다
+model Meal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photoUrl  String
+  // AI 분석 결과 (분석 실패/키 없음이면 analyzed=false, 나머지는 비어 있다)
+  analyzed  Boolean  @default(false)
+  title     String? // 한 줄 요약 (예: 닭가슴살 샐러드)
+  kcal      Int? // 추정 총 칼로리
+  items     Json? // [{ name, kcal }]
+  comment   String? // 친구에게 보일 짧은 한마디
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // 주간 마감 후 정산 상태만 저장 (횟수/벌금은 Checkin에서 즉시 계산)

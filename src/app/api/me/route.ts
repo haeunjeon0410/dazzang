@@ -23,7 +23,13 @@ export async function GET() {
     .sort((a, b) => b.getTime() - a.getTime())[0];
 
   return NextResponse.json({
-    user: { id: user.id, name: user.name, caption: user.captions[0] ?? "", restUntil: restUntil?.toISOString() ?? null },
+    user: {
+      id: user.id,
+      name: user.name,
+      caption: user.captions[0] ?? "",
+      restUntil: restUntil?.toISOString() ?? null,
+      labMeal: user.labMeal,
+    },
     room: {
       inviteToken: user.room.inviteToken,
       full: !!other,
@@ -51,7 +57,16 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption } = await req.json();
+  const { name, caption, labMeal } = await req.json();
+
+  // 실험실 식단 인증 켜기/끄기
+  if (labMeal !== undefined) {
+    if (typeof labMeal !== "boolean") {
+      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { labMeal } });
+    return NextResponse.json({ ok: true });
+  }
 
   // 말풍선 멘트 수정 (User.captions[0]에 하나만 저장, 비우면 인증 횟수별 기본 멘트)
   if (caption !== undefined) {
