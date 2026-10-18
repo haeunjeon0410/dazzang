@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CharacterSprite, CharPose, CharRow } from "./sprite";
 
 // 새 소식 팝업. 업데이트가 있을 때마다 UPDATE_ID를 바꾸면, 앱을 처음 여는 순간 한 번만 보여준다.
@@ -41,12 +41,20 @@ function markSeen() {
   }
 }
 
-// 마스코트 얼굴만 동그랗게 잘라 프로필 사진처럼 쓴다
+// 마스코트 머리 전체(머리카락~턱)를 동그랗게 잘라 프로필 사진처럼 쓴다.
+// 스프라이트 칸(384x512)에서 머리는 대략 x 42~342, y 50~350 (300px 정사각)이라, 그 영역이 44px 원에 들어오게 줄여서 맞춘다
+const AVATAR = 44;
+const HEAD_BOX = 300;
+const AVATAR_SCALE = AVATAR / HEAD_BOX;
+
 function Avatar({ who, pose }: { who: "A" | "B"; pose: (typeof CharPose)[keyof typeof CharPose] }) {
   return (
-    <div className="h-10 w-10 flex-none overflow-hidden rounded-full border-2 border-white bg-[#fff0f6] shadow">
-      <div style={{ marginLeft: -22, marginTop: -14 }}>
-        <CharacterSprite row={who === "A" ? CharRow.A : CharRow.B} pose={pose} height={112} />
+    <div
+      className="flex-none overflow-hidden rounded-full border-2 border-white bg-[#fff0f6] shadow"
+      style={{ width: AVATAR, height: AVATAR }}
+    >
+      <div style={{ marginLeft: -42 * AVATAR_SCALE, marginTop: -50 * AVATAR_SCALE }}>
+        <CharacterSprite row={who === "A" ? CharRow.A : CharRow.B} pose={pose} height={512 * AVATAR_SCALE} />
       </div>
     </div>
   );
@@ -55,8 +63,19 @@ function Avatar({ who, pose }: { who: "A" | "B"; pose: (typeof CharPose)[keyof t
 export function WhatsNew({ ready }: { ready: boolean }) {
   // 로그인 정보가 오기 전(ready=false)에는 아무것도 그리지 않으므로, 서버 렌더와 어긋날 일이 없다
   const [show, setShow] = useState(() => !alreadySeen());
+  const chatRef = useRef<HTMLDivElement>(null);
+  const visible = ready && show;
 
-  if (!ready || !show) return null;
+  // 말풍선이 뜰 때마다 대화창을 아래로 내려서, 길어져도 새 말풍선이 잘리지 않게 한다
+  useEffect(() => {
+    if (!visible) return;
+    const timers = CHAT.map((_, i) =>
+      setTimeout(() => chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" }), 300 + i * STEP_MS + 120),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [visible]);
+
+  if (!visible) return null;
 
   function close() {
     markSeen();
@@ -65,7 +84,7 @@ export function WhatsNew({ ready }: { ready: boolean }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="celebrate-pop flex max-h-[88vh] w-full max-w-[20rem] flex-col overflow-hidden rounded-3xl border-2 border-[#ffc2dc] bg-white shadow-xl">
+      <div className="celebrate-pop flex max-h-[92vh] w-full max-w-[20rem] flex-col overflow-hidden rounded-3xl border-2 border-[#ffc2dc] bg-white shadow-xl">
         {/* 메신저 상단 바 */}
         <div className="flex flex-none items-center justify-between bg-[#ffe1ee] px-4 py-3">
           <div className="flex items-center gap-2">
@@ -91,7 +110,7 @@ export function WhatsNew({ ready }: { ready: boolean }) {
         </div>
 
         {/* 수다: 말풍선이 하나씩 떠오른다 */}
-        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fff7fb] px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={chatRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#fff7fb] px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {CHAT.map((l, i) => {
             const mine = l.from === "B";
             return (
