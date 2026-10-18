@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CaptionBubble, CharacterSprite, CharPose, CharRow } from "./sprite";
+import { CharacterSprite, CharPose, CharRow } from "./sprite";
 
 // 새 소식 팝업. 업데이트가 있을 때마다 UPDATE_ID를 바꾸면, 앱을 처음 여는 순간 한 번만 보여준다.
 // 어느 소식을 이 기기에서 이미 봤는지는 localStorage에 기억한다 (못 쓰면 열 때마다 뜨는 정도)
@@ -118,8 +118,7 @@ export function WhatsNew({ ready, labMeal }: { ready: boolean; labMeal: boolean 
                 <CharacterSprite row={CharRow.A} pose={CharPose.WIN} height={104} className="celebrate-hop" />
                 <CharacterSprite row={CharRow.B} pose={CharPose.WIN} height={104} className="celebrate-hop [animation-delay:250ms]" />
               </div>
-              <CaptionBubble row={CharRow.A} text="새 소식이 왔어요!" height={52} />
-              <p className="text-sm font-semibold text-[#4a2540]">다짱이 이만큼 좋아졌어요 ✨</p>
+              <p className="text-base font-black text-[#4a2540]">다짱이 이만큼 좋아졌어요 ✨</p>
               <p className="text-xs text-[#b4779b]">넘겨 보면서 뭐가 달라졌는지 확인해 보세요</p>
             </>
           ) : (
