@@ -81,7 +81,7 @@ export default function JoinRoom() {
   return (
     <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-xs space-y-4 bg-white/90 backdrop-blur rounded-3xl border border-[#ffd6e8] shadow-lg p-6">
-        <h1 className="text-3xl font-black text-center text-[#ec4899] tracking-tight">다짱</h1>
+        <h1 className="text-3xl font-black text-center text-[#de73a5] tracking-tight">다짱</h1>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/assets/poster.webp" alt="" className="w-full h-auto" />
         <p className="text-center text-sm text-[#c2679c]">누구인가요?</p>
@@ -93,7 +93,7 @@ export default function JoinRoom() {
             <button
               key={m.id}
               onClick={() => pick(m.id)}
-              className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] py-4 font-bold text-[#4a2540] hover:border-[#ec4899]"
+              className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] py-4 font-bold text-[#4a2540] hover:border-[#de73a5]"
             >
               {m.name}
             </button>
@@ -111,14 +111,14 @@ export default function JoinRoom() {
             />
             <button
               disabled={busy}
-              className="w-full rounded-xl bg-[#ec4899] py-3 font-bold text-white disabled:opacity-50"
+              className="w-full rounded-xl bg-[#de73a5] py-3 font-bold text-white disabled:opacity-50"
             >
               {busy ? "참여하는 중..." : "닉네임으로 참여하기"}
             </button>
           </form>
         )}
 
-        {error && <p className="text-[#ec4899] text-sm text-center">{error}</p>}
+        {error && <p className="text-[#de73a5] text-sm text-center">{error}</p>}
       </div>
     </div>
   );

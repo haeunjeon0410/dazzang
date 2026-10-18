@@ -335,7 +335,7 @@ export function Battle({
           <div key={p.name} className="p-3 text-center">
             <p className="text-xs text-[#b4779b] font-semibold truncate">{p.name}</p>
             <p className={`text-lg font-black ${p.count >= 3 ? "text-[#2f9e44]" : "text-[#4a2540]"}`}>{p.count}/3</p>
-            {p.fine > 0 && <p className="text-[11px] text-[#ec4899] font-bold">벌금 {p.fine.toLocaleString()}원</p>}
+            {p.fine > 0 && <p className="text-[11px] text-[#de73a5] font-bold">벌금 {p.fine.toLocaleString()}원</p>}
           </div>
         ))}
       </div>
@@ -370,7 +370,7 @@ export function Battle({
             <button
               disabled={savingCaption}
               onClick={saveCaption}
-              className="w-full rounded-xl bg-[#ec4899] text-white py-3 text-base font-bold disabled:opacity-50"
+              className="w-full rounded-xl bg-[#de73a5] text-white py-3 text-base font-bold disabled:opacity-50"
             >
               저장
             </button>

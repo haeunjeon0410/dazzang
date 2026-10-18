@@ -64,9 +64,9 @@ export default function OwnerHome() {
 
   return (
     <div className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-10">
-      <h1 className="text-xl font-black text-[#ec4899] pt-4">내 방 목록</h1>
+      <h1 className="text-xl font-black text-[#de73a5] pt-4">내 방 목록</h1>
 
-      {error && <p className="text-[#ec4899] text-sm">{error}</p>}
+      {error && <p className="text-[#de73a5] text-sm">{error}</p>}
       {!rooms && !error && <p className="text-[#d9a9c4] text-sm">불러오는 중...</p>}
       {rooms?.length === 0 && <p className="text-[#d9a9c4] text-sm">만들어둔 방이 없어요.</p>}
 

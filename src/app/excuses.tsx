@@ -166,7 +166,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
             최근 요청: {STATUS_LABEL[latestMine.status]}
           </span>
         ) : (
-          <span className="text-[#ec4899] text-lg leading-none">›</span>
+          <span className="text-[#de73a5] text-lg leading-none">›</span>
         )}
       </button>
 
@@ -203,7 +203,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
                 />
                 <button
                   onClick={() => reason.trim() && setConfirmOpen(true)}
-                  className="w-full rounded-xl bg-[#ec4899] py-3 text-sm font-bold text-white"
+                  className="w-full rounded-xl bg-[#de73a5] py-3 text-sm font-bold text-white"
                 >
                   친구에게 요청 보내기
                 </button>
@@ -235,7 +235,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
               <li>· 사정 봐달라하기는 <b>한 달에 한 번만</b> 쓸 수 있어요</li>
               <li>· 친구가 받아들이면 <b>이번 주 벌금이 전액 면제</b>돼요</li>
             </ul>
-            <button onClick={submit} className="w-full rounded-xl bg-[#ec4899] py-3 text-sm font-bold text-white">
+            <button onClick={submit} className="w-full rounded-xl bg-[#de73a5] py-3 text-sm font-bold text-white">
               보낼게요
             </button>
             <button
@@ -269,7 +269,7 @@ export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
                 <span className="font-bold text-[#c2679c]">친구 답장</span> {resultPopup.reply}
               </p>
             )}
-            <button onClick={closeResultPopup} className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white">
+            <button onClick={closeResultPopup} className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white">
               확인
             </button>
           </div>

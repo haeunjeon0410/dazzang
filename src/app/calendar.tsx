@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type CheckinItem = { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean };
 type PersonSummary = { userId: string; name: string; checkins: CheckinItem[] };
@@ -55,7 +55,7 @@ function FloatingHeart({ delay, onDone }: { delay: number; onDone: () => void })
   }, []);
   return (
     <span
-      className="absolute left-1/2 top-1/2 text-base pointer-events-none text-[#ec4899]"
+      className="absolute left-1/2 top-1/2 text-base pointer-events-none text-[#de73a5]"
       style={{
         transform: go ? "translate(-50%, -46px) scale(1.3)" : "translate(-50%, -50%) scale(0.6)",
         opacity: go ? 0 : 1,
@@ -67,7 +67,7 @@ function FloatingHeart({ delay, onDone }: { delay: number; onDone: () => void })
   );
 }
 
-export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; people: PersonSummary[]; meId: string }) {
+export function WeekCalendar({ weekStart, people, meId, header }: { weekStart: string; people: PersonSummary[]; meId: string; header?: ReactNode }) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeOverrides, setLikeOverrides] = useState<Record<string, boolean>>({});
@@ -111,10 +111,11 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
 
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
+      {header}
       <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
-          <div key={label} className={i === todayIdx ? "font-black text-[#ec4899]" : ""}>
+          <div key={label} className={i === todayIdx ? "font-black text-[#de73a5]" : ""}>
             {label}
             <div className="text-[10px]">{dayDates[i]}</div>
           </div>
@@ -143,7 +144,7 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={c.photoUrl} alt="" className="w-full h-full object-cover" />
                     {isLiked(c) && (
-                      <span className="absolute top-0 right-0 text-[10px] leading-none bg-white/90 rounded-bl px-0.5 text-[#ec4899]">
+                      <span className="absolute top-0 right-0 text-[10px] leading-none bg-white/90 rounded-bl px-0.5 text-[#de73a5]">
                         ♥
                       </span>
                     )}
@@ -171,26 +172,36 @@ export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; p
 
       {selected && (
         <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
           onClick={() => setSelected(null)}
         >
-          <div className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={selected.photoUrl} alt="인증샷" className="w-full rounded-xl" />
-            <p className="text-center text-white text-sm mt-2">
-              {new Date(selected.createdAt).toLocaleString("ko-KR")} 촬영
-            </p>
-            {selected.userId !== meId && (
-              <button
-                disabled={likeBusy || isLiked(selected)}
-                onClick={() => likeCheckin(selected)}
-                className={`mt-3 w-full rounded-xl py-2.5 text-sm font-bold ${
-                  isLiked(selected) ? "bg-white text-[#ec4899]" : "bg-[#ec4899] text-white"
-                } disabled:opacity-100`}
-              >
-                {isLiked(selected) ? "♥ 좋아요 눌렀어요" : "♡ 좋아요 누르기"}
-              </button>
-            )}
+          <div className="w-full max-w-[19rem] rounded-3xl bg-white p-4 shadow-xl space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="overflow-hidden rounded-2xl border border-[#ffd6e8]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selected.photoUrl} alt="인증샷" className="aspect-square w-full object-cover" />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#c2679c]">
+                {new Date(selected.createdAt).toLocaleString("ko-KR", {
+                  month: "long",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </span>
+              {selected.userId !== meId && (
+                <button
+                  disabled={likeBusy || isLiked(selected)}
+                  onClick={() => likeCheckin(selected)}
+                  aria-label={isLiked(selected) ? "좋아요 눌렀어요" : "좋아요 누르기"}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full text-xl ${
+                    isLiked(selected) ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#de73a5]"
+                  } disabled:opacity-100`}
+                >
+                  {isLiked(selected) ? "♥" : "♡"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

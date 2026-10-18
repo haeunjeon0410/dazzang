@@ -88,7 +88,7 @@ const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
 // 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
 
 // 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
-const CONFETTI_COLORS = ["#f472b6", "#ec4899", "#ffc72c", "#60a5fa", "#34d399", "#a78bfa"];
+const CONFETTI_COLORS = ["#f472b6", "#de73a5", "#ffc72c", "#60a5fa", "#34d399", "#a78bfa"];
 const CONFETTI_PIECES = Array.from({ length: 36 }, (_, i) => ({
   left: `${(i * 97) % 100}%`,
   color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
@@ -557,7 +557,7 @@ export default function Home() {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-xs space-y-4 bg-white/90 backdrop-blur rounded-3xl border border-[#ffd6e8] shadow-lg p-6">
-          <h1 className="text-3xl font-black text-center text-[#ec4899] tracking-tight">다짱</h1>
+          <h1 className="text-3xl font-black text-center text-[#de73a5] tracking-tight">다짱</h1>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/assets/poster.webp" alt="" className="w-full h-auto" />
           <p className="text-center text-sm text-[#c2679c]">방 코드로 친구와 함께 시작해보세요.</p>
@@ -570,13 +570,13 @@ export default function Home() {
               autoCapitalize="characters"
               className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] px-4 py-3 text-center text-lg tracking-widest"
             />
-            <button className="w-full rounded-xl bg-[#ec4899] py-3 font-bold text-white shadow-md shadow-[#ec4899]/30">방 코드로 입장하기</button>
+            <button className="w-full rounded-xl bg-[#de73a5] py-3 font-bold text-white shadow-md shadow-[#de73a5]/30">방 코드로 입장하기</button>
           </form>
           <div className="flex items-center gap-3 text-xs text-[#d9a9c4]"><span className="h-px flex-1 bg-[#ffd6e8]" /><span>또는</span><span className="h-px flex-1 bg-[#ffd6e8]" /></div>
           <form onSubmit={handleCreateRoom}>
-            <button disabled={creating} className="w-full rounded-xl bg-white border-2 border-[#ec4899] py-3 font-bold text-[#ec4899] disabled:opacity-50">{creating ? "방 만드는 중..." : "방 만들기"}</button>
+            <button disabled={creating} className="w-full rounded-xl bg-white border-2 border-[#de73a5] py-3 font-bold text-[#de73a5] disabled:opacity-50">{creating ? "방 만드는 중..." : "방 만들기"}</button>
           </form>
-          {loginError && <p className="text-[#ec4899] text-sm text-center">{loginError}</p>}
+          {loginError && <p className="text-[#de73a5] text-sm text-center">{loginError}</p>}
         </div>
       </div>
     );
@@ -585,6 +585,34 @@ export default function Home() {
   const myEntry = weekData?.summary.find((s) => s.userId === me.id);
   const otherEntry = weekData?.summary.find((s) => s.userId !== me.id);
   const hasGroupAccount = !!room?.groupAccountNumber;
+  // 실험실 식단 인증을 켜면 주간 표 카드 맨 위에 제목과 운동 | 식단 전환이 생긴다. 끄면 기존 화면 그대로
+  const calendarHeader = me.labMeal ? (
+    <div className="mb-3 flex items-center justify-between">
+      <p className="text-sm font-bold text-[#4a2540]">{viewMode === "diet" ? "먹은 칼로리" : "운동 인증"}</p>
+      <div className="grid w-28 grid-cols-2 gap-0.5 rounded-full bg-[#fff0f6] border border-[#ffd6e8] p-0.5" role="tablist">
+        {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
+          <button
+            key={mode}
+            role="tab"
+            aria-selected={viewMode === mode}
+            onClick={() => {
+              setViewMode(mode);
+              try {
+                localStorage.setItem("dajjang_view_mode", mode);
+              } catch {
+                // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
+              }
+            }}
+            className={`rounded-full py-1 text-xs font-bold ${
+              viewMode === mode ? "bg-[#de73a5] text-white shadow-sm" : "text-[#c2679c]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -596,7 +624,7 @@ export default function Home() {
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
       >
         <header className="flex items-center justify-between pt-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
-          <h1 className="text-xl font-black text-[#ec4899] [text-shadow:0_1px_0_#fff,0_0_6px_#fff]">
+          <h1 className="text-xl font-black text-[#de73a5] [text-shadow:0_1px_0_#fff,0_0_6px_#fff]">
             다짱 <span className="text-[#4a2540] font-bold text-base">· {me.name}님</span>
           </h1>
           <div className="hdr-icons flex items-center gap-2">
@@ -639,9 +667,9 @@ export default function Home() {
               <p className="text-sm font-bold text-[#b4356f]">친구가 아직 안 들어왔어요</p>
               <p className="text-xs text-[#b4779b]">아래 초대 코드를 카톡으로 보내거나, 코드를 눌러 복사해주세요</p>
               <button onClick={copyRoomCode}>
-                <p className="text-center text-2xl font-black tracking-[0.25em] text-[#ec4899]">{room.inviteToken}</p>
+                <p className="text-center text-2xl font-black tracking-[0.25em] text-[#de73a5]">{room.inviteToken}</p>
               </button>
-              <button onClick={shareInvite} className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white">
+              <button onClick={shareInvite} className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white">
                 초대 공유하기
               </button>
             </div>
@@ -757,38 +785,13 @@ export default function Home() {
               </div>
             )}
 
-            {/* 실험실 식단 인증을 켜면 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
-            {me.labMeal && (
-              <div className="ml-auto grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
-                {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    role="tab"
-                    aria-selected={viewMode === mode}
-                    onClick={() => {
-                      setViewMode(mode);
-                      try {
-                        localStorage.setItem("dajjang_view_mode", mode);
-                      } catch {
-                        // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
-                      }
-                    }}
-                    className={`rounded-full py-1 text-xs font-bold ${
-                      viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {me.labMeal && viewMode === "diet" ? (
-              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} />
+              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} header={calendarHeader} />
             ) : (
               <WeekCalendar
                 weekStart={weekData.weekStart}
                 meId={me.id}
+                header={calendarHeader}
                 people={[
                   { userId: myEntry.userId, name: "나", checkins: myEntry.checkins },
                   { userId: otherEntry.userId, name: otherEntry.name, checkins: otherEntry.checkins },
@@ -806,7 +809,7 @@ export default function Home() {
               className="w-full flex items-center justify-between rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3 text-sm"
             >
               <span className="text-[#c2679c] font-semibold">지난 기록</span>
-              <span className="text-[#ec4899] text-lg leading-none">{historyOpen ? "︿" : "﹀"}</span>
+              <span className="text-[#de73a5] text-lg leading-none">{historyOpen ? "︿" : "﹀"}</span>
             </button>
 
             {historyOpen && (
@@ -961,7 +964,7 @@ export default function Home() {
                       await loadMe();
                     }
                   }}
-                  className="h-6 w-6 flex-none accent-[#ec4899]"
+                  className="h-6 w-6 flex-none accent-[#de73a5]"
                 />
               </label>
             </div>
@@ -1085,7 +1088,7 @@ export default function Home() {
                 {stats.map((s) => (
                   <div key={s.userId} className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 text-center space-y-1">
                     <p className="text-sm font-bold text-[#4a2540]">{s.name}</p>
-                    <p className="text-2xl font-black text-[#ec4899]">{s.weeksWon}</p>
+                    <p className="text-2xl font-black text-[#de73a5]">{s.weeksWon}</p>
                     <p className="text-xs text-[#b4779b]">승리한 주 (총 {s.totalWeeks}주)</p>
                     <p className="text-xs text-[#8a5a1f]">누적 인증 {s.totalCheckins}회</p>
                     <p className="text-xs text-[#b4356f] font-semibold">누적 벌금 {s.totalFine.toLocaleString()}원</p>
@@ -1126,12 +1129,12 @@ export default function Home() {
                           {s.ribbonUsed ? (
                             <span className="font-bold text-[#b4779b]">
                               {s.count}/3 ·{" "}
-                              <span className="line-through decoration-[#ec4899] decoration-2">
+                              <span className="line-through decoration-[#de73a5] decoration-2">
                                 벌금 {(s.waivedFine ?? 0).toLocaleString()}원
                               </span>
                             </span>
                           ) : (
-                            <span className={s.fine > 0 ? "text-[#ec4899] font-bold" : "text-[#2f9e44] font-bold"}>
+                            <span className={s.fine > 0 ? "text-[#de73a5] font-bold" : "text-[#2f9e44] font-bold"}>
                               {s.count}/3{s.fine > 0 ? ` · 벌금 ${s.fine.toLocaleString()}원` : " · 완료"}
                             </span>
                           )}
@@ -1150,7 +1153,7 @@ export default function Home() {
                   </div>
                   <button
                     onClick={() => closeWeekResultPopup(myFineExists)}
-                    className="w-full rounded-xl bg-[#ec4899] py-2.5 text-sm font-bold text-white"
+                    className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white"
                   >
                     {myFineExists ? "정산하러 가기" : "확인"}
                   </button>

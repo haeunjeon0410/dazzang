@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { todayDayIndex } from "./calendar";
 
 type Meal = {
@@ -25,19 +25,42 @@ type MealsData = {
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
+// 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 2500kcal 이상이면 가장 진하다
+const HEAT_MAX_KCAL = 2500;
+function heatStyle(kcal: number): { backgroundColor: string; color: string } {
+  const t = Math.min(1, Math.max(0, kcal / HEAT_MAX_KCAL));
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+  return {
+    backgroundColor: `rgb(${mix(255, 210)}, ${mix(214, 78)}, ${mix(232, 134)})`,
+    color: t > 0.3 ? "#ffffff" : "#b4356f",
+  };
+}
+
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 }
 
 // 식단 보기. 운동 보기와 같은 주간 표 모양에 칸마다 그날 먹은 칼로리가 들어가고,
 // 칸을 누르면 운동 인증샷처럼 창이 떠서 그날 식단을 슬라이드로 넘겨 볼 수 있다 (아침, 점심, 저녁 순)
-export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekStart: string; refreshKey: number }) {
+export function MealView({
+  meId,
+  weekStart,
+  refreshKey,
+  header,
+}: {
+  meId: string;
+  weekStart: string;
+  refreshKey: number;
+  header?: ReactNode;
+}) {
   const [data, setData] = useState<MealsData | null>(null);
   // 창에 띄울 칸 (누가, 무슨 요일). 사진이 든 목록은 칸을 누를 때만 받아온다
   const [popup, setPopup] = useState<{ userId: string; day: number } | null>(null);
   const [dayMeals, setDayMeals] = useState<Meal[] | null>(null);
   const [slide, setSlide] = useState(0);
   const [reload, setReload] = useState(0);
+  // 마우스로 끌어 넘기는 중인지 (터치는 브라우저가 알아서 스와이프를 처리한다)
+  const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,6 +97,34 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
     if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
   }
 
+  // 컴퓨터에서는 마우스로 사진을 끌어 넘길 수 있게 한다. 놓으면 가까운 장으로 맞춘다
+  function startMouseDrag(e: React.MouseEvent<HTMLDivElement>) {
+    const el = trackRef.current;
+    if (!el || e.button !== 0) return;
+    const startX = e.clientX;
+    const startLeft = el.scrollLeft;
+    let moved = false;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      if (!moved && Math.abs(dx) > 4) {
+        moved = true;
+        setDragging(true);
+      }
+      if (moved) el.scrollLeft = startLeft - dx;
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setDragging(false);
+      if (moved) {
+        const last = Math.max(0, Math.round(el.scrollWidth / el.clientWidth) - 1);
+        goTo(Math.min(last, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
   async function remove(id: string) {
     if (!confirm("이 식단을 지울까요?")) return;
     const res = await fetch(`/api/meals/${id}`, { method: "DELETE" });
@@ -94,10 +145,11 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
 
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
+      {header}
       <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
-          <div key={label} className={i === todayIdx ? "font-black text-[#ec4899]" : ""}>
+          <div key={label} className={i === todayIdx ? "font-black text-[#de73a5]" : ""}>
             {label}
             <div className="text-[10px]">{dayDates[i]}</div>
           </div>
@@ -114,9 +166,10 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
               <button
                 key={i}
                 onClick={() => mine.length && openCell(p.id, i)}
-                className={`aspect-square rounded-md flex items-center justify-center text-[10px] leading-tight ${
-                  mine.length ? "bg-[#ff8fc0] text-white font-bold" : "bg-[#ffe1ee] text-[#c2679c]"
-                }`}
+                style={mine.length && kcal > 0 ? heatStyle(kcal) : undefined}
+                className={`aspect-square rounded-md flex items-center justify-center text-xs leading-tight ${
+                  mine.length ? "font-black" : "bg-[#ffe1ee] text-[#c2679c]"
+                } ${mine.length && kcal === 0 ? "bg-[#ffd6e8] text-[#b4356f]" : ""}`}
               >
                 {mine.length ? (kcal > 0 ? kcal.toLocaleString() : `${mine.length}끼`) : "-"}
               </button>
@@ -126,80 +179,91 @@ export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekSt
       ))}
 
       {popup && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6" onClick={() => setPopup(null)}>
-          <div className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            {dayMeals === null && <p className="text-center text-sm text-white">불러오는 중...</p>}
+        // 앱의 다른 창(내 정보, 통산전적)과 같은 흰 카드. 바깥을 누르면 닫힌다
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setPopup(null)}>
+          <div
+            className="w-full max-w-[19rem] rounded-3xl bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {dayMeals === null && <p className="py-10 text-center text-sm text-[#b4779b]">불러오는 중...</p>}
             {shown.length > 0 && (
               <>
                 <div
                   ref={trackRef}
-                  className="flex overflow-x-auto snap-x snap-mandatory rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className={`flex overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                    dragging ? "cursor-grabbing select-none" : "snap-x snap-mandatory"
+                  }`}
+                  onMouseDown={startMouseDrag}
                   onScroll={(e) => {
                     const el = e.currentTarget;
                     setSlide(Math.round(el.scrollLeft / el.clientWidth));
                   }}
                 >
-                  {shown.map((m) => (
-                    <div key={m.id} className="w-full flex-none snap-center">
-                      <div className="relative">
+                  {shown.map((m, idx) => (
+                    <div key={m.id} className="w-full flex-none snap-center space-y-3">
+                      <div>
+                        <p className="text-[11px] font-semibold text-[#c2679c]">
+                          {m.userId === meId ? "나" : m.name} · {timeLabel(m.createdAt)}
+                        </p>
+                        <p className="truncate text-lg font-black text-[#4a2540]">{m.analyzed ? m.title : "분석하지 못했어요"}</p>
+                      </div>
+
+                      <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={m.photoUrl} alt="식단" className="w-full rounded-t-xl" />
+                        <img src={m.photoUrl} alt="식단" draggable={false} className="aspect-square w-full object-cover" />
+                        {m.analyzed && m.kcal != null && (
+                          <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#de73a5] px-3 py-1 text-sm font-black text-white shadow-md">
+                            약 {m.kcal.toLocaleString()} kcal
+                          </span>
+                        )}
+                        {idx > 0 && (
+                          <button
+                            onClick={() => goTo(idx - 1)}
+                            aria-label="이전 식단"
+                            className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-lg leading-none text-[#de73a5] shadow"
+                          >
+                            ‹
+                          </button>
+                        )}
+                        {idx < shown.length - 1 && (
+                          <button
+                            onClick={() => goTo(idx + 1)}
+                            aria-label="다음 식단"
+                            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-lg leading-none text-[#de73a5] shadow"
+                          >
+                            ›
+                          </button>
+                        )}
                         {m.userId === meId && (
                           // 눈에 띄지 않게 사진 구석에 둔 지우기 버튼
                           <button
                             onClick={() => remove(m.id)}
                             aria-label="식단 지우기"
-                            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/25 text-sm text-white/80"
+                            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-xs text-white/80"
                           >
                             ✕
                           </button>
                         )}
                       </div>
-                      <div className="rounded-b-xl bg-white p-3 space-y-1">
-                        <p className="text-[11px] text-[#d9a9c4]">
-                          {m.userId === meId ? "나" : m.name} · {timeLabel(m.createdAt)}
-                        </p>
-                        <p className="text-sm font-bold text-[#4a2540]">{m.analyzed ? m.title : "분석하지 못했어요"}</p>
-                        {m.analyzed && m.kcal != null && (
-                          <p className="text-sm font-black text-[#ec4899]">약 {m.kcal.toLocaleString()} kcal</p>
-                        )}
-                        {m.items && m.items.length > 0 && (
-                          <ul className="text-xs text-[#b4779b]">
-                            {m.items.map((i, idx) => (
-                              <li key={idx}>
-                                {i.name} · {i.kcal} kcal
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
+
+                      {m.items && m.items.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.items.map((i, k) => (
+                            <span key={k} className="rounded-full bg-[#ffe1ee] px-2.5 py-1 text-xs font-semibold text-[#b4356f]">
+                              {i.name} {i.kcal}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
 
                 {shown.length > 1 && (
-                  <div className="mt-3 flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => goTo(slide - 1)}
-                      disabled={slide === 0}
-                      aria-label="이전 식단"
-                      className="h-7 w-7 rounded-full bg-white/80 text-[#ec4899] disabled:opacity-30"
-                    >
-                      ‹
-                    </button>
-                    <div className="flex gap-1.5">
-                      {shown.map((m, i) => (
-                        <span key={m.id} className={`h-1.5 w-1.5 rounded-full ${i === slide ? "bg-white" : "bg-white/40"}`} />
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => goTo(slide + 1)}
-                      disabled={slide === shown.length - 1}
-                      aria-label="다음 식단"
-                      className="h-7 w-7 rounded-full bg-white/80 text-[#ec4899] disabled:opacity-30"
-                    >
-                      ›
-                    </button>
+                  <div className="mt-3 flex justify-center gap-1.5">
+                    {shown.map((m, i) => (
+                      <span key={m.id} className={`h-1.5 w-1.5 rounded-full ${i === slide ? "bg-[#de73a5]" : "bg-[#ffd6e8]"}`} />
+                    ))}
                   </div>
                 )}
               </>
