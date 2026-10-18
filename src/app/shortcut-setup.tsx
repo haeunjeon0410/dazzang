@@ -6,14 +6,14 @@ const PILL = "flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold te
 
 // 도움말 속 "눌러야 하는 글씨"를 분홍색으로 눈에 띄게 한다
 function B({ children }: { children: ReactNode }) {
-  return <span className="rounded bg-[#ffe1ee] px-1 font-bold text-[#b4356f]">{children}</span>;
+  return <span className="rounded bg-[#ffe1ee] px-1.5 py-0.5 font-bold text-[#b4356f]">{children}</span>;
 }
 
 // 번호 붙은 한 줄. 번호는 장이 바뀌어도 이어져서 전체가 하나의 순서처럼 읽힌다
 function Line({ n, children }: { n: number; children: ReactNode }) {
   return (
-    <div className="flex gap-2">
-      <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-[#de73a5] text-[10px] font-bold text-white">{n}</span>
+    <div className="flex gap-2.5">
+      <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[#de73a5] text-xs font-bold text-white">{n}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -57,7 +57,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       body: token ? (
         <p className="font-bold text-[#2f9e44]">✓ 만들어졌어요. 남에게 알려 주지 마세요</p>
       ) : (
-        <button onClick={make} disabled={busy} className="w-full rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white disabled:opacity-50">
+        <button onClick={make} disabled={busy} className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-50">
           {busy ? "만드는 중..." : "내 주소 만들기"}
         </button>
       ),
@@ -87,7 +87,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
         <>
           <Line n={5}>
             <B>동작 검색</B> → <B>URL 콘텐츠 가져오기</B>
-            <ul className="mt-1 space-y-0.5 text-[#8a5a73]">
+            <ul className="mt-1.5 space-y-1 text-[#8a5a73]">
               <li>
                 · URL: 아래 주소 붙여넣기
               </li>
@@ -99,7 +99,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
               </li>
             </ul>
           </Line>
-          <button onClick={() => token && copy(url, "주소를")} className={`${PILL} w-full py-1.5`}>
+          <button onClick={() => token && copy(url, "주소를")} className={`${PILL} w-full py-2.5 text-sm`}>
             주소 복사하기
           </button>
           <Line n={6}>
@@ -115,7 +115,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
           <Line n={7}>
             <B>설정</B> → <B>액션 버튼</B> → <B>단축어</B> → <B>식단</B>
           </Line>
-          <p className="text-[11px] text-[#b4779b]">버튼이 없는 폰: 설정 → 손쉬운 사용 → 터치 → 뒷면 탭 → 두 번 탭 → 식단</p>
+          <p className="text-xs text-[#b4779b]">버튼이 없는 폰: 설정 → 손쉬운 사용 → 터치 → 뒷면 탭 → 두 번 탭 → 식단</p>
         </>
       ),
     },
@@ -156,7 +156,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={close}>
           <div
-            className="relative flex max-h-[88vh] w-full max-w-xs flex-col gap-2.5 rounded-3xl bg-white p-4 shadow-xl"
+            className="relative flex max-h-[88vh] w-full max-w-sm flex-col gap-3 rounded-3xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-4 top-4 flex items-center gap-2">
@@ -178,16 +178,16 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
               <p className="text-[11px] font-bold text-[#de73a5]">
                 {step + 1} / {steps.length}
               </p>
-              <p className="text-base font-black text-[#4a2540]">{cur.title}</p>
+              <p className="text-lg font-black text-[#4a2540]">{cur.title}</p>
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto text-[13px] leading-snug text-[#6b4a5e]">{cur.body}</div>
+            <div className="flex-1 space-y-3 overflow-y-auto text-[15px] leading-relaxed text-[#6b4a5e]">{cur.body}</div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setStep((n) => Math.max(0, n - 1))}
                 disabled={step === 0}
-                className="rounded-xl bg-[#ffeef5] py-2 text-sm font-semibold text-[#c2679c] disabled:opacity-40"
+                className="rounded-xl bg-[#ffeef5] py-2.5 text-sm font-semibold text-[#c2679c] disabled:opacity-40"
               >
                 이전
               </button>
@@ -195,12 +195,12 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
                 <button
                   onClick={() => setStep((n) => Math.min(last, n + 1))}
                   disabled={!canNext}
-                  className="rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white disabled:opacity-40"
+                  className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-40"
                 >
                   다음
                 </button>
               ) : (
-                <button onClick={close} className="rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white">
+                <button onClick={close} className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white">
                   완료
                 </button>
               )}
