@@ -101,3 +101,40 @@ export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | 
     return null;
   }
 }
+
+// 사용자가 음식을 고치거나 새로 넣었을 때, 이름만 보고 1인분 칼로리를 다시 추정한다 (글자만 보내서 사진보다 훨씬 싸다)
+const ESTIMATE_PROMPT = `너는 다이어트 코치야. 음식 이름 목록을 받으면 각각의 1인분 기준 칼로리를 추정해서 JSON 객체 하나로만 답해.
+형식: {"kcals":[숫자, ...]} (목록과 같은 순서, 같은 개수)`;
+
+export async function estimateKcals(names: string[]): Promise<number[] | null> {
+  const key = process.env.GATEWAY_API_KEY;
+  if (!key || names.length === 0) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/chat/completions/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: ESTIMATE_PROMPT },
+          { role: "user", content: JSON.stringify(names) },
+        ],
+        max_tokens: 1000,
+        temperature: 0.2,
+        reasoning_effort: "low",
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) throw new Error(`gateway ${res.status}`);
+    const data = await res.json();
+    if (data?.usage) console.info("[meal] usage", JSON.stringify(data.usage));
+    const text = data?.choices?.[0]?.message?.content;
+    const parsed = typeof text === "string" ? (extractJson(text) as { kcals?: unknown } | null) : null;
+    const k = parsed?.kcals;
+    if (!Array.isArray(k) || k.length !== names.length) return null;
+    return k.map((v) => (typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(Math.round(v), 0), 5000) : 0));
+  } catch (e) {
+    console.error("[meal] gateway", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
