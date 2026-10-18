@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { estimateKcals } from "@/lib/meal-ai";
 import { tooManyRequests } from "@/lib/rate-limit";
+import { takeAiQuota } from "@/lib/ai-quota";
 
 // 식단 확인 창에서 음식을 고치거나 새로 넣었을 때, 이름만으로 1인분 칼로리를 다시 계산해 준다
 export async function POST(req: Request) {
@@ -21,6 +22,8 @@ export async function POST(req: Request) {
     .filter(Boolean);
   if (names.length === 0) return NextResponse.json({ error: "음식 이름이 없어요" }, { status: 400 });
 
+  // 하루 한도를 넘으면 계산하지 않는다 (칼로리는 0으로 저장된다)
+  if (!(await takeAiQuota(userId, "text"))) return NextResponse.json({ kcals: null, limit: true });
   const kcals = await estimateKcals(names);
   return NextResponse.json({ kcals });
 }

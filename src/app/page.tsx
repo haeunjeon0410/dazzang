@@ -464,8 +464,9 @@ export default function Home() {
           });
           return;
         }
-        if (data?.kind === "unknown" && viewMode === "diet") {
-          // AI를 못 쓰는 상태: 직접 적을 수 있게 빈 확인 창을 연다
+        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
+          // AI를 못 쓰는 상태(키 없음, 실패, 오늘 한도 초과): 직접 적을 수 있게 빈 확인 창을 연다
+          if (data.kind === "limit") setToast("오늘 AI 분석을 다 썼어요. 직접 적어 주세요");
           setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
           return;
         }

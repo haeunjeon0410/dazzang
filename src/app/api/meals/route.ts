@@ -5,6 +5,7 @@ import { getWeekStart } from "@/lib/week";
 import { analyzeMealPhoto } from "@/lib/meal-ai";
 import { draftFromAnalysis, parseMealInput } from "@/lib/meal-input";
 import { tooManyRequests } from "@/lib/rate-limit";
+import { takeAiQuota } from "@/lib/ai-quota";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // 하루는 오전 6시에 바뀐다 (lib/week.ts와 동일)
@@ -143,6 +144,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ kind: "meal", meal: { id: meal.id, title: meal.title, kcal: meal.kcal } });
   }
 
+  // 하루 한도를 넘으면 AI를 부르지 않고 직접 적게 한다
+  if (!(await takeAiQuota(userId, "photo"))) return NextResponse.json({ kind: "limit" });
   const analysis = await analyzeMealPhoto(photoDataUrl);
   if (!analysis) return NextResponse.json({ kind: "unknown" });
   if (!analysis.isFood) return NextResponse.json({ kind: "other" });

@@ -4,6 +4,7 @@ import { analyzeMealPhoto } from "@/lib/meal-ai";
 import { draftFromAnalysis } from "@/lib/meal-input";
 import { sendPushToUser } from "@/lib/push";
 import { tooManyRequests } from "@/lib/rate-limit";
+import { takeAiQuota } from "@/lib/ai-quota";
 
 const MAX_BASE64_CHARS = 4_000_000;
 const MIME_OK = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
   }
   const photoUrl = `data:${mimeType};base64,${imageBase64}`;
 
+  if (!(await takeAiQuota(user.id, "photo"))) {
+    return NextResponse.json({ ok: false, message: "오늘은 AI 분석을 다 썼어요. 내일 다시 올려 주세요" });
+  }
   const analysis = await analyzeMealPhoto(photoUrl);
   if (analysis && !analysis.isFood) {
     return NextResponse.json({ ok: false, message: "음식 사진이 아닌 것 같아요" });
