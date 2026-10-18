@@ -1240,7 +1240,7 @@ export default function Home() {
       )}
 
       {/* 업데이트 소식: 다른 팝업이 떠 있을 땐 기다렸다가, 앱을 처음 여는 한 번만 보여준다 */}
-      <WhatsNew ready={!!me && historyReady && !weekResultPopup && !incomingPause && !pauseFalling && !mealConfirm} labMeal={!!me?.labMeal} />
+      <WhatsNew ready={!!me && historyReady && !weekResultPopup && !incomingPause && !pauseFalling && !mealConfirm} />
 
       {weekResultPopup && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => closeWeekResultPopup(false)}>

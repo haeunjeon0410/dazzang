@@ -11,22 +11,14 @@ const SEEN_KEY = "dajjang_seen_update";
 // 방 친구 둘(마스코트 A, B)이 메신저로 수다 떨듯이 소식을 알려준다. 말풍선이 하나씩 떠오른다
 type Line = { from: "A" | "B"; text: string; pose?: (typeof CharPose)[keyof typeof CharPose] };
 
-const MEAL_CHAT: Line[] = [
-  { from: "A", text: "식단 이제 사진만 올리면 AI가 칼로리까지 알아서 적어줘! 📸", pose: CharPose.WIN },
-  { from: "B", text: "헐 틀리게 읽으면 어떡해? 😳", pose: CharPose.PLEAD },
-  { from: "A", text: "식단 창에서 [수정]! 음식 이름도 먹은 양도 고칠 수 있어 ✏️", pose: CharPose.NEUTRAL },
-  { from: "A", text: "식사 알림 켜면 점심·저녁에 콕 알려줘 🔔\n(내 정보 → 실험실)", pose: CharPose.NEUTRAL },
-  { from: "B", text: "인증샷 잘못 올렸는데ㅠㅠ", pose: CharPose.PLEAD },
-  { from: "A", text: "사진 누르고 오른쪽 위 ✕로 지우면 돼! 🗑️", pose: CharPose.WIN },
-  { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },
-];
-
-const NO_MEAL_CHAT: Line[] = [
-  { from: "A", text: "실험실이 생겼어! 🧪 식단 인증을 켜면 AI가 칼로리를 알려줘", pose: CharPose.WIN },
-  { from: "B", text: "벌금이랑은 상관없는 거지?", pose: CharPose.PLEAD },
-  { from: "A", text: "응! 내 정보 → 실험실에서 켜 봐 💗", pose: CharPose.NEUTRAL },
-  { from: "B", text: "인증샷 잘못 올렸는데ㅠㅠ", pose: CharPose.PLEAD },
-  { from: "A", text: "사진 누르고 오른쪽 위 ✕로 지우면 돼! 🗑️", pose: CharPose.WIN },
+const CHAT: Line[] = [
+  { from: "A", text: "설정 → 실험실에 AI 식단 기능이 생겼어! 🧪\n사진만 올리면 칼로리를 계산해 줘", pose: CharPose.WIN },
+  { from: "B", text: "올리기 귀찮은데…", pose: CharPose.SAD },
+  { from: "A", text: "동작 버튼을 연동하면 훨씬 간단하게 등록할 수 있어! 📸", pose: CharPose.NEUTRAL },
+  { from: "B", text: "밥 먹을 때 깜빡하면?", pose: CharPose.PLEAD },
+  { from: "A", text: "알림 설정도 할 수 있어 🔔\n점심 · 저녁 시간에 콕 알려줘", pose: CharPose.NEUTRAL },
+  { from: "B", text: "AI가 틀리게 읽으면 어떡해?", pose: CharPose.PLEAD },
+  { from: "A", text: "메뉴랑 먹은 양을 직접 수정할 수 있어! ✏️", pose: CharPose.WIN },
   { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },
 ];
 
@@ -60,13 +52,11 @@ function Avatar({ who, pose }: { who: "A" | "B"; pose: (typeof CharPose)[keyof t
   );
 }
 
-export function WhatsNew({ ready, labMeal }: { ready: boolean; labMeal: boolean }) {
+export function WhatsNew({ ready }: { ready: boolean }) {
   // 로그인 정보가 오기 전(ready=false)에는 아무것도 그리지 않으므로, 서버 렌더와 어긋날 일이 없다
   const [show, setShow] = useState(() => !alreadySeen());
 
   if (!ready || !show) return null;
-
-  const chat = labMeal ? MEAL_CHAT : NO_MEAL_CHAT;
 
   function close() {
     markSeen();
@@ -102,7 +92,7 @@ export function WhatsNew({ ready, labMeal }: { ready: boolean; labMeal: boolean 
 
         {/* 수다: 말풍선이 하나씩 떠오른다 */}
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fff7fb] px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {chat.map((l, i) => {
+          {CHAT.map((l, i) => {
             const mine = l.from === "B";
             return (
               <div
