@@ -1069,7 +1069,6 @@ export default function Home() {
               >
                 로그아웃 (새 방 만들기로)
               </button>
-              <p className="text-center text-[11px] text-[#d9a9c4]">기록은 그대로 남고, 로그인 화면으로만 돌아가요</p>
             </div>
           </div>
         </div>
