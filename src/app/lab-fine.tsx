@@ -8,6 +8,7 @@ import { CharacterSprite, CharPose, CharRow } from "./sprite";
 export type FineRule = {
   feature: "weight";
   amount: number;
+  activeAmount: number;
   sinceWeek: string | null;
   proposedAmount: number | null;
   proposedByMe: boolean;

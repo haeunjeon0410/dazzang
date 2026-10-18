@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
 
   const weekParam = req.nextUrl.searchParams.get("weekStart");
   const weekStart = weekParam ? new Date(weekParam) : getWeekStart();
+  // 날짜가 아닌 값이 오면 DB 오류(500) 대신 잘못된 요청으로 돌려보낸다
+  if (Number.isNaN(weekStart.getTime())) return NextResponse.json({ error: "주 날짜가 올바르지 않아요" }, { status: 400 });
   const deadline = getWeekDeadline(weekStart);
 
   // 이번 주 화면을 열 때 지난 주 리본(획득/사용)을 바로 반영한다. 마감(월요일 오전 6시)이 지나면 9시 정산 작업을 기다리지 않는다.

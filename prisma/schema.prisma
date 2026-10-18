@@ -44,6 +44,9 @@ model LabFineRule {
   sinceWeek      DateTime?
   proposedAmount Int?
   proposedBy     String?
+  // 금액을 바꿨을 때 바뀌기 전 금액과 그 시작 주. 새 금액이 시작되기 전 주까지는 이 금액이 적용된다
+  prevAmount     Int?
+  prevSinceWeek  DateTime?
 
   @@unique([roomId, feature])
 }
@@ -132,6 +135,9 @@ model Checkin {
   weekStart DateTime // 해당 인증이 속한 주의 월요일 00:00 (KST)
   liked     Boolean  @default(false) // 상대방이 칭찬(좋아요) 눌렀는지
   createdAt DateTime @default(now()) // 사진 촬영 시각(EXIF). 촬영 정보가 없으면 업로드 시각
+
+  @@index([userId, weekStart])
+  @@index([userId, createdAt])
 }
 
 // 실험실 식단 인증. 주 3회 운동 인증/벌금과는 별개로, 친구와 공유만 한다
@@ -215,6 +221,8 @@ model Excuse {
   reply      String?   // 허락/거절하면서 상대방이 남긴 답장 (선택)
   createdAt  DateTime  @default(now())
   resolvedAt DateTime?
+
+  @@index([userId, weekStart])
 }
 
 model PushSubscription {

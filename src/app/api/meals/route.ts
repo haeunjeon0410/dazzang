@@ -106,7 +106,7 @@ export async function GET(req: Request) {
 
 // 식단 사진 올리기는 두 단계다.
 // mode "analyze": 사진을 AI로 읽어서 저장하지 않고 초안만 돌려준다.
-//   체중계 사진이면 kind "weight"(kg: 읽은 몸무게, 몸무게 인증을 켠 사람만), 음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 음식이 아니면 kind "other"(운동 인증으로 보내면 된다),
+//   체중계 사진이면 kind "weight"(kg: 읽은 몸무게, token: 서버가 서명한 값. 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록), 음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 음식이 아니면 kind "other"(운동 인증으로 보내면 된다),
 //   분석 자체가 안 되면(키 없음/실패) kind "unknown"(직접 적게 한다).
 // mode "save": 사용자가 확인하거나 고친 값(title, items, fraction)으로 사진과 함께 저장한다.
 export async function POST(req: Request) {
@@ -114,7 +114,6 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  // 식단이나 몸무게 인증 중 하나라도 켜져 있어야 사진을 AI로 가려낼 수 있다 (저장은 식단 인증이 켜진 사람만)
   // 사진 분석에는 크레딧이 들어서 사람당 분당 6장까지
   if (tooManyRequests(`meal:${userId}`, 6)) {
     return NextResponse.json({ error: "너무 빨라요. 잠시 뒤에 다시 올려 주세요" }, { status: 429 });

@@ -11,6 +11,17 @@ export type LabFeature = (typeof LAB_FEATURES)[number];
 export const FINE_CHOICES = [0, 5000, 10000, 15000, 20000, 25000, 30000];
 
 export type LabUser = { id: string };
+
+// 그 주에 적용되는 벌금 금액. 금액을 바꿨으면 새 금액이 시작되는 주부터 새 금액, 그 전 주들은 이전 금액이다
+export function fineAmountForWeek(
+  rule: { amount: number; sinceWeek: Date | null; prevAmount: number | null; prevSinceWeek: Date | null },
+  weekStart: Date,
+): number {
+  const t = weekStart.getTime();
+  if (rule.sinceWeek && t >= rule.sinceWeek.getTime()) return rule.amount;
+  if (rule.prevSinceWeek && rule.prevAmount && t >= rule.prevSinceWeek.getTime()) return rule.prevAmount;
+  return 0;
+}
 export type LabFine = { weight: number; total: number };
 
 export const noLabFine: LabFine = { weight: 0, total: 0 };
@@ -29,8 +40,7 @@ export async function labFinesFor(
   if (weekStarts.length === 0) return out;
 
   const rule = await prisma.labFineRule.findUnique({ where: { roomId_feature: { roomId, feature: "weight" } } });
-  if (!rule || rule.amount <= 0 || !rule.sinceWeek) return out;
-  const since = rule.sinceWeek.getTime();
+  if (!rule || (!rule.sinceWeek && !rule.prevSinceWeek)) return out;
 
   // 친구와 같이 하는 기능이라 두 사람이 모두 있는 방에서만 벌금이 있다
   if (users.length < 2) return out;
@@ -43,17 +53,18 @@ export async function labFinesFor(
   });
 
   for (const w of weekStarts) {
-    if (w.getTime() < since) continue;
+    const amount = fineAmountForWeek(rule, w);
+    if (amount <= 0) continue;
     for (const id of ids) {
       const mine = logs.filter((l) => l.userId === id && l.weekStart.getTime() <= w.getTime());
       const cur = mine.find((l) => l.weekStart.getTime() === w.getTime());
       // 그 주에 인증을 안 하면 자동으로 벌금
       if (!cur) {
-        out.set(labFineKey(id, w), { weight: rule.amount, total: rule.amount });
+        out.set(labFineKey(id, w), { weight: amount, total: amount });
         continue;
       }
       const prev = [...mine].reverse().find((l) => l.weekStart.getTime() < w.getTime());
-      if (prev && cur.kg > prev.kg) out.set(labFineKey(id, w), { weight: rule.amount, total: rule.amount });
+      if (prev && cur.kg > prev.kg) out.set(labFineKey(id, w), { weight: amount, total: amount });
     }
   }
   return out;

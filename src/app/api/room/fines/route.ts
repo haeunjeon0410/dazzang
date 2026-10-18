@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { sendPushToUser } from "@/lib/push";
 import { getWeekStart } from "@/lib/week";
-import { LAB_FEATURES, FINE_CHOICES, type LabFeature } from "@/lib/lab-fine";
+import { LAB_FEATURES, FINE_CHOICES, fineAmountForWeek, type LabFeature } from "@/lib/lab-fine";
 
 const NAMES: Record<LabFeature, string> = { weight: "몸무게 인증" };
 
@@ -17,6 +17,8 @@ async function snapshot(roomId: string, meId: string) {
       return {
         feature,
         amount: r?.amount ?? 0,
+        // 이번 주에 실제로 적용되는 금액 (금액을 바꾼 직후에는 새 금액이 시작되기 전까지 이전 금액)
+        activeAmount: r ? fineAmountForWeek(r, getWeekStart()) : 0,
         sinceWeek: r?.sinceWeek ?? null,
         // 대기 중인 제안: 내가 보낸 것(mine)인지, 친구가 보낸 것인지
         proposedAmount: r?.proposedAmount ?? null,
@@ -83,10 +85,23 @@ export async function POST(req: NextRequest) {
     }
     if (body.accept === true) {
       // 합의한 다음 주부터 적용 (이미 지나간 주나 진행 중인 주에는 갑자기 벌금이 생기지 않는다)
-      const sinceWeek = new Date(getWeekStart().getTime() + 7 * 24 * 60 * 60 * 1000);
-      await prisma.labFineRule.update({
-        where,
-        data: { amount: rule.proposedAmount, sinceWeek, proposedAmount: null, proposedBy: null },
+      const thisWeek = getWeekStart();
+      const sinceWeek = new Date(thisWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
+      // 이미 적용 중인 약속을 바꾸는 거면 이전 금액을 남긴다: 새 금액이 시작되기 전 주까지는 이전 금액이 그대로 적용되고, 지난 주 계산은 바뀌지 않는다.
+      // 아직 시작 전인 약속을 또 바꾸는 거면 그 전의 이전 금액을 그대로 둔다
+      const active = rule.amount > 0 && !!rule.sinceWeek && rule.sinceWeek <= thisWeek;
+      const keepPrev = !active && !!rule.sinceWeek && rule.sinceWeek > thisWeek;
+      // 같이 누른 두 번 처리를 막으려고 아직 같은 제안이 남아 있을 때만 확정한다
+      await prisma.labFineRule.updateMany({
+        where: { roomId: me.roomId, feature, proposedBy: rule.proposedBy },
+        data: {
+          amount: rule.proposedAmount,
+          sinceWeek,
+          prevAmount: active ? rule.amount : keepPrev ? rule.prevAmount : null,
+          prevSinceWeek: active ? rule.sinceWeek : keepPrev ? rule.prevSinceWeek : null,
+          proposedAmount: null,
+          proposedBy: null,
+        },
       });
     } else {
       await prisma.labFineRule.update({ where, data: { proposedAmount: null, proposedBy: null } });

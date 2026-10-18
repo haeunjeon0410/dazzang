@@ -18,6 +18,11 @@ export async function PATCH(req: NextRequest) {
   // ── 기존: 모임 통장 수정 ──────────────────────────────────────
   if (!action) {
     const { groupBankName, groupAccountNumber } = body;
+    // 문자열이 아니거나 너무 길면 거절한다 (아무 값이나 DB에 들어가지 않게)
+    const ok = (v: unknown) => typeof v === "string" && v.length <= 60;
+    if (!ok(groupBankName) || !ok(groupAccountNumber)) {
+      return NextResponse.json({ error: "은행과 계좌번호를 다시 확인해 주세요" }, { status: 400 });
+    }
     const room = await prisma.room.update({
       where: { id: me.roomId },
       data: { groupBankName, groupAccountNumber },

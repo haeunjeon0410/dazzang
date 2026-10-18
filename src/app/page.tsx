@@ -834,8 +834,8 @@ export default function Home() {
           <section className="space-y-3">
             {/* 몸무게 인증을 켰는데 이번 주 인증을 아직 안 했으면 맨 위에 알려준다 (다른 카드와 구분되게 노란 픽셀 테두리).
                 마감 하루 전부터는 빨간색으로 바뀌고 자동 벌금을 알려준다 */}
-            {me.weightPending && (() => {
-              const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0;
+            {me.weightPending && !roomPaused && !(me.restUntil && new Date(me.restUntil) > new Date()) && (() => {
+              const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0;
               const lastDay = !!weekData && new Date(weekData.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000;
               return (
                 <div
@@ -989,7 +989,7 @@ export default function Home() {
       )}
 
       {graphOpen && (
-        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0} onClose={() => setGraphOpen(false)} />
+        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0} onClose={() => setGraphOpen(false)} />
       )}
 
       {toast && (

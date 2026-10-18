@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
+import { fineAmountForWeek } from "@/lib/lab-fine";
 import { getWeekStart, getDaysLeftInWeek, REQUIRED_COUNT, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러(Vercel Cron 등)가 매일 저녁 7시(KST) 호출 -> "이제부터 남은 날 매일 해야만 벌금을 피할 수 있는"
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   // 몸무게 인증: 마감 전날(일요일) 저녁에, 이번 주 몸무게 인증을 안 한 사람에게 알린다. 벌금 약속이 있으면 자동 청구도 알려준다
   if (daysLeft === 1) {
-    const weightRules = await prisma.labFineRule.findMany({ where: { feature: "weight", amount: { gt: 0 } } });
+    const weightRules = await prisma.labFineRule.findMany({ where: { feature: "weight" } });
     const weightLogs = await prisma.weightLog.findMany({ where: { weekStart }, select: { userId: true } });
     for (const user of users) {
       // 몸무게 인증은 모두의 기본 기능이고 친구와 같이 하는 거라, 친구가 들어온 방에서만 알린다
@@ -60,12 +61,13 @@ export async function GET(req: NextRequest) {
       if (isWeekPaused(user.rests, weekStart)) continue;
       if (approvedExcuses.some((e) => e.userId === user.id)) continue;
       if (weightLogs.some((l) => l.userId === user.id)) continue;
-      const rule = weightRules.find((r) => r.roomId === user.roomId && r.sinceWeek && r.sinceWeek <= weekStart);
+      const rule = weightRules.find((r) => r.roomId === user.roomId);
+      const fineAmount = rule ? fineAmountForWeek(rule, weekStart) : 0;
       pushes.push(
         sendPushToUser(user, {
           title: "몸무게 인증 마감 임박!",
-          body: rule
-            ? `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 안 하면 벌금 ${rule.amount.toLocaleString()}원이 자동으로 청구돼요`
+          body: fineAmount > 0
+            ? `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 안 하면 벌금 ${fineAmount.toLocaleString()}원이 자동으로 청구돼요`
             : `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 인증해 주세요`,
         }),
       );
