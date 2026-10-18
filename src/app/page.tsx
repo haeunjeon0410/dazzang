@@ -494,6 +494,7 @@ export default function Home() {
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다
+        if (data?.kind === "other") setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
         setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);

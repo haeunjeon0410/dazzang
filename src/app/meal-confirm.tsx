@@ -172,6 +172,17 @@ export function MealConfirm({
                   ✕
                 </button>
               </div>
+              {/* 이름이 틀리면 칼로리가 이상하게 나오니, 계산된 칼로리를 보여줘서 오타를 알아채게 한다 */}
+              {r.name.trim() &&
+                (stale(r) ? (
+                  <p className="px-1 text-[11px] text-[#b4779b]">칼로리 계산 중...</p>
+                ) : r.kcalKnown ? (
+                  <p className="px-1 text-[11px] text-[#b4779b]">약 {Math.round(r.kcal * r.fraction).toLocaleString()} kcal</p>
+                ) : (
+                  <p className="px-1 text-[11px] font-semibold text-[#d1465f]">
+                    칼로리를 못 구했어요. 이름을 확인해 주세요 (0 kcal로 저장돼요)
+                  </p>
+                ))}
             </div>
           ))}
         </div>
