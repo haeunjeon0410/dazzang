@@ -1144,7 +1144,12 @@ export default function Home() {
                     {weekResultPopup.summary.map((s) => (
                       <div key={s.userId}>
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-[#4a2540]">{s.name}</span>
+                          <span className="text-left font-semibold text-[#4a2540]">
+                            {s.name}
+                            {s.avgKcal ? (
+                              <span className="block text-[11px] font-normal text-[#b4779b]">평균 {s.avgKcal.toLocaleString()} kcal</span>
+                            ) : null}
+                          </span>
                           {s.ribbonUsed ? (
                             <span className="font-bold text-[#b4779b]">
                               {s.count}/3 ·{" "}
