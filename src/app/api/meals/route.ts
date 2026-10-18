@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getWeekStart } from "@/lib/week";
-import { analyzeMealPhoto } from "@/lib/gemini";
+import { analyzeMealPhoto } from "@/lib/meal-ai";
 import { tooManyRequests } from "@/lib/rate-limit";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
 }
 
 // 인증하기로 올린 사진 분류 + 식단 저장.
-// mode "auto": Gemini가 음식 사진이면 칼로리를 분석해 식단으로 저장(kind "meal"), 음식이 아니면 저장하지 않고 kind "other"(운동 인증으로 보내면 된다),
+// mode "auto": AI가 음식 사진이면 칼로리를 분석해 식단으로 저장(kind "meal"), 음식이 아니면 저장하지 않고 kind "other"(운동 인증으로 보내면 된다),
 //   분석 자체가 안 되면(키 없음/실패) 저장하지 않고 kind "unknown"을 돌려준다.
 // mode "meal": 식단으로 확정해서 분석 없이 사진만 저장한다 ("unknown"이었는데 식단 보기에서 올린 경우)
 export async function POST(req: Request) {
