@@ -39,11 +39,15 @@ export async function GET(req: Request) {
     kcal: m.kcal ?? 0,
   }));
 
-  const meals = await prisma.meal.findMany({
-    where: { userId: { in: ids }, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-  });
+  // day=none: 표만 필요할 때라 사진이 든 목록은 건너뛴다
+  const meals =
+    dayRaw === "none"
+      ? []
+      : await prisma.meal.findMany({
+          where: { userId: { in: ids }, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        });
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
   return NextResponse.json({
     // 나를 먼저

@@ -755,7 +755,7 @@ export default function Home() {
 
             {/* 실험실 식단 인증을 켜면 이 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
             {me.labMeal && (
-              <div className="grid grid-cols-2 gap-1 rounded-full bg-white/80 border border-[#ffd6e8] p-1" role="tablist">
+              <div className="ml-auto grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
                 {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
                   <button
                     key={mode}
@@ -769,7 +769,7 @@ export default function Home() {
                         // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
                       }
                     }}
-                    className={`rounded-full py-1.5 text-sm font-bold ${
+                    className={`rounded-full py-1 text-xs font-bold ${
                       viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
                     }`}
                   >
