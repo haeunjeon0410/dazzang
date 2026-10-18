@@ -4,9 +4,19 @@ import { useState, type ReactNode } from "react";
 
 const PILL = "flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]";
 
-// 도움말 속 "눌러야 하는 글씨"를 분홍 배경으로 눈에 띄게 한다
+// 도움말 속 "눌러야 하는 글씨"를 분홍색으로 눈에 띄게 한다
 function B({ children }: { children: ReactNode }) {
-  return <span className="rounded bg-[#ffe1ee] px-1.5 py-0.5 font-bold text-[#b4356f]">{children}</span>;
+  return <span className="rounded bg-[#ffe1ee] px-1 font-bold text-[#b4356f]">{children}</span>;
+}
+
+// 번호 붙은 한 줄. 번호는 장이 바뀌어도 이어져서 전체가 하나의 순서처럼 읽힌다
+function Line({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <div className="flex gap-2">
+      <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-[#de73a5] text-[10px] font-bold text-white">{n}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
 }
 
 // 아이폰 액션 버튼 → 단축어 → 사진 찍기 → 서버로 바로 보내기 연결.
@@ -47,130 +57,80 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       body: token ? (
         <p className="font-bold text-[#2f9e44]">✓ 만들어졌어요. 남에게 알려 주지 마세요</p>
       ) : (
-        <button onClick={make} disabled={busy} className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-50">
+        <button onClick={make} disabled={busy} className="w-full rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white disabled:opacity-50">
           {busy ? "만드는 중..." : "내 주소 만들기"}
         </button>
       ),
     },
     {
-      title: "새 단축어 만들기",
+      title: "단축어 만들기",
       body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            <B>단축어</B> 앱 → 오른쪽 위 <B>＋</B>
-          </li>
-          <li>
-            맨 위 이름을 눌러 <B>식단</B> 으로 바꾸기
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "사진 찍기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            아래 <B>동작 검색</B> 누르기
-          </li>
-          <li>
-            <B>사진 찍기</B> 검색 → 결과 누르기
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "사진 줄이기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            <B>이미지 크기 변경</B> 검색 → 결과 누르기
-          </li>
-          <li>
-            <B>너비</B> 를 <B>1024</B> 로
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "JPEG로 바꾸기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            <B>이미지 변환</B> 검색 → 결과 누르기
-          </li>
-          <li>
-            형식을 <B>JPEG</B> 로
-          </li>
-        </ol>
+        <>
+          <Line n={1}>
+            <B>단축어</B> 앱 → <B>＋</B> → 이름 <B>식단</B>
+          </Line>
+          <Line n={2}>
+            <B>동작 검색</B> → <B>사진 찍기</B>
+          </Line>
+          <Line n={3}>
+            <B>동작 검색</B> → <B>이미지 크기 변경</B> → 너비 <B>1024</B>
+          </Line>
+          <Line n={4}>
+            <B>동작 검색</B> → <B>이미지 변환</B> → 형식 <B>JPEG</B>
+          </Line>
+        </>
       ),
     },
     {
       title: "앱으로 보내기",
       body: (
         <>
-          <ol className="list-decimal space-y-1.5 pl-4">
-            <li>
-              <B>URL 콘텐츠 가져오기</B> 검색 → 결과 누르기
-            </li>
-            <li>
-              <B>URL</B> 자리에 아래 주소 붙여넣기
-            </li>
-            <li>
-              칸의 <B>⌄</B> → 방법 <B>POST</B>
-            </li>
-            <li>
-              요청 본문 <B>파일</B> → <B>변환된 이미지</B>
-            </li>
-          </ol>
-          <button onClick={() => token && copy(url, "주소를")} className={`${PILL} w-full py-2`}>
+          <Line n={5}>
+            <B>동작 검색</B> → <B>URL 콘텐츠 가져오기</B>
+            <ul className="mt-1 space-y-0.5 text-[#8a5a73]">
+              <li>
+                · URL: 아래 주소 붙여넣기
+              </li>
+              <li>
+                · 칸의 <B>⌄</B> → 방법 <B>POST</B>
+              </li>
+              <li>
+                · 요청 본문 <B>파일</B> → <B>변환된 이미지</B>
+              </li>
+            </ul>
+          </Line>
+          <button onClick={() => token && copy(url, "주소를")} className={`${PILL} w-full py-1.5`}>
             주소 복사하기
           </button>
+          <Line n={6}>
+            <B>동작 검색</B> → <B>결과 보기</B> → 오른쪽 위 <B>완료</B>
+          </Line>
         </>
-      ),
-    },
-    {
-      title: "결과 보기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            <B>결과 보기</B> 검색 → 결과 누르기
-          </li>
-          <li>
-            오른쪽 위 <B>완료</B>
-          </li>
-        </ol>
       ),
     },
     {
       title: "액션 버튼에 연결",
       body: (
         <>
-          <ol className="list-decimal space-y-1.5 pl-4">
-            <li>
-              <B>설정</B> → <B>액션 버튼</B>
-            </li>
-            <li>
-              <B>단축어</B> → <B>식단</B>
-            </li>
-          </ol>
-          <p className="text-xs text-[#b4779b]">
-            액션 버튼이 없는 폰: 설정 → 손쉬운 사용 → 터치 → 뒷면 탭 → 두 번 탭 → 식단
-          </p>
+          <Line n={7}>
+            <B>설정</B> → <B>액션 버튼</B> → <B>단축어</B> → <B>식단</B>
+          </Line>
+          <p className="text-[11px] text-[#b4779b]">버튼이 없는 폰: 설정 → 손쉬운 사용 → 터치 → 뒷면 탭 → 두 번 탭 → 식단</p>
         </>
       ),
     },
     {
       title: "해 보기",
       body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
+        <>
+          <Line n={8}>
             액션 버튼 → 음식 찍기 → <B>사진 사용</B>
-          </li>
-          <li>&ldquo;N kcal로 읽었어요&rdquo;가 뜨면 성공</li>
-          <li>
-            앱 식단 화면 <B>확인하기</B> 배너에서 저장
-          </li>
-        </ol>
+          </Line>
+          <Line n={9}>&ldquo;N kcal로 읽었어요&rdquo;가 뜨면 성공</Line>
+          <Line n={10}>
+            앱 식단 화면의 <B>확인하기</B> 배너에서 저장
+          </Line>
+        </>
       ),
     },
   ];
@@ -196,7 +156,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={close}>
           <div
-            className="relative flex max-h-[88vh] w-full max-w-sm flex-col gap-3 rounded-3xl bg-white p-5 shadow-xl"
+            className="relative flex max-h-[88vh] w-full max-w-xs flex-col gap-2.5 rounded-3xl bg-white p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-4 top-4 flex items-center gap-2">
@@ -214,25 +174,20 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
               </button>
             </div>
 
-            <div className="pr-24">
+            <div className="pr-20">
               <p className="text-[11px] font-bold text-[#de73a5]">
                 {step + 1} / {steps.length}
               </p>
-              <p className="text-lg font-black text-[#4a2540]">{cur.title}</p>
+              <p className="text-base font-black text-[#4a2540]">{cur.title}</p>
             </div>
 
-            {/* 진행 막대 */}
-            <div className="h-1 overflow-hidden rounded-full bg-[#ffe1ee]">
-              <div className="h-full rounded-full bg-[#de73a5] transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
-            </div>
-
-            <div className="min-h-[9rem] flex-1 space-y-3 overflow-y-auto text-sm leading-relaxed text-[#6b4a5e]">{cur.body}</div>
+            <div className="flex-1 space-y-2 overflow-y-auto text-[13px] leading-snug text-[#6b4a5e]">{cur.body}</div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setStep((n) => Math.max(0, n - 1))}
                 disabled={step === 0}
-                className="rounded-xl bg-[#ffeef5] py-2.5 text-sm font-semibold text-[#c2679c] disabled:opacity-40"
+                className="rounded-xl bg-[#ffeef5] py-2 text-sm font-semibold text-[#c2679c] disabled:opacity-40"
               >
                 이전
               </button>
@@ -240,12 +195,12 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
                 <button
                   onClick={() => setStep((n) => Math.min(last, n + 1))}
                   disabled={!canNext}
-                  className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                  className="rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white disabled:opacity-40"
                 >
                   다음
                 </button>
               ) : (
-                <button onClick={close} className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white">
+                <button onClick={close} className="rounded-xl bg-[#de73a5] py-2 text-sm font-bold text-white">
                   완료
                 </button>
               )}

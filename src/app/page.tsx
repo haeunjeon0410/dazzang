@@ -800,20 +800,19 @@ export default function Home() {
               mySleeping={!!me.restUntil && new Date(me.restUntil) > new Date()}
               otherSleeping={otherResting}
               onCaptionSaved={loadMe}
-              footer={
-                myEntry.fine > 0 && !hasGroupAccount ? (
-                  <div className="flex items-center justify-between gap-3 border-t border-[#ffd6e8] px-4 py-2.5">
-                    <p className="text-xs font-semibold text-[#8a5a1f]">지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원</p>
-                    <button
-                      onClick={() => setGroupAccountOpen(true)}
-                      className="flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
-                    >
-                      통장 등록
-                    </button>
-                  </div>
-                ) : undefined
-              }
             />
+
+            {myEntry.fine > 0 && !hasGroupAccount && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3">
+                <p className="text-sm font-bold text-[#4a2540]">지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원</p>
+                <button
+                  onClick={() => setGroupAccountOpen(true)}
+                  className="flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
+                >
+                  통장 등록
+                </button>
+              </div>
+            )}
 
             {myEntry.fine > 0 && hasGroupAccount && (
               <div className={`${CARD} space-y-2`}>

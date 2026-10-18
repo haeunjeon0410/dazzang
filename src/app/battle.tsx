@@ -129,7 +129,6 @@ export function Battle({
   mySleeping,
   otherSleeping,
   onCaptionSaved,
-  footer,
 }: {
   myCount: number;
   otherCount: number;
@@ -154,7 +153,6 @@ export function Battle({
   mySleeping?: boolean;
   otherSleeping?: boolean;
   onCaptionSaved?: () => void;
-  footer?: React.ReactNode;
 }) {
   const [poked, setPoked] = useState(() => {
     try {
@@ -341,8 +339,6 @@ export function Battle({
           </div>
         ))}
       </div>
-
-      {footer}
 
       {captionOpen && (
         <div
