@@ -63,7 +63,6 @@ export async function GET(req: Request) {
       title: m.title,
       kcal: m.kcal,
       items: m.items,
-      comment: m.comment,
       createdAt: m.createdAt,
     })),
   });
@@ -104,7 +103,6 @@ export async function POST(req: Request) {
       title: analysis?.title,
       kcal: analysis?.kcal,
       items: analysis?.items,
-      comment: analysis?.comment || null,
     },
   });
   return NextResponse.json({ kind: "meal", meal: { id: meal.id, analyzed: meal.analyzed, title: meal.title, kcal: meal.kcal } });

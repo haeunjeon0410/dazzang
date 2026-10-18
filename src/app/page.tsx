@@ -585,24 +585,6 @@ export default function Home() {
   const myEntry = weekData?.summary.find((s) => s.userId === me.id);
   const otherEntry = weekData?.summary.find((s) => s.userId !== me.id);
   const hasGroupAccount = !!room?.groupAccountNumber;
-  // 실험실 식단 인증이 켜져 있을 때만: 표 왼쪽 위 칸에 지금 보기를 보여주고 누르면 바뀐다
-  const modeSwitch = me.labMeal ? (
-    <button
-      onClick={() => {
-        const next = viewMode === "diet" ? "workout" : "diet";
-        setViewMode(next);
-        try {
-          localStorage.setItem("dajjang_view_mode", next);
-        } catch {
-          // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
-        }
-      }}
-      aria-label={viewMode === "diet" ? "운동 보기로 바꾸기" : "식단 보기로 바꾸기"}
-      className="w-full rounded-full bg-[#ffe1ee] border border-[#ffc2dc] py-0.5 text-[10px] font-bold text-[#b4356f] whitespace-nowrap"
-    >
-      {viewMode === "diet" ? "식단" : "운동"} ⇄
-    </button>
-  ) : null;
 
   return (
     <>
@@ -716,9 +698,38 @@ export default function Home() {
 
         {weekData && myEntry && otherEntry && (
           <section className="space-y-3">
-            <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full">
-              이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full whitespace-nowrap">
+                {me.labMeal
+                  ? `${new Date(weekData.weekStart).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })} ~ · 월 6시 마감`
+                  : `이번 주 (${new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감`}
+              </p>
+              {/* 실험실 식단 인증을 켜면 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
+              {me.labMeal && (
+                <div className="grid w-28 flex-none grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
+                  {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      role="tab"
+                      aria-selected={viewMode === mode}
+                      onClick={() => {
+                        setViewMode(mode);
+                        try {
+                          localStorage.setItem("dajjang_view_mode", mode);
+                        } catch {
+                          // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
+                        }
+                      }}
+                      className={`rounded-full py-1 text-xs font-bold ${
+                        viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <Battle
               myCount={myEntry.count}
@@ -771,14 +782,12 @@ export default function Home() {
               </div>
             )}
 
-            {/* 실험실 식단 인증을 켜면 주간 표 왼쪽 위 작은 버튼으로 운동 | 식단을 바꾼다 (화면이 늘어나지 않는다). 끄면 기존 화면 그대로 */}
             {me.labMeal && viewMode === "diet" ? (
-              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} corner={modeSwitch} />
+              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} />
             ) : (
               <WeekCalendar
                 weekStart={weekData.weekStart}
                 meId={me.id}
-                corner={modeSwitch}
                 people={[
                   { userId: myEntry.userId, name: "나", checkins: myEntry.checkins },
                   { userId: otherEntry.userId, name: otherEntry.name, checkins: otherEntry.checkins },

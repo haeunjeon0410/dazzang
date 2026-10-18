@@ -10,7 +10,6 @@ CREATE TABLE "Meal" (
     "title" TEXT,
     "kcal" INTEGER,
     "items" JSONB,
-    "comment" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Meal_pkey" PRIMARY KEY ("id")

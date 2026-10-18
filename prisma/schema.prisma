@@ -114,7 +114,6 @@ model Meal {
   title     String? // 한 줄 요약 (예: 닭가슴살 샐러드)
   kcal      Int? // 추정 총 칼로리
   items     Json? // [{ name, kcal }]
-  comment   String? // 친구에게 보일 짧은 한마디
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])

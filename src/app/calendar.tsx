@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 type CheckinItem = { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean };
 type PersonSummary = { userId: string; name: string; checkins: CheckinItem[] };
@@ -62,7 +62,7 @@ function FloatingHeart({ delay, onDone }: { delay: number; onDone: () => void })
   );
 }
 
-export function WeekCalendar({ weekStart, people, meId, corner }: { weekStart: string; people: PersonSummary[]; meId: string; corner?: ReactNode }) {
+export function WeekCalendar({ weekStart, people, meId }: { weekStart: string; people: PersonSummary[]; meId: string }) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeOverrides, setLikeOverrides] = useState<Record<string, boolean>>({});
@@ -106,7 +106,7 @@ export function WeekCalendar({ weekStart, people, meId, corner }: { weekStart: s
   return (
     <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
       <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#d9a9c4] mb-2">
-        <div className="flex items-center">{corner}</div>
+        <div />
         {DAY_LABELS.map((label, i) => (
           <div key={label}>
             {label}
