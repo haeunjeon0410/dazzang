@@ -2,9 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 
-// 아이폰 액션 버튼 → 단축어 → 사진 찍기 → 서버로 바로 보내기 연결.
-// 설정에는 한 줄(연동 버튼)만 두고, 버튼을 누르면 단계별 도움말이 한 장씩 넘어가며 뜬다.
-// 단축어에는 쿠키가 없어서 이 앱이 만들어 주는 개인 토큰으로 "누구의 사진인지"를 알린다.
 const PILL = "flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]";
 
 // 도움말 속 "눌러야 하는 글씨"를 분홍 배경으로 눈에 띄게 한다
@@ -12,6 +9,30 @@ function B({ children }: { children: ReactNode }) {
   return <span className="rounded bg-[#ffe1ee] px-1.5 py-0.5 font-bold text-[#b4356f]">{children}</span>;
 }
 
+// "화면에 이렇게 보여요" 그림. 실제 단축어 화면을 흉내 낸 칸들이고, 분홍 테두리가 지금 눌러야 하는 곳이다
+function Mock({ children }: { children: ReactNode }) {
+  return (
+    <div className="space-y-1.5 rounded-2xl border border-[#e6e6ee] bg-[#f4f4f8] p-3 text-xs">
+      <p className="text-[10px] font-bold text-[#a0a0ae]">화면에 이렇게 보여요</p>
+      {children}
+    </div>
+  );
+}
+function Row({ children, hot }: { children: ReactNode; hot?: boolean }) {
+  return (
+    <div
+      className={`rounded-lg px-2.5 py-1.5 ${
+        hot ? "bg-white font-bold text-[#b4356f] ring-2 ring-[#de73a5]" : "bg-white text-[#8a8a96]"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// 아이폰 액션 버튼 → 단축어 → 사진 찍기 → 서버로 바로 보내기 연결.
+// 설정에는 한 줄(연동 버튼)만 두고, 버튼을 누르면 한 장에 한 동작씩 도움말이 넘어가며 뜬다.
+// 단축어에는 쿠키가 없어서 이 앱이 만들어 주는 개인 토큰으로 "누구의 사진인지"를 알린다.
 export function ShortcutSetup({ token, onChanged }: { token: string | null; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -33,21 +54,33 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
   async function copy(text: string, what: string) {
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${what} 복사했어요`);
+      alert(`${what} 복사했어요. 이제 단축어 앱으로 가서 붙여 넣어요`);
     } catch {
       alert("복사하지 못했어요");
     }
   }
 
-  const pill = PILL;
-
   const steps: { title: string; body: ReactNode; needsToken?: boolean }[] = [
     {
-      title: "연결 코드 만들기",
+      title: "시작해 볼까요?",
+      body: (
+        <>
+          <p>
+            아이폰 <B>단축어</B> 앱으로 &ldquo;사진을 찍으면 이 앱으로 바로 보내는 버튼&rdquo;을 만들어요.
+          </p>
+          <p>어려워 보여도 설명을 한 장에 한 가지씩만 따라 하면 돼요. 약 10분 걸려요.</p>
+          <p className="rounded-xl bg-[#fff0f6] px-3 py-2 text-xs">
+            꼭 순서대로 하세요. 화면이 설명과 다르면 <B>이전</B>으로 돌아가 다시 읽어 보세요.
+          </p>
+        </>
+      ),
+    },
+    {
+      title: "먼저 연결 코드 만들기",
       needsToken: true,
       body: (
         <>
-          <p>이 코드가 있어야 아이폰이 &ldquo;내 사진&rdquo;이라는 걸 알아요. 먼저 만들어 주세요.</p>
+          <p>이 코드가 있어야 아이폰이 &ldquo;이 사진은 내 거예요&rdquo;라고 알릴 수 있어요. 비밀번호 같은 거라서 남에게 알려 주면 안 돼요.</p>
           {token ? (
             <p className="rounded-xl bg-[#fff0f6] px-3 py-2 font-bold text-[#2f9e44]">✓ 코드가 만들어졌어요. 다음으로 넘어가요</p>
           ) : (
@@ -59,156 +92,275 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       ),
     },
     {
-      title: "새 단축어 만들기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            아이폰에서 <B>단축어</B> 앱을 열어요. (파랑·보라색 네모 겹친 아이콘이에요)
-          </li>
-          <li>
-            오른쪽 위 <B>＋</B>를 눌러요.
-          </li>
-          <li>
-            맨 위 이름 칸을 눌러 <B>식단</B>으로 바꿔요.
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "① 사진 찍기 넣기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            아래 <B>동작 검색</B> 칸을 눌러요.
-          </li>
-          <li>
-            <B>사진 찍기</B>라고 입력해요.
-          </li>
-          <li>나온 결과 중 &ldquo;사진 찍기&rdquo;를 눌러요. 화면 위쪽에 칸이 하나 생겨요.</li>
-        </ol>
-      ),
-    },
-    {
-      title: "② 사진 가볍게 줄이기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            다시 검색 칸에 <B>이미지 크기 변경</B>을 입력하고 눌러요.
-          </li>
-          <li>
-            생긴 칸에서 <B>너비</B>(또는 크기)를 눌러 <B>1024</B>로 바꿔요. 높이는 그대로 둬요.
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "③ JPEG로 바꾸기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            검색 칸에 <B>이미지 변환</B>을 입력하고 눌러요.
-          </li>
-          <li>
-            칸 안의 형식 글씨를 눌러 <B>JPEG</B>로 골라요.
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "④ 사진을 글자로 바꾸기",
-      body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            검색 칸에 <B>Base64로 인코딩</B>을 입력하고 눌러요.
-          </li>
-          <li>
-            칸 안의 <B>줄바꿈</B> 글씨를 눌러 <B>없음</B>으로 골라요. (안 보이면 칸 오른쪽의 <B>⌄</B>를 눌러요)
-          </li>
-        </ol>
-      ),
-    },
-    {
-      title: "⑤ 서버로 보내기 (1/2) 주소",
+      title: "단축어 앱 열기",
       body: (
         <>
-          <ol className="list-decimal space-y-1.5 pl-4">
-            <li>
-              검색 칸에 <B>URL 콘텐츠 가져오기</B>를 입력하고 눌러요.
-            </li>
-            <li>
-              칸의 <B>URL</B> 자리에 아래 주소를 붙여 넣어요.
-            </li>
-            <li>
-              칸 오른쪽의 <B>⌄</B>(화살표)를 눌러 펼친 뒤, 방법을 <B>POST</B>로 바꿔요.
-            </li>
-          </ol>
-          <button onClick={() => copy(url, "주소를")} className={`${pill} w-full py-2`}>
+          <p>
+            아이폰 화면에서 <B>단축어</B> 앱을 찾아 열어요. 파랑·보라색 네모 두 개가 겹친 모양이에요.
+          </p>
+          <p>안 보이면 홈 화면 가운데를 아래로 쓸어내려서 검색 칸에 <B>단축어</B>라고 쓰면 나와요.</p>
+        </>
+      ),
+    },
+    {
+      title: "새 단축어 시작하기",
+      body: (
+        <>
+          <p>
+            단축어 앱 오른쪽 위에 있는 <B>＋</B> 를 눌러요.
+          </p>
+          <Mock>
+            <Row>단축어</Row>
+            <div className="flex justify-end">
+              <span className="rounded-full bg-white px-3 py-1 font-bold text-[#b4356f] ring-2 ring-[#de73a5]">＋</span>
+            </div>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "이름 짓기",
+      body: (
+        <>
+          <p>
+            화면 맨 위의 <B>이름 없는 단축어</B> 글씨를 눌러요. <B>이름 변경</B>이 나오면 누르고, <B>식단</B> 이라고 써요.
+          </p>
+          <Mock>
+            <Row hot>새로운 단축어 ▾</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진 찍기 넣기 (1/2)",
+      body: (
+        <>
+          <p>
+            화면 아래쪽에 있는 <B>동작 검색</B> 칸을 눌러요. 아직 아무 칸도 없는 하얀 화면이에요.
+          </p>
+          <Mock>
+            <Row>(비어 있음)</Row>
+            <Row hot>동작 검색</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진 찍기 넣기 (2/2)",
+      body: (
+        <>
+          <p>
+            검색 칸에 <B>사진 찍기</B> 라고 써요. 아래 나온 결과 중 <B>사진 찍기</B> 를 눌러요.
+          </p>
+          <p>화면 위쪽에 &ldquo;사진 찍기&rdquo; 칸이 하나 생기면 성공이에요.</p>
+          <Mock>
+            <Row hot>사진 찍기</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진 줄이기 넣기",
+      body: (
+        <>
+          <p>
+            사진이 너무 크면 보내는 데 오래 걸려서 작게 줄여요. 검색 칸에 <B>이미지 크기 변경</B> 이라고 쓰고 나온 결과를 눌러요.
+          </p>
+          <Mock>
+            <Row>사진 찍기</Row>
+            <Row hot>이미지 크기 변경</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "크기를 1024로 바꾸기",
+      body: (
+        <>
+          <p>
+            방금 생긴 칸에서 <B>너비</B> 옆의 파란 글씨(또는 숫자)를 눌러요. 키보드가 나오면 <B>1024</B> 라고 쓰고 완료를 눌러요.
+          </p>
+          <p>높이는 손대지 않아도 돼요.</p>
+          <Mock>
+            <Row hot>이미지 크기 변경 · 너비 1024</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "JPEG로 바꾸기",
+      body: (
+        <>
+          <p>
+            검색 칸에 <B>이미지 변환</B> 이라고 쓰고 나온 결과를 눌러요.
+          </p>
+          <p>
+            생긴 칸 안의 <B>형식</B> 옆 글씨(HEIF 같은 것)를 눌러 <B>JPEG</B> 를 골라요.
+          </p>
+          <Mock>
+            <Row hot>이미지 변환 · JPEG</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진을 글자로 바꾸기",
+      body: (
+        <>
+          <p>
+            이름이 어렵지만 그대로 따라 하면 돼요. 사진을 글자로 바꿔야 인터넷으로 보낼 수 있어요. 검색 칸에 <B>Base64로 인코딩</B> 이라고 쓰고 결과를 눌러요.
+          </p>
+          <p>
+            생긴 칸에 <B>줄바꿈</B> 이 보이면 눌러서 <B>없음</B> 으로 골라요. 안 보이면 칸 오른쪽의 <B>⌄</B> 를 먼저 눌러요.
+          </p>
+          <Mock>
+            <Row hot>Base64로 인코딩 · 줄바꿈 없음</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "보내기 칸 만들기",
+      body: (
+        <>
+          <p>
+            이제 사진을 이 앱으로 보내는 칸이에요. 검색 칸에 <B>URL 콘텐츠 가져오기</B> 라고 쓰고 결과를 눌러요.
+          </p>
+          <Mock>
+            <Row hot>URL 콘텐츠 가져오기</Row>
+            <Row>URL ____________</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "주소 붙여 넣기",
+      body: (
+        <>
+          <p>
+            먼저 아래 <B>주소 복사하기</B> 를 눌러요. 그다음 단축어 앱으로 돌아가 칸의 <B>URL</B> 자리를 길게 눌러 <B>붙여넣기</B> 해요.
+          </p>
+          <button onClick={() => copy(url, "주소를")} className={`${PILL} w-full py-2`}>
             주소 복사하기
           </button>
         </>
       ),
     },
     {
-      title: "⑤ 서버로 보내기 (2/2) 내용",
+      title: "보내는 방법 고르기",
       body: (
         <>
-          <ol className="list-decimal space-y-1.5 pl-4">
-            <li>
-              펼친 칸에서 <B>헤더 추가</B>를 두 번 눌러요.
-              <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                <li>
-                  첫째: 키 <B>Authorization</B>, 값은 아래 연결 코드를 붙여 넣기
-                </li>
-                <li>
-                  둘째: 키 <B>Content-Type</B>, 값 <B>application/json</B>
-                </li>
-              </ul>
-            </li>
-            <li>
-              <B>요청 본문</B>을 <B>JSON</B>으로 두고 <B>새 필드 추가</B> → <B>텍스트</B>를 두 번 눌러요.
-              <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                <li>
-                  첫째: 키 <B>imageBase64</B>, 값은 글자 대신 위 ④번 결과(<B>Base64 인코딩됨</B>)를 골라요
-                </li>
-                <li>
-                  둘째: 키 <B>mimeType</B>, 값 <B>image/jpeg</B>
-                </li>
-              </ul>
-            </li>
-          </ol>
-          <button onClick={() => token && copy(`Bearer ${token}`, "연결 코드를")} className={`${pill} w-full py-2`}>
-            연결 코드 복사하기
-          </button>
+          <p>
+            그 칸 오른쪽의 <B>⌄</B>(작은 화살표)를 눌러 칸을 펼쳐요. <B>방법</B> 이 보이면 눌러서 <B>POST</B> 를 골라요.
+          </p>
+          <p>POST는 &ldquo;보낸다&rdquo;는 뜻이에요.</p>
+          <Mock>
+            <Row>URL https://…</Row>
+            <Row hot>방법 POST</Row>
+          </Mock>
         </>
       ),
     },
     {
-      title: "⑥ 결과 알림 띄우기",
+      title: "내 코드 알려 주기 (1/2)",
       body: (
-        <ol className="list-decimal space-y-1.5 pl-4">
-          <li>
-            검색 칸에 <B>사전에서 값 가져오기</B>를 입력하고 눌러요. 키 자리에 <B>message</B>를 적어요.
-          </li>
-          <li>
-            검색 칸에 <B>결과 보기</B>를 입력하고 눌러요.
-          </li>
-          <li>
-            오른쪽 위 <B>완료</B>를 눌러 저장해요.
-          </li>
-        </ol>
+        <>
+          <p>
+            펼친 칸에서 <B>헤더 추가</B> 를 눌러요. 칸이 두 개 나오면 왼쪽(키)에 <B>Authorization</B> 이라고 써요.
+          </p>
+          <p>오른쪽(값)에는 아래 <B>연결 코드 복사하기</B> 를 눌러 복사한 걸 붙여 넣어요.</p>
+          <button onClick={() => token && copy(`Bearer ${token}`, "연결 코드를")} className={`${PILL} w-full py-2`}>
+            연결 코드 복사하기
+          </button>
+          <Mock>
+            <Row hot>Authorization ｜ Bearer 내코드…</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "내 코드 알려 주기 (2/2)",
+      body: (
+        <>
+          <p>
+            <B>헤더 추가</B> 를 한 번 더 눌러요. 왼쪽에 <B>Content-Type</B>, 오른쪽에 <B>application/json</B> 이라고 써요.
+          </p>
+          <p>&ldquo;이렇게 보내요&rdquo;라는 약속이에요. 철자를 똑같이 써야 해요.</p>
+          <Mock>
+            <Row>Authorization ｜ Bearer …</Row>
+            <Row hot>Content-Type ｜ application/json</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진 담기",
+      body: (
+        <>
+          <p>
+            칸 아래 <B>요청 본문</B> 을 눌러 <B>JSON</B> 을 골라요. 그다음 <B>새 필드 추가</B> → <B>텍스트</B> 를 눌러요.
+          </p>
+          <p>
+            왼쪽(키)에 <B>imageBase64</B> 라고 쓰고, 오른쪽(값)을 누르면 아래에 변수 목록이 떠요. 거기서 <B>Base64 인코딩됨</B> 을 골라요. 글자를 직접 쓰는 게 아니에요.
+          </p>
+          <Mock>
+            <Row hot>imageBase64 ｜ [Base64 인코딩됨]</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "사진 종류 알려 주기",
+      body: (
+        <>
+          <p>
+            <B>새 필드 추가</B> → <B>텍스트</B> 를 한 번 더 눌러요. 왼쪽에 <B>mimeType</B>, 오른쪽에 <B>image/jpeg</B> 라고 써요.
+          </p>
+          <Mock>
+            <Row>imageBase64 ｜ [Base64 인코딩됨]</Row>
+            <Row hot>mimeType ｜ image/jpeg</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "결과 문구 꺼내기",
+      body: (
+        <>
+          <p>
+            검색 칸에 <B>사전에서 값 가져오기</B> 를 쓰고 결과를 눌러요. 칸에 <B>키</B> 를 누르고 <B>message</B> 라고 써요.
+          </p>
+          <p>앱이 보내 주는 &ldquo;OO 약 N kcal로 읽었어요&rdquo; 문구를 꺼내는 칸이에요.</p>
+          <Mock>
+            <Row hot>사전에서 값 가져오기 · 키 message</Row>
+          </Mock>
+        </>
+      ),
+    },
+    {
+      title: "결과 보여주고 저장하기",
+      body: (
+        <>
+          <p>
+            검색 칸에 <B>결과 보기</B> 를 쓰고 결과를 눌러요. 맨 끝에 &ldquo;결과 보기&rdquo; 칸이 생겨야 해요.
+          </p>
+          <p>
+            마지막으로 화면 오른쪽 위 <B>완료</B> 를 눌러 저장해요. 단축어 만들기는 끝이에요!
+          </p>
+        </>
       ),
     },
     {
       title: "액션 버튼에 연결하기",
       body: (
         <>
-          <p className="font-bold text-[#c2679c]">액션 버튼이 있는 폰 (15 Pro 이후)</p>
+          <p className="font-bold text-[#c2679c]">액션 버튼이 있는 폰 (아이폰 15 Pro 이후)</p>
           <ol className="list-decimal space-y-1 pl-4">
             <li>
-              <B>설정</B> → <B>액션 버튼</B>
+              <B>설정</B> 앱 → <B>액션 버튼</B>
             </li>
             <li>
-              화면을 옆으로 넘겨 <B>단축어</B>를 고르고, <B>식단</B>을 선택해요.
+              화면을 옆으로 넘겨 <B>단축어</B> 를 고르고 <B>식단</B> 을 선택해요.
             </li>
           </ol>
           <p className="font-bold text-[#c2679c]">액션 버튼이 없는 폰</p>
@@ -222,11 +374,12 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       title: "해 보기",
       body: (
         <ol className="list-decimal space-y-1.5 pl-4">
-          <li>액션 버튼(또는 뒷면 두 번 탭)을 눌러요.</li>
+          <li>액션 버튼(또는 폰 뒷면 두 번 탭)을 눌러요.</li>
           <li>
-            카메라가 뜨면 음식을 찍고 <B>사진 사용</B>을 눌러요.
+            카메라가 켜지면 음식을 찍고 <B>사진 사용</B> 을 눌러요.
           </li>
-          <li>잠시 뒤 &ldquo;식단 확인&rdquo; 알림이 오면 성공이에요. 앱 식단 화면에서 확인하고 저장해요.</li>
+          <li>잠시 뒤 화면에 &ldquo;OO 약 N kcal로 읽었어요&rdquo; 문구가 뜨면 성공이에요.</li>
+          <li>이 앱 식단 화면에서 <B>아이폰으로 올린 식단 N건 확인하기</B> 를 눌러 확인하고 저장해요.</li>
         </ol>
       ),
     },
@@ -245,7 +398,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
     <>
       <div className="flex items-center justify-between border-t border-[#ffd6e8] pt-3">
         <p className="text-sm font-semibold text-[#4a2540]">아이폰 액션 버튼</p>
-        <button onClick={() => setOpen(true)} className={pill}>
+        <button onClick={() => setOpen(true)} className={PILL}>
           연동
         </button>
       </div>
@@ -257,7 +410,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-4 top-4 flex items-center gap-2">
-              {token && step > 0 && (
+              {token && step > 1 && (
                 <button onClick={make} disabled={busy} className="text-[11px] text-[#d9a9c4] underline">
                   코드 다시 만들기
                 </button>
@@ -278,13 +431,12 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
               <p className="text-lg font-black text-[#4a2540]">{cur.title}</p>
             </div>
 
-            <div className="min-h-[12rem] flex-1 space-y-3 overflow-y-auto text-sm leading-relaxed text-[#6b4a5e]">{cur.body}</div>
-
-            <div className="flex justify-center gap-1.5">
-              {steps.map((_, i) => (
-                <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === step ? "bg-[#de73a5]" : "bg-[#ffd6e8]"}`} />
-              ))}
+            {/* 진행 막대 */}
+            <div className="h-1 overflow-hidden rounded-full bg-[#ffe1ee]">
+              <div className="h-full rounded-full bg-[#de73a5] transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
             </div>
+
+            <div className="min-h-[13rem] flex-1 space-y-3 overflow-y-auto text-sm leading-relaxed text-[#6b4a5e]">{cur.body}</div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
