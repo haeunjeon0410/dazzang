@@ -702,32 +702,6 @@ export default function Home() {
               이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감
             </p>
 
-            {/* 실험실 식단 인증을 켜면 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
-            {me.labMeal && (
-              <div className="grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
-                {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    role="tab"
-                    aria-selected={viewMode === mode}
-                    onClick={() => {
-                      setViewMode(mode);
-                      try {
-                        localStorage.setItem("dajjang_view_mode", mode);
-                      } catch {
-                        // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
-                      }
-                    }}
-                    className={`rounded-full py-1 text-xs font-bold ${
-                      viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
             <Battle
               myCount={myEntry.count}
               otherCount={otherEntry.count}
@@ -776,6 +750,32 @@ export default function Home() {
                 <button onClick={() => setGroupAccountOpen(true)} className="text-xs text-[#ec4899] underline">
                   모임 통장을 등록하면 여기서 바로 송금 정보가 떠요
                 </button>
+              </div>
+            )}
+
+            {/* 실험실 식단 인증을 켜면 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
+            {me.labMeal && (
+              <div className="grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
+                {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    role="tab"
+                    aria-selected={viewMode === mode}
+                    onClick={() => {
+                      setViewMode(mode);
+                      try {
+                        localStorage.setItem("dajjang_view_mode", mode);
+                      } catch {
+                        // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
+                      }
+                    }}
+                    className={`rounded-full py-1 text-xs font-bold ${
+                      viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
 
