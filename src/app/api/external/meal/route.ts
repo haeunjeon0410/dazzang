@@ -18,7 +18,7 @@ function sniff(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | "heic" 
   return null;
 }
 
-// 아이폰 단축어(액션 버튼)가 식단 사진을 바로 올리는 주소.
+// 아이폰 단축어(동작 버튼)가 식단 사진을 바로 올리는 주소.
 // 쿠키가 없어서, 설정에서 만든 개인 코드로 누구의 사진인지 알아낸다. 코드는 주소 끝(?t=코드)이나 Authorization 헤더로 받는다.
 // 사진은 파일 그대로(본문 전체, 또는 양식의 첫 파일)나 예전 방식(JSON의 imageBase64)으로 받는다.
 // 파일로 보내면 응답도 단축어가 바로 "결과 보기"에 띄울 수 있게 글자로 돌려준다.
@@ -37,12 +37,17 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { mealToken: token } });
   if (!user) return reply(false, "연결 코드가 올바르지 않아요. 앱에서 주소를 다시 복사해 주세요", 401);
-  if (!user.labMeal) return reply(false, "앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
-  if (tooManyRequests(`meal-ext:${user.id}`, 10)) return reply(false, "너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
+  // 사진이 못 올라간 이유는 단축어 화면 대신 푸시로 알려 준다 (단축어에 "콘텐츠 보기" 단계를 두지 않는다)
+  const fail = async (message: string, status = 200) => {
+    await sendPushToUser(user, { title: "식단을 못 올렸어요", body: message }).catch(() => {});
+    return reply(false, message, status);
+  };
+  if (!user.labMeal) return fail("앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
+  if (tooManyRequests(`meal-ext:${user.id}`, 10)) return fail("너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
 
   // 너무 큰 요청은 본문을 읽기 전에 거절한다 (사진 3MB, 양식 머리글 여유 포함)
   if (Number(req.headers.get("content-length") ?? 0) > MAX_IMAGE_BYTES * 1.5) {
-    return reply(false, "사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
+    return fail("사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
   }
 
   // 사진 꺼내기
@@ -58,17 +63,17 @@ export async function POST(req: NextRequest) {
   } else {
     image = Buffer.from(await req.arrayBuffer());
   }
-  if (!image || image.length === 0) return reply(false, "사진이 안 왔어요. 요청 본문에 사진이 들어갔는지 확인해 주세요", 400);
-  if (image.length > MAX_IMAGE_BYTES) return reply(false, "사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
+  if (!image || image.length === 0) return fail("사진이 안 왔어요. 요청 본문에 사진이 들어갔는지 확인해 주세요", 400);
+  if (image.length > MAX_IMAGE_BYTES) return fail("사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
   const mimeType = sniff(image);
-  if (mimeType === "heic") return reply(false, "사진이 HEIC 형식이에요. 이미지 변환(JPEG) 단계를 확인해 주세요", 415);
-  if (!mimeType) return reply(false, "사진 파일이 아닌 것 같아요", 415);
+  if (mimeType === "heic") return fail("사진이 HEIC 형식이에요. 이미지 변환(JPEG) 단계를 확인해 주세요", 415);
+  if (!mimeType) return fail("사진 파일이 아닌 것 같아요", 415);
   const photoUrl = `data:${mimeType};base64,${image.toString("base64")}`;
 
   const quota = await takeAiQuota(user.id, "photo");
-  if (quota !== "ok") return reply(false, `${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
+  if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
   const analysis = await analyzeMealPhoto(photoUrl);
-  if (analysis && !analysis.isFood) return reply(false, "음식 사진이 아닌 것 같아요");
+  if (analysis && !analysis.isFood) return fail("음식 사진이 아닌 것 같아요");
 
   const draft = analysis ? draftFromAnalysis(analysis) : null;
   await prisma.meal.create({

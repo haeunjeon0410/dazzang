@@ -46,12 +46,15 @@ export function MealView({
   refreshKey,
   header,
   onSaved,
+  onChanged,
 }: {
   meId: string;
   refreshKey: number;
   header?: ReactNode;
   // 확인 창에서 저장했을 때 알림 문구를 띄우는 곳 (홈 화면 아래 토스트)
   onSaved?: (text: string) => void;
+  // 확인 대기 수가 바뀌었을 때(저장하거나 취소해서 지웠을 때) 홈 화면의 숫자를 다시 읽게 한다
+  onChanged?: () => void;
 }) {
   const [data, setData] = useState<MealsData | null>(null);
   // 창에 띄울 칸 (누가, 무슨 요일). 사진이 든 목록은 칸을 누를 때만 받아온다
@@ -113,9 +116,20 @@ export function MealView({
       setDraft(null);
       setReload((n) => n + 1);
       onSaved?.(`저장했어요 · 약 ${(saved?.kcal ?? 0).toLocaleString()} kcal`);
+      onChanged?.();
     } finally {
       setDraftBusy(false);
     }
+  }
+
+  // 취소: 아이폰으로 올린 초안은 등록을 그만두는 것이라 사진도 지운다 (안 지우면 "확인 대기 1건"이 계속 남는다)
+  async function cancelDraft() {
+    const id = draft?.id;
+    setDraft(null);
+    if (!id) return;
+    await fetch(`/api/meals/${id}`, { method: "DELETE" }).catch(() => {});
+    setReload((n) => n + 1);
+    onChanged?.();
   }
 
   function openCell(userId: string, day: number) {
@@ -228,7 +242,7 @@ export function MealView({
           aiRead={draft.analyzed}
           busy={draftBusy}
           onSave={saveDraft}
-          onCancel={() => setDraft(null)}
+          onCancel={cancelDraft}
         />
       )}
 

@@ -851,10 +851,8 @@ export default function Home() {
                 meId={me.id}
                 refreshKey={mealRefresh}
                 header={calendarHeader}
-                onSaved={(t) => {
-                  setToast(t);
-                  loadMe();
-                }}
+                onSaved={setToast}
+                onChanged={loadMe}
               />
             ) : (
               <WeekCalendar

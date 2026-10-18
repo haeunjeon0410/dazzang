@@ -19,7 +19,7 @@ function Line({ n, children }: { n: number; children: ReactNode }) {
   );
 }
 
-// 아이폰 액션 버튼 → 단축어 → 사진 찍기 → 서버로 바로 보내기 연결.
+// 아이폰 동작 버튼 → 단축어 → 사진 찍기 → 서버로 바로 보내기 연결.
 // 설정에는 한 줄(연동 버튼)만 두고, 버튼을 누르면 한 장에 한 동작씩 도움말이 넘어가며 뜬다.
 // 단축어에는 쿠키가 없어서 이 앱이 만들어 주는 개인 토큰으로 "누구의 사진인지"를 알린다.
 export function ShortcutSetup({ token, onChanged }: { token: string | null; onChanged: () => void }) {
@@ -103,17 +103,17 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             주소 복사하기
           </button>
           <Line n={6}>
-            <B>동작 검색</B> → <B>콘텐츠 보기</B> → 오른쪽 위 <B>완료</B>
+            오른쪽 위 <B>완료</B> 눌러 저장
           </Line>
         </>
       ),
     },
     {
-      title: "액션 버튼에 연결",
+      title: "동작 버튼에 연결",
       body: (
         <>
           <Line n={7}>
-            <B>설정</B> → <B>액션 버튼</B> → <B>단축어</B> → <B>식단</B>
+            <B>설정</B> → <B>동작 버튼</B> → <B>단축어</B> → <B>식단</B>
           </Line>
           <p className="text-xs text-[#b4779b]">버튼이 없는 폰: 설정 → 손쉬운 사용 → 터치 → 뒷면 탭 → 두 번 탭 → 식단</p>
         </>
@@ -124,11 +124,10 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       body: (
         <>
           <Line n={8}>
-            액션 버튼 → 음식 찍기 → <B>사진 사용</B>
+            동작 버튼 → 음식 찍기 → <B>사진 사용</B>
           </Line>
-          <Line n={9}>&ldquo;N kcal로 읽었어요&rdquo;가 뜨면 성공</Line>
-          <Line n={10}>
-            앱 식단 화면의 <B>확인하기</B> 배너에서 저장
+          <Line n={9}>
+            &ldquo;식단 확인&rdquo; 알림이 오면 성공. 앱 식단 화면의 <B>확인하기</B> 배너에서 저장
           </Line>
         </>
       ),
@@ -147,7 +146,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
   return (
     <>
       <div className="flex items-center justify-between border-t border-[#ffd6e8] pt-3">
-        <p className="text-sm font-semibold text-[#4a2540]">아이폰 액션 버튼</p>
+        <p className="text-sm font-semibold text-[#4a2540]">아이폰 동작 버튼</p>
         <button onClick={() => setOpen(true)} className={PILL}>
           연동
         </button>

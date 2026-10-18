@@ -42,6 +42,8 @@ export function MealConfirm({
   );
   // 먹은 양을 고르는 중인 음식 (그 음식 위에 토글이 펼쳐진다)
   const [pickIdx, setPickIdx] = useState<number | null>(null);
+  // 사진을 눌러 크게 볼 때 (음식이 뭐뭐 들어 있는지 보면서 고치기 편하게)
+  const [zoom, setZoom] = useState(false);
   const alive = useRef(true);
 
   // 이름이 바뀌었는데 아직 칼로리를 계산하지 않은 음식
@@ -95,24 +97,37 @@ export function MealConfirm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
-        className="max-h-[90vh] w-full max-w-[22rem] space-y-3 overflow-y-auto rounded-3xl bg-white p-4 shadow-xl"
+        className="max-h-[90vh] w-full max-w-sm space-y-4 overflow-y-auto rounded-3xl bg-white p-5 shadow-xl"
       >
         <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" className="h-14 w-14 flex-none rounded-2xl border border-[#ffd6e8] object-cover" />
+          <button type="button" onClick={() => setZoom(true)} aria-label="사진 크게 보기" className="flex-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoUrl} alt="" className="h-16 w-16 rounded-2xl border border-[#ffd6e8] object-cover" />
+          </button>
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-[11px] font-bold text-[#c2679c]">{aiRead ? "AI가 읽었어요. 틀리면 고쳐 주세요" : "직접 적어 주세요"}</p>
+            <p className="text-xs font-bold text-[#c2679c]">{aiRead ? "AI가 읽었어요. 틀리면 고쳐 주세요" : "직접 적어 주세요"}</p>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="음식 이름"
               maxLength={40}
-              className="w-full rounded-xl border border-[#ffd6e8] bg-[#fff0f6] px-3 py-1.5 text-sm font-bold text-[#4a2540]"
+              className="w-full rounded-xl border border-[#ffd6e8] bg-[#fff0f6] px-3 py-2 text-base font-bold text-[#4a2540]"
             />
           </div>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-[#c2679c]">먹은 음식</p>
+            {rows.length < 8 && (
+              <button
+                onClick={() => setRows((prev) => [...prev, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
+                className="rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
+              >
+                + 추가
+              </button>
+            )}
+          </div>
           {rows.map((r, idx) => (
             <div key={idx} className="space-y-1">
               {pickIdx === idx && (
@@ -124,7 +139,7 @@ export function MealConfirm({
                         setRow(idx, { fraction: f });
                         setPickIdx(null);
                       }}
-                      className={`rounded-full py-1 text-[11px] font-bold ${
+                      className={`rounded-full py-1.5 text-xs font-bold ${
                         r.fraction === f ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#b4356f]"
                       }`}
                     >
@@ -133,17 +148,17 @@ export function MealConfirm({
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <input
                   value={r.name}
                   onChange={(e) => setRow(idx, { name: e.target.value })}
                   placeholder="음식"
                   maxLength={30}
-                  className="min-w-0 flex-1 rounded-lg border border-[#ffd6e8] px-2.5 py-1.5 text-sm text-[#4a2540]"
+                  className="min-w-0 flex-1 rounded-lg border border-[#ffd6e8] px-3 py-2 text-base text-[#4a2540]"
                 />
                 <button
                   onClick={() => setPickIdx(pickIdx === idx ? null : idx)}
-                  className={`w-[3.6rem] flex-none rounded-full py-1.5 text-[11px] font-bold ${
+                  className={`w-[4.2rem] flex-none rounded-full py-2 text-xs font-bold ${
                     r.fraction < 1 ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#b4356f]"
                   }`}
                 >
@@ -152,25 +167,17 @@ export function MealConfirm({
                 <button
                   onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
                   aria-label="이 음식 빼기"
-                  className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-xs text-[#c2679c]"
+                  className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-sm text-[#c2679c]"
                 >
                   ✕
                 </button>
               </div>
             </div>
           ))}
-          {rows.length < 8 && (
-            <button
-              onClick={() => setRows((prev) => [...prev, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
-              className="w-full rounded-lg border border-dashed border-[#ffc2dc] py-1.5 text-xs font-semibold text-[#c2679c]"
-            >
-              + 음식 추가
-            </button>
-          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={onCancel} className="rounded-xl bg-[#ffeef5] py-2.5 text-sm font-semibold text-[#c2679c]">
+          <button onClick={onCancel} className="rounded-xl bg-[#ffeef5] py-3 text-base font-semibold text-[#c2679c]">
             취소
           </button>
           <button
@@ -184,12 +191,19 @@ export function MealConfirm({
               })
             }
             disabled={!canSave}
-            className="rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            className="rounded-xl bg-[#de73a5] py-3 text-base font-bold text-white disabled:opacity-50"
           >
             {busy ? "저장 중..." : pending ? "계산 중..." : "저장"}
           </button>
         </div>
       </div>
+
+      {zoom && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setZoom(false)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoUrl} alt="식단 사진" className="max-h-[88vh] max-w-full rounded-2xl object-contain" />
+        </div>
+      )}
     </div>
   );
 }
