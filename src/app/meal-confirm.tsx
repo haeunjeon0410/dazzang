@@ -97,7 +97,7 @@ export function MealConfirm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
-        className="max-h-[90vh] w-full max-w-sm space-y-4 overflow-y-auto rounded-3xl bg-white p-5 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 rounded-3xl bg-white p-5 shadow-xl"
       >
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setZoom(true)} aria-label="사진 크게 보기" className="flex-none">
@@ -116,8 +116,9 @@ export function MealConfirm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
+        {/* 사진·이름과 취소/저장은 고정하고, 음식 목록만 스크롤한다 (스크롤바는 숨김) */}
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="flex flex-none items-center justify-between">
             <p className="text-sm font-bold text-[#c2679c]">먹은 음식</p>
             {rows.length < 8 && (
               <button
@@ -128,8 +129,9 @@ export function MealConfirm({
               </button>
             )}
           </div>
+          <div className="flex min-h-0 max-h-64 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {rows.map((r, idx) => (
-            <div key={idx} className="space-y-1">
+            <div key={idx} className="flex-none space-y-1">
               {pickIdx === idx && (
                 <div className="grid grid-cols-4 gap-1">
                   {FRACTIONS.map(([f, text]) => (
@@ -185,9 +187,10 @@ export function MealConfirm({
                 ))}
             </div>
           ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid flex-none grid-cols-2 gap-2">
           <button onClick={onCancel} className="rounded-xl bg-[#ffeef5] py-3 text-base font-semibold text-[#c2679c]">
             취소
           </button>
