@@ -6,40 +6,64 @@ import { sendPushToUser } from "@/lib/push";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { quotaMessage, takeAiQuota } from "@/lib/ai-quota";
 
-const MAX_BASE64_CHARS = 4_000_000;
-const MIME_OK = new Set(["image/jpeg", "image/png", "image/webp"]);
+// 저장하는 사진은 글자(base64)로 바뀌며 3분의 1 커지고, Vercel은 요청 하나를 4.5MB까지만 받는다
+const MAX_IMAGE_BYTES = 3_000_000;
+
+// 사진 앞부분(매직 바이트)을 보고 종류를 알아낸다. 단축어가 보내는 Content-Type은 믿기 어려워서 직접 확인한다
+function sniff(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | "heic" | null {
+  if (buf.length > 12 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf.length > 12 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (buf.length > 12 && buf.subarray(0, 4).toString() === "RIFF" && buf.subarray(8, 12).toString() === "WEBP") return "image/webp";
+  if (buf.length > 12 && buf.subarray(4, 8).toString() === "ftyp") return "heic";
+  return null;
+}
 
 // 아이폰 단축어(액션 버튼)가 식단 사진을 바로 올리는 주소.
-// 쿠키가 없어서, 설정에서 만든 개인 토큰(Authorization: Bearer)으로 누구의 사진인지 알아낸다.
+// 쿠키가 없어서, 설정에서 만든 개인 코드로 누구의 사진인지 알아낸다. 코드는 주소 끝(?t=코드)이나 Authorization 헤더로 받는다.
+// 사진은 파일 그대로(본문 전체, 또는 양식의 첫 파일)나 예전 방식(JSON의 imageBase64)으로 받는다.
+// 파일로 보내면 응답도 단축어가 바로 "결과 보기"에 띄울 수 있게 글자로 돌려준다.
 // 사진은 AI가 읽은 뒤 "확인 대기" 초안으로 저장되고, 본인이 앱에서 확인(필요하면 수정)해야 친구와 공유된다.
 export async function POST(req: NextRequest) {
+  const type = (req.headers.get("content-type") ?? "").toLowerCase();
+  const asJson = type.includes("application/json");
+  const reply = (ok: boolean, message: string, status = 200) =>
+    asJson
+      ? NextResponse.json({ ok, message }, { status })
+      : new Response(message, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+
   const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (token.length < 16) return NextResponse.json({ ok: false, message: "토큰이 올바르지 않아요" }, { status: 401 });
+  const token = (auth.startsWith("Bearer ") ? auth.slice(7) : req.nextUrl.searchParams.get("t") ?? "").trim();
+  if (token.length < 16) return reply(false, "연결 코드가 올바르지 않아요. 앱에서 주소를 다시 복사해 주세요", 401);
 
   const user = await prisma.user.findUnique({ where: { mealToken: token } });
-  if (!user) return NextResponse.json({ ok: false, message: "토큰이 올바르지 않아요" }, { status: 401 });
-  if (!user.labMeal) return NextResponse.json({ ok: false, message: "앱의 실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
-  if (tooManyRequests(`meal-ext:${user.id}`, 10)) {
-    return NextResponse.json({ ok: false, message: "너무 빨라요. 잠시 뒤에 다시 보내 주세요" }, { status: 429 });
-  }
+  if (!user) return reply(false, "연결 코드가 올바르지 않아요. 앱에서 주소를 다시 복사해 주세요", 401);
+  if (!user.labMeal) return reply(false, "앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
+  if (tooManyRequests(`meal-ext:${user.id}`, 10)) return reply(false, "너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
 
-  const body = await req.json().catch(() => null);
-  const imageBase64 = typeof body?.imageBase64 === "string" ? body.imageBase64.replace(/\s+/g, "") : "";
-  const mimeType = typeof body?.mimeType === "string" ? body.mimeType : "image/jpeg";
-  if (!imageBase64 || imageBase64.length > MAX_BASE64_CHARS || !MIME_OK.has(mimeType)) {
-    return NextResponse.json({ ok: false, message: "사진이 올바르지 않아요" }, { status: 400 });
+  // 사진 꺼내기
+  let image: Buffer | null = null;
+  if (asJson) {
+    const body = await req.json().catch(() => null);
+    const b64 = typeof body?.imageBase64 === "string" ? body.imageBase64.replace(/\s+/g, "") : "";
+    image = b64 ? Buffer.from(b64, "base64") : null;
+  } else if (type.includes("multipart/form-data")) {
+    const form = await req.formData().catch(() => null);
+    const file = form ? [...form.values()].find((v): v is File => typeof v !== "string") : null;
+    image = file ? Buffer.from(await file.arrayBuffer()) : null;
+  } else {
+    image = Buffer.from(await req.arrayBuffer());
   }
-  const photoUrl = `data:${mimeType};base64,${imageBase64}`;
+  if (!image || image.length === 0) return reply(false, "사진이 안 왔어요. 요청 본문에 사진이 들어갔는지 확인해 주세요", 400);
+  if (image.length > MAX_IMAGE_BYTES) return reply(false, "사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
+  const mimeType = sniff(image);
+  if (mimeType === "heic") return reply(false, "사진이 HEIC 형식이에요. 이미지 변환(JPEG) 단계를 확인해 주세요", 415);
+  if (!mimeType) return reply(false, "사진 파일이 아닌 것 같아요", 415);
+  const photoUrl = `data:${mimeType};base64,${image.toString("base64")}`;
 
   const quota = await takeAiQuota(user.id, "photo");
-  if (quota !== "ok") {
-    return NextResponse.json({ ok: false, message: `${quotaMessage(quota)}. 나중에 다시 올려 주세요` });
-  }
+  if (quota !== "ok") return reply(false, `${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
   const analysis = await analyzeMealPhoto(photoUrl);
-  if (analysis && !analysis.isFood) {
-    return NextResponse.json({ ok: false, message: "음식 사진이 아닌 것 같아요" });
-  }
+  if (analysis && !analysis.isFood) return reply(false, "음식 사진이 아닌 것 같아요");
 
   const draft = analysis ? draftFromAnalysis(analysis) : null;
   await prisma.meal.create({
@@ -61,5 +85,5 @@ export async function POST(req: NextRequest) {
     : "사진은 올렸어요. 분석은 못 했으니 앱에서 직접 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
   await sendPushToUser(user, { title: "식단 확인", body: message }).catch(() => {});
-  return NextResponse.json({ ok: true, message });
+  return reply(true, message);
 }

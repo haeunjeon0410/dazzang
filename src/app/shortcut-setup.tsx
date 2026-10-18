@@ -37,10 +37,11 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
-  const url = typeof location === "undefined" ? "" : `${location.origin}/api/external/meal`;
+  // 연결 코드를 주소 끝에 붙여 두면 헤더를 따로 적을 필요가 없다
+  const url = typeof location === "undefined" ? "" : `${location.origin}/api/external/meal${token ? `?t=${token}` : ""}`;
 
   async function make() {
-    if (token && !confirm("새로 만들면 이전 코드는 못 써요. 계속할까요?")) return;
+    if (token && !confirm("새로 만들면 이전 주소는 못 써요. 단축어의 주소도 바꿔야 해요. 계속할까요?")) return;
     setBusy(true);
     try {
       const res = await fetch("/api/me/meal-token", { method: "POST" });
@@ -68,7 +69,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
           <p>
             아이폰 <B>단축어</B> 앱으로 &ldquo;사진을 찍으면 이 앱으로 바로 보내는 버튼&rdquo;을 만들어요.
           </p>
-          <p>어려워 보여도 설명을 한 장에 한 가지씩만 따라 하면 돼요. 약 10분 걸려요.</p>
+          <p>설명을 한 장에 한 가지씩만 따라 하면 돼요. 약 7분 걸려요.</p>
           <p className="rounded-xl bg-[#fff0f6] px-3 py-2 text-xs">
             꼭 순서대로 하세요. 화면이 설명과 다르면 <B>이전</B>으로 돌아가 다시 읽어 보세요.
           </p>
@@ -76,16 +77,16 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       ),
     },
     {
-      title: "먼저 연결 코드 만들기",
+      title: "먼저 내 주소 만들기",
       needsToken: true,
       body: (
         <>
-          <p>이 코드가 있어야 아이폰이 &ldquo;이 사진은 내 거예요&rdquo;라고 알릴 수 있어요. 비밀번호 같은 거라서 남에게 알려 주면 안 돼요.</p>
+          <p>아이폰이 &ldquo;이 사진은 내 거예요&rdquo;라고 알릴 수 있는 나만의 주소를 만들어요. 비밀번호 같은 거라서 남에게 알려 주면 안 돼요.</p>
           {token ? (
-            <p className="rounded-xl bg-[#fff0f6] px-3 py-2 font-bold text-[#2f9e44]">✓ 코드가 만들어졌어요. 다음으로 넘어가요</p>
+            <p className="rounded-xl bg-[#fff0f6] px-3 py-2 font-bold text-[#2f9e44]">✓ 주소가 만들어졌어요. 다음으로 넘어가요</p>
           ) : (
             <button onClick={make} disabled={busy} className="w-full rounded-xl bg-[#de73a5] py-2.5 text-sm font-bold text-white disabled:opacity-50">
-              {busy ? "만드는 중..." : "연결 코드 만들기"}
+              {busy ? "만드는 중..." : "내 주소 만들기"}
             </button>
           )}
         </>
@@ -164,7 +165,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       body: (
         <>
           <p>
-            사진이 너무 크면 보내는 데 오래 걸려서 작게 줄여요. 검색 칸에 <B>이미지 크기 변경</B> 이라고 쓰고 나온 결과를 눌러요.
+            사진이 너무 크면 보내는 데 오래 걸리고 보내지지 않을 수도 있어서 작게 줄여요. 검색 칸에 <B>이미지 크기 변경</B> 이라고 쓰고 나온 결과를 눌러요.
           </p>
           <Mock>
             <Row>사진 찍기</Row>
@@ -192,29 +193,13 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       body: (
         <>
           <p>
-            검색 칸에 <B>이미지 변환</B> 이라고 쓰고 나온 결과를 눌러요.
+            아이폰 사진은 특별한 형식(HEIC)이라 이 앱이 못 읽어요. 검색 칸에 <B>이미지 변환</B> 이라고 쓰고 나온 결과를 눌러요.
           </p>
           <p>
             생긴 칸 안의 <B>형식</B> 옆 글씨(HEIF 같은 것)를 눌러 <B>JPEG</B> 를 골라요.
           </p>
           <Mock>
             <Row hot>이미지 변환 · JPEG</Row>
-          </Mock>
-        </>
-      ),
-    },
-    {
-      title: "사진을 글자로 바꾸기",
-      body: (
-        <>
-          <p>
-            이름이 어렵지만 그대로 따라 하면 돼요. 사진을 글자로 바꿔야 인터넷으로 보낼 수 있어요. 검색 칸에 <B>Base64로 인코딩</B> 이라고 쓰고 결과를 눌러요.
-          </p>
-          <p>
-            생긴 칸에 <B>줄바꿈</B> 이 보이면 눌러서 <B>없음</B> 으로 골라요. 안 보이면 칸 오른쪽의 <B>⌄</B> 를 먼저 눌러요.
-          </p>
-          <Mock>
-            <Row hot>Base64로 인코딩 · 줄바꿈 없음</Row>
           </Mock>
         </>
       ),
@@ -240,7 +225,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
           <p>
             먼저 아래 <B>주소 복사하기</B> 를 눌러요. 그다음 단축어 앱으로 돌아가 칸의 <B>URL</B> 자리를 길게 눌러 <B>붙여넣기</B> 해요.
           </p>
-          <button onClick={() => copy(url, "주소를")} className={`${PILL} w-full py-2`}>
+          <button onClick={() => token && copy(url, "주소를")} className={`${PILL} w-full py-2`}>
             주소 복사하기
           </button>
         </>
@@ -262,77 +247,17 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
       ),
     },
     {
-      title: "내 코드 알려 주기 (1/2)",
-      body: (
-        <>
-          <p>
-            펼친 칸에서 <B>헤더 추가</B> 를 눌러요. 칸이 두 개 나오면 왼쪽(키)에 <B>Authorization</B> 이라고 써요.
-          </p>
-          <p>오른쪽(값)에는 아래 <B>연결 코드 복사하기</B> 를 눌러 복사한 걸 붙여 넣어요.</p>
-          <button onClick={() => token && copy(`Bearer ${token}`, "연결 코드를")} className={`${PILL} w-full py-2`}>
-            연결 코드 복사하기
-          </button>
-          <Mock>
-            <Row hot>Authorization ｜ Bearer 내코드…</Row>
-          </Mock>
-        </>
-      ),
-    },
-    {
-      title: "내 코드 알려 주기 (2/2)",
-      body: (
-        <>
-          <p>
-            <B>헤더 추가</B> 를 한 번 더 눌러요. 왼쪽에 <B>Content-Type</B>, 오른쪽에 <B>application/json</B> 이라고 써요.
-          </p>
-          <p>&ldquo;이렇게 보내요&rdquo;라는 약속이에요. 철자를 똑같이 써야 해요.</p>
-          <Mock>
-            <Row>Authorization ｜ Bearer …</Row>
-            <Row hot>Content-Type ｜ application/json</Row>
-          </Mock>
-        </>
-      ),
-    },
-    {
       title: "사진 담기",
       body: (
         <>
           <p>
-            칸 아래 <B>요청 본문</B> 을 눌러 <B>JSON</B> 을 골라요. 그다음 <B>새 필드 추가</B> → <B>텍스트</B> 를 눌러요.
+            펼친 칸 아래 <B>요청 본문</B> 을 눌러 <B>파일</B> 을 골라요. (JSON, 양식, 파일 중 <B>파일</B>이에요)
           </p>
           <p>
-            왼쪽(키)에 <B>imageBase64</B> 라고 쓰고, 오른쪽(값)을 누르면 아래에 변수 목록이 떠요. 거기서 <B>Base64 인코딩됨</B> 을 골라요. 글자를 직접 쓰는 게 아니에요.
+            그다음 <B>파일</B> 칸을 누르면 아래에 변수 목록이 떠요. 거기서 <B>변환된 이미지</B> 를 골라요. 글자를 직접 쓰는 게 아니에요.
           </p>
           <Mock>
-            <Row hot>imageBase64 ｜ [Base64 인코딩됨]</Row>
-          </Mock>
-        </>
-      ),
-    },
-    {
-      title: "사진 종류 알려 주기",
-      body: (
-        <>
-          <p>
-            <B>새 필드 추가</B> → <B>텍스트</B> 를 한 번 더 눌러요. 왼쪽에 <B>mimeType</B>, 오른쪽에 <B>image/jpeg</B> 라고 써요.
-          </p>
-          <Mock>
-            <Row>imageBase64 ｜ [Base64 인코딩됨]</Row>
-            <Row hot>mimeType ｜ image/jpeg</Row>
-          </Mock>
-        </>
-      ),
-    },
-    {
-      title: "결과 문구 꺼내기",
-      body: (
-        <>
-          <p>
-            검색 칸에 <B>사전에서 값 가져오기</B> 를 쓰고 결과를 눌러요. 칸에 <B>키</B> 를 누르고 <B>message</B> 라고 써요.
-          </p>
-          <p>앱이 보내 주는 &ldquo;OO 약 N kcal로 읽었어요&rdquo; 문구를 꺼내는 칸이에요.</p>
-          <Mock>
-            <Row hot>사전에서 값 가져오기 · 키 message</Row>
+            <Row hot>요청 본문 ｜ 파일 ｜ [변환된 이미지]</Row>
           </Mock>
         </>
       ),
@@ -379,7 +304,9 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             카메라가 켜지면 음식을 찍고 <B>사진 사용</B> 을 눌러요.
           </li>
           <li>잠시 뒤 화면에 &ldquo;OO 약 N kcal로 읽었어요&rdquo; 문구가 뜨면 성공이에요.</li>
-          <li>이 앱 식단 화면에서 <B>아이폰으로 올린 식단 N건 확인하기</B> 를 눌러 확인하고 저장해요.</li>
+          <li>
+            이 앱 식단 화면에서 <B>아이폰으로 올린 식단 N건 확인하기</B> 를 눌러 확인하고 저장해요.
+          </li>
         </ol>
       ),
     },
@@ -412,7 +339,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             <div className="absolute right-4 top-4 flex items-center gap-2">
               {token && step > 1 && (
                 <button onClick={make} disabled={busy} className="text-[11px] text-[#d9a9c4] underline">
-                  코드 다시 만들기
+                  주소 다시 만들기
                 </button>
               )}
               <button
