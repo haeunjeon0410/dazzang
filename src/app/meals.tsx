@@ -12,7 +12,7 @@ type Meal = {
   analyzed: boolean;
   title: string | null;
   kcal: number | null;
-  items: { name: string; kcal: number }[] | null;
+  items: { name: string; kcal: number; fraction?: number }[] | null;
   fraction?: number;
   createdAt: string;
 };
@@ -215,8 +215,10 @@ export function MealView({
           photoUrl={draft.photoUrl}
           initial={{
             title: draft.title ?? "",
-            items: draft.items && draft.items.length ? draft.items : [{ name: "", kcal: 0 }],
-            fraction: draft.fraction ?? 1,
+            items:
+              draft.items && draft.items.length
+                ? draft.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? 1 }))
+                : [{ name: "", kcal: 0, fraction: 1 }],
           }}
           aiRead={draft.analyzed}
           busy={draftBusy}
@@ -253,11 +255,6 @@ export function MealView({
                           {m.userId === meId ? "나" : m.name} · {timeLabel(m.createdAt)}
                         </p>
                         <p className="truncate text-lg font-black text-[#4a2540]">{m.title ?? "이름 없음"}</p>
-                        {m.fraction != null && m.fraction < 1 && (
-                          <p className="text-[11px] font-semibold text-[#b4779b]">
-                            {m.fraction === 0.75 ? "3/4" : m.fraction === 0.5 ? "절반" : m.fraction === 0.25 ? "1/4" : `${Math.round(m.fraction * 100)}%`}만 먹었어요
-                          </p>
-                        )}
                       </div>
 
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
@@ -300,11 +297,17 @@ export function MealView({
 
                       {m.items && m.items.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {m.items.map((i, k) => (
-                            <span key={k} className="rounded-full bg-[#ffe1ee] px-2.5 py-1 text-xs font-semibold text-[#b4356f]">
-                              {i.name} {i.kcal}
-                            </span>
-                          ))}
+                          {m.items.map((i, k) => {
+                            // 음식마다 먹은 양이 다르다 (예전 기록은 식단 전체 비율을 따른다)
+                            const f = i.fraction ?? m.fraction ?? 1;
+                            const word = f === 0.75 ? "3/4" : f === 0.5 ? "절반" : f === 0.25 ? "1/4" : `${Math.round(f * 100)}%`;
+                            return (
+                              <span key={k} className="rounded-full bg-[#ffe1ee] px-2.5 py-1 text-xs font-semibold text-[#b4356f]">
+                                {i.name} {Math.round(i.kcal * f)}
+                                {f < 1 ? ` (${word})` : ""}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

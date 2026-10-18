@@ -449,14 +449,17 @@ export default function Home() {
           // AI가 읽은 값을 바로 올리지 않고 확인 창을 먼저 보여준다
           setMealConfirm({
             photo: mealPhoto,
-            initial: { title: data.draft.title, items: data.draft.items, fraction: data.draft.fraction },
+            initial: {
+              title: data.draft.title,
+              items: data.draft.items.map((i: { name: string; kcal: number }) => ({ ...i, fraction: 1 })),
+            },
             aiRead: true,
           });
           return;
         }
         if (data?.kind === "unknown" && viewMode === "diet") {
           // AI를 못 쓰는 상태: 직접 적을 수 있게 빈 확인 창을 연다
-          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0 }], fraction: 1 }, aiRead: false });
+          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다
