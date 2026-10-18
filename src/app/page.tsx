@@ -251,6 +251,8 @@ export default function Home() {
   }, [toast]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
+  // 설정의 "잠깐 쉬어갈까요?"는 평소엔 접어 두고 누르면 펼친다
+  const [pauseOpen, setPauseOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
   const [groupForm, setGroupForm] = useState({ groupBankName: "", groupAccountNumber: "" });
   // 트로피 창 안의 탭: 통산전적 | 지난 기록
@@ -1036,7 +1038,16 @@ export default function Home() {
             {/* 쉬어가기 요청 */}
             {!roomPaused && !room?.pauseRequestedBy && (
               <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
-                <p className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</p>
+                <button
+                  onClick={() => setPauseOpen((v) => !v)}
+                  aria-expanded={pauseOpen}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <span className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</span>
+                  <span className={`text-base leading-none text-[#c2679c] transition-transform ${pauseOpen ? "rotate-90" : ""}`}>›</span>
+                </button>
+                {pauseOpen && (
+                  <>
                 <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
                 <input
                   placeholder="쉬어가려는 사유 (예: 여행, 시험기간)"
@@ -1059,6 +1070,7 @@ export default function Home() {
                       if (!pauseReason.trim()) { alert("쉬어가려는 사유를 적어주세요"); return; }
                       if (await roomAction("request-pause", { weeks: pauseWeeks, reason: pauseReason })) {
                         setPauseReason("");
+                        setPauseOpen(false);
                         setSettingsOpen(false);
                       }
                     }}
@@ -1067,6 +1079,8 @@ export default function Home() {
                     쉬어가기 요청
                   </button>
                 </div>
+                  </>
+                )}
               </div>
             )}
 
