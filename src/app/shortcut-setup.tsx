@@ -92,7 +92,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
                 · URL: 아래 주소 붙여넣기
               </li>
               <li>
-                · 칸의 <B>⌄</B> → 방법 <B>POST</B>
+                · 칸의 <B>⌄</B> → 메소드 <B>POST</B>
               </li>
               <li>
                 · 요청 본문 <B>파일</B> → <B>변환된 이미지</B>
