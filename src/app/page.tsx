@@ -7,7 +7,7 @@ import { subscribeToPush } from "./push-setup";
 import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
-import { MealPanel } from "./meals";
+import { MealView } from "./meals";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
@@ -214,6 +214,15 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const [weekData, setWeekData] = useState<{ weekStart: string; deadline: string; summary: Summary[] } | null>(null);
   const [uploading, setUploading] = useState(false);
+  // 실험실 식단 인증을 켠 사람만 쓰는 보기 전환 (운동 | 식단). 고른 보기는 이 기기에 기억한다
+  const [viewMode, setViewMode] = useState<"workout" | "diet">(() => {
+    try {
+      return localStorage.getItem("dajjang_view_mode") === "diet" ? "diet" : "workout";
+    } catch {
+      return "workout";
+    }
+  });
+  const [mealRefresh, setMealRefresh] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   const [nameForm, setNameForm] = useState("");
@@ -412,6 +421,17 @@ export default function Home() {
     if (!file) return;
     setUploading(true);
     try {
+      if (me?.labMeal && viewMode === "diet") {
+        // 식단 보기에서는 같은 인증하기 버튼이 식단 사진을 올린다 (AI가 칼로리를 어림잡는다)
+        const res = await fetch("/api/meals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoDataUrl: await compressImage(file, 1024, 0.7) }),
+        });
+        if (!res.ok) alert((await res.json().catch(() => null))?.error || "업로드 실패");
+        else setMealRefresh((n) => n + 1);
+        return;
+      }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
       const res = await fetch("/api/checkins", {
         method: "POST",
@@ -655,12 +675,42 @@ export default function Home() {
           </div>
         )}
 
+        {/* 실험실 식단 인증을 켜면 운동 | 식단 보기 전환이 생긴다. 끄면 기존 화면 그대로 */}
+        {me.labMeal && (
+          <div className="grid grid-cols-2 gap-1 rounded-full bg-white/80 border border-[#ffd6e8] p-1" role="tablist">
+            {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                role="tab"
+                aria-selected={viewMode === mode}
+                onClick={() => {
+                  setViewMode(mode);
+                  try {
+                    localStorage.setItem("dajjang_view_mode", mode);
+                  } catch {
+                    // 저장이 안 되면 다음에 다시 운동 보기로 열릴 뿐이다
+                  }
+                }}
+                className={`rounded-full py-1.5 text-sm font-bold ${
+                  viewMode === mode ? "bg-[#ec4899] text-white shadow-sm" : "text-[#c2679c]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {weekData && myEntry && otherEntry && (
           <section className="space-y-3">
             <p className="text-xs text-[#8a5a1f] font-semibold bg-white/80 inline-block px-3 py-1 rounded-full">
               이번 주 ({new Date(weekData.weekStart).toLocaleDateString("ko-KR")} ~), 월요일 오전 6시 마감
             </p>
 
+            {me.labMeal && viewMode === "diet" ? (
+              <MealView meId={me.id} weekStart={weekData.weekStart} refreshKey={mealRefresh} />
+            ) : (
+            <>
             <Battle
               myCount={myEntry.count}
               otherCount={otherEntry.count}
@@ -721,8 +771,6 @@ export default function Home() {
               ]}
             />
 
-            {me.labMeal && <MealPanel meId={me.id} />}
-
             <ExcusePanel onResolved={loadWeek} />
 
             <button
@@ -769,6 +817,8 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+            )}
+            </>
             )}
           </section>
         )}
@@ -869,7 +919,7 @@ export default function Home() {
                 <span className="space-y-0.5">
                   <span className="block text-sm font-semibold text-[#4a2540]">식단 인증</span>
                   <span className="block text-xs text-[#b4779b]">
-                    먹은 걸 찍어 올리면 AI가 칼로리를 어림잡고, 친구와 같이 볼 수 있어요. 벌금과는 상관없어요.
+                    켜면 홈에 운동 | 식단 전환이 생겨요. 식단 보기에서 인증하기로 먹은 걸 올리면 AI가 칼로리를 어림잡고 친구와 같이 볼 수 있어요. 벌금과는 상관없어요.
                   </span>
                 </span>
                 <input

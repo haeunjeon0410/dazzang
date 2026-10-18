@@ -15,104 +15,92 @@ type Meal = {
   createdAt: string;
 };
 
-// 식단 사진은 분석용이라 운동 인증보다 작게 줄인다 (긴 변 1024px)
-async function compressImage(file: File, maxDim = 1024, quality = 0.7): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas unsupported");
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", quality);
-}
+type MealsData = {
+  people: { id: string; name: string }[];
+  week: { userId: string; day: number; kcal: number }[];
+  day: number;
+  meals: Meal[];
+};
+
+const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" });
 }
 
-// 실험실: 식단 인증. 운동 인증(주 3회/벌금)과 별개로 오늘 먹은 걸 올리면 AI가 칼로리를 추정하고 친구와 공유한다
-export function MealPanel({ meId }: { meId: string }) {
-  const [meals, setMeals] = useState<Meal[] | null>(null);
-  const [uploading, setUploading] = useState(false);
+// 식단 보기. 운동 보기와 같은 주간 표 모양에, 칸마다 그날 먹은 칼로리가 들어간다 (칸을 누르면 그날 식단이 아래에 펼쳐진다)
+export function MealView({ meId, weekStart, refreshKey }: { meId: string; weekStart: string; refreshKey: number }) {
+  const [data, setData] = useState<MealsData | null>(null);
+  // 고른 날(0=월). 처음엔 서버가 정해주는 오늘
+  const [picked, setPicked] = useState<number | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-
-  async function load() {
-    const res = await fetch("/api/meals");
-    if (!res.ok) return;
-    setMeals((await res.json()).meals);
-  }
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    fetch("/api/meals")
+    const q = picked === null ? "" : `?day=${picked}`;
+    let alive = true;
+    fetch(`/api/meals${q}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data && setMeals(data.meals))
+      .then((d) => alive && d && setData(d))
       .catch(() => {});
-  }, []);
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const photoDataUrl = await compressImage(file);
-      const res = await fetch("/api/meals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photoDataUrl }),
-      });
-      if (!res.ok) {
-        alert((await res.json().catch(() => null))?.error || "업로드 실패");
-      } else {
-        await load();
-      }
-    } catch {
-      alert("사진을 올리지 못했어요");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  }
+    return () => {
+      alive = false;
+    };
+  }, [picked, refreshKey, reload]);
 
   async function remove(id: string) {
     if (!confirm("이 식단을 지울까요?")) return;
     const res = await fetch(`/api/meals/${id}`, { method: "DELETE" });
-    if (res.ok) await load();
+    if (res.ok) setReload((n) => n + 1);
   }
 
-  const totals = new Map<string, number>();
-  for (const m of meals ?? []) totals.set(m.userId, (totals.get(m.userId) ?? 0) + (m.kcal ?? 0));
+  const start = new Date(new Date(weekStart).getTime() + KST_OFFSET_MS);
+  const dayDates = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 24 * 60 * 60 * 1000).getUTCDate());
+  const day = data?.day ?? 0;
 
   return (
-    <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-[#4a2540]">
-          오늘의 식단 <span className="ml-1 rounded-full bg-[#ffc72c] px-2 py-0.5 text-[10px] font-bold text-[#6b4a00]">실험실</span>
-        </p>
-        <label className="cursor-pointer">
-          <input type="file" accept="image/*" onChange={handleUpload} className="hidden" disabled={uploading} />
-          <span className="inline-block rounded-full bg-[#ec4899] px-3 py-1.5 text-xs font-bold text-white">
-            {uploading ? "분석 중..." : "식단 올리기"}
-          </span>
-        </label>
-      </div>
-
-      {meals && meals.length > 0 && (
-        <div className="flex flex-wrap gap-2 text-xs text-[#b4779b]">
-          {[...totals].map(([uid, kcal]) => (
-            <span key={uid} className="rounded-full bg-[#ffe1ee] px-2.5 py-1 font-semibold text-[#b4356f]">
-              {meals.find((m) => m.userId === uid)?.name}
-              {uid === meId ? "(나)" : ""} {kcal.toLocaleString()} kcal
-            </span>
+    <div className="space-y-3">
+      <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
+        <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#d9a9c4] mb-2">
+          <div />
+          {DAY_LABELS.map((label, i) => (
+            <div key={label} className={data && i === day ? "font-bold text-[#ec4899]" : ""}>
+              {label}
+              <div className="text-[10px]">{dayDates[i]}</div>
+            </div>
           ))}
         </div>
-      )}
 
-      {meals?.length === 0 && <p className="text-xs text-[#d9a9c4]">아직 올라온 식단이 없어요. 먹기 전에 한 장 찍어 볼까요?</p>}
+        {(data?.people ?? []).map((p) => (
+          <div key={p.id} className="grid grid-cols-8 gap-1 items-center mb-1">
+            <div className="text-xs text-[#b4779b] truncate font-semibold">{p.id === meId ? "나" : p.name}</div>
+            {DAY_LABELS.map((_, i) => {
+              const mine = data!.week.filter((w) => w.userId === p.id && w.day === i);
+              const kcal = mine.reduce((s, w) => s + w.kcal, 0);
+              return (
+                <button
+                  key={i}
+                  onClick={() => setPicked(i)}
+                  className={`aspect-square rounded-md flex flex-col items-center justify-center text-[10px] leading-tight ${
+                    mine.length ? "bg-[#ff8fc0] text-white font-bold" : "bg-[#ffe1ee] text-[#c2679c]"
+                  } ${i === day ? "ring-2 ring-[#ec4899]" : ""}`}
+                >
+                  {mine.length ? (kcal > 0 ? kcal.toLocaleString() : `${mine.length}끼`) : "-"}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+        <p className="mt-2 text-[10px] text-[#d9a9c4]">칸의 숫자는 그날 먹은 칼로리(kcal)예요. 벌금·인증 횟수와는 상관없어요.</p>
+      </div>
 
-      <div className="space-y-3">
-        {meals?.map((m) => (
+      <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4 space-y-3">
+        <p className="text-sm font-bold text-[#4a2540]">
+          {data ? `${DAY_LABELS[day]}요일 식단` : "불러오는 중..."}
+        </p>
+        {data?.meals.length === 0 && <p className="text-xs text-[#d9a9c4]">아직 올라온 식단이 없어요. 아래 인증하기 버튼으로 올려 보세요.</p>}
+        {data?.meals.map((m) => (
           <div key={m.id} className="flex gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={m.photoUrl} alt="" className="h-20 w-20 flex-none rounded-xl object-cover border border-[#ffd6e8]" />
@@ -145,7 +133,6 @@ export function MealPanel({ meId }: { meId: string }) {
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-[#d9a9c4]">칼로리는 사진으로 어림잡은 값이에요. 벌금·인증 횟수와는 상관없어요.</p>
     </div>
   );
 }

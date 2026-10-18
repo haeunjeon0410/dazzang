@@ -1,32 +1,59 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { getDayRange } from "@/lib/week";
+import { getWeekStart } from "@/lib/week";
 import { analyzeMealPhoto } from "@/lib/gemini";
 import { tooManyRequests } from "@/lib/rate-limit";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// 하루는 오전 6시에 바뀐다 (lib/week.ts와 동일)
+const DAY_RESET_MS = 6 * 60 * 60 * 1000;
 const MAX_PHOTO_CHARS = 6 * 1024 * 1024 * 1.4;
 
-// 오늘(오전 6시 기준) 올라온 식단. 방의 두 사람 것이 같이 내려가고, 실험실을 켠 사람만 볼 수 있다
-export async function GET() {
+// 이번 주 식단. 주 전체는 날짜별 칼로리 합계만, 사진이 든 목록은 고른 날(day=0 월 ~ 6 일, 기본 오늘) 것만 내려보낸다.
+// 방의 두 사람 것이 같이 내려가고, 실험실을 켠 사람만 볼 수 있다
+export async function GET(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  if (!me.labMeal) return NextResponse.json({ meals: [] });
+  if (!me.labMeal) return NextResponse.json({ people: [], week: [], day: 0, meals: [] });
 
-  const { start } = getDayRange();
+  const weekStart = getWeekStart();
+  const dayStart = (i: number) => new Date(weekStart.getTime() + DAY_RESET_MS + i * DAY_MS);
+  const todayIdx = Math.min(Math.max(Math.floor((Date.now() - dayStart(0).getTime()) / DAY_MS), 0), 6);
+  // Number(null)이 0(월요일)이 되지 않게, 값이 있을 때만 읽는다
+  const dayRaw = new URL(req.url).searchParams.get("day");
+  const dayParam = dayRaw === null || dayRaw === "" ? NaN : Number(dayRaw);
+  const day = Number.isInteger(dayParam) && dayParam >= 0 && dayParam <= 6 ? dayParam : todayIdx;
+
+  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, select: { id: true, name: true } });
+  const ids = users.map((u) => u.id);
+  const weekMeals = await prisma.meal.findMany({
+    where: { userId: { in: ids }, createdAt: { gte: dayStart(0), lt: dayStart(7) } },
+    select: { userId: true, kcal: true, createdAt: true },
+  });
+  const week = weekMeals.map((m) => ({
+    userId: m.userId,
+    day: Math.floor((m.createdAt.getTime() - dayStart(0).getTime()) / DAY_MS),
+    kcal: m.kcal ?? 0,
+  }));
+
   const meals = await prisma.meal.findMany({
-    where: { createdAt: { gte: start }, user: { roomId: me.roomId } },
+    where: { userId: { in: ids }, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
     orderBy: { createdAt: "desc" },
     take: 30,
-    include: { user: { select: { name: true } } },
   });
+  const nameOf = new Map(users.map((u) => [u.id, u.name]));
   return NextResponse.json({
+    // 나를 먼저
+    people: [...users].sort((a, b) => Number(b.id === userId) - Number(a.id === userId)),
+    week,
+    day,
     meals: meals.map((m) => ({
       id: m.id,
       userId: m.userId,
-      name: m.user.name,
+      name: nameOf.get(m.userId) ?? "",
       photoUrl: m.photoUrl,
       analyzed: m.analyzed,
       title: m.title,
