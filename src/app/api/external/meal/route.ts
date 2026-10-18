@@ -22,7 +22,7 @@ function sniff(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | "heic" 
 // 쿠키가 없어서, 설정에서 만든 개인 코드로 누구의 사진인지 알아낸다. 코드는 주소 끝(?t=코드)이나 Authorization 헤더로 받는다.
 // 사진은 파일 그대로(본문 전체, 또는 양식의 첫 파일)나 예전 방식(JSON의 imageBase64)으로 받는다.
 // 파일로 보내면 응답도 단축어가 바로 "결과 보기"에 띄울 수 있게 글자로 돌려준다.
-// 사진은 AI가 읽은 뒤 "확인 대기" 초안으로 저장되고, 본인이 앱에서 확인(필요하면 수정)해야 친구와 공유된다.
+// 사진은 AI가 읽으면 바로 기록되어 친구와 공유된다(앱에서 나중에 고칠 수 있다). AI가 못 읽었을 때만 "확인 대기" 초안으로 남는다.
 export async function POST(req: NextRequest) {
   const type = (req.headers.get("content-type") ?? "").toLowerCase();
   const asJson = type.includes("application/json");
@@ -85,15 +85,16 @@ export async function POST(req: NextRequest) {
       kcal: draft?.kcal ?? null,
       items: draft?.items ?? undefined,
       fraction: 1,
-      confirmed: false,
+      // AI가 읽은 사진은 바로 기록하고, 못 읽은 사진만 확인 대기로 남긴다
+      confirmed: !!draft,
       source: "shortcut",
     },
   });
 
   const message = draft
-    ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 읽었어요. 앱에서 확인해 주세요`
+    ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 기록했어요`
     : "사진은 올렸어요. 분석은 못 했으니 앱에서 직접 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
-  await sendPushToUser(user, { title: "식단 확인", body: message }).catch(() => {});
+  await sendPushToUser(user, { title: draft ? "식단 기록" : "식단 확인", body: message }).catch(() => {});
   return reply(true, message);
 }
