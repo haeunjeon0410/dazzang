@@ -42,18 +42,18 @@ function markSeen() {
 }
 
 // 마스코트 머리 전체(똥머리, 왕관, 턱까지)를 둥근 네모로 잘라 프로필 사진처럼 쓴다.
-// 스프라이트 칸(384x512)에서 머리가 들어오는 영역을 실제 그림에서 재서 정했다: 왼쪽 위 (26, 28)부터 332px 정사각.
-// 동그라미로 자르면 양옆 똥머리와 왕관이 잘려서 모서리만 둥글게 한다
+// 스프라이트 칸(384x512)에서 머리가 여백까지 들어오는 영역을 8가지 표정 그림으로 확인해 정했다: 왼쪽 위 (18, 20)부터 348px 정사각.
+// 동그라미로 자르면 양옆 똥머리와 왕관이 잘려서 모서리만 둥글게 하고, 테두리는 칸 안쪽을 줄이지 않게 ring으로 둔다
 const AVATAR = 38;
-const HEAD_X = 26;
-const HEAD_Y = 28;
-const HEAD_BOX = 332;
+const HEAD_X = 18;
+const HEAD_Y = 20;
+const HEAD_BOX = 348;
 const AVATAR_SCALE = AVATAR / HEAD_BOX;
 
 function Avatar({ who, pose }: { who: "A" | "B"; pose: (typeof CharPose)[keyof typeof CharPose] }) {
   return (
     <div
-      className="flex-none overflow-hidden rounded-xl border-2 border-white bg-[#fff0f6] shadow"
+      className="flex-none overflow-hidden rounded-md bg-[#fff0f6] shadow ring-2 ring-white"
       style={{ width: AVATAR, height: AVATAR }}
     >
       <div style={{ marginLeft: -HEAD_X * AVATAR_SCALE, marginTop: -HEAD_Y * AVATAR_SCALE }}>
