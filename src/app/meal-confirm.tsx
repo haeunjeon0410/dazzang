@@ -9,10 +9,10 @@ export type ConfirmValues = {
 };
 
 const FRACTIONS: [number, string][] = [
-  [1, "다 먹음"],
-  [0.75, "3/4"],
-  [0.5, "절반"],
   [0.25, "1/4"],
+  [0.5, "절반"],
+  [0.75, "3/4"],
+  [1, "다 먹음"],
 ];
 
 // 식단을 올리기 전(또는 단축어로 올라온 초안을 확인할 때)에 AI가 읽은 내용을 보여주고, 맞는지 보고 고치는 창.
@@ -24,7 +24,6 @@ export function MealConfirm({
   busy,
   onSave,
   onCancel,
-  onDiscard,
 }: {
   photoUrl: string;
   initial: ConfirmValues;
@@ -33,8 +32,6 @@ export function MealConfirm({
   busy?: boolean;
   onSave: (values: ConfirmValues) => void;
   onCancel: () => void;
-  // 단축어로 올라온 초안처럼 이미 올라가 있는 사진을 지울 때만 넘긴다
-  onDiscard?: () => void;
 }) {
   const [title, setTitle] = useState(initial.title);
   const [items, setItems] = useState(initial.items);
@@ -109,13 +106,6 @@ export function MealConfirm({
                 className="w-16 rounded-lg border border-[#ffd6e8] px-2 py-1.5 text-right text-sm text-[#4a2540]"
               />
               <span className="text-[11px] text-[#b4779b]">kcal</span>
-              <button
-                onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                aria-label="이 음식 빼기"
-                className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-xs text-[#c2679c]"
-              >
-                ✕
-              </button>
             </div>
           ))}
           {items.length < 8 && (
@@ -136,12 +126,6 @@ export function MealConfirm({
             </p>
           )}
         </div>
-
-        {onDiscard && (
-          <button onClick={onDiscard} className="w-full text-center text-[11px] text-[#d9a9c4] underline">
-            이 사진 버리기
-          </button>
-        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button onClick={onCancel} className="rounded-xl bg-[#ffeef5] py-2.5 text-sm font-semibold text-[#c2679c]">

@@ -113,15 +113,6 @@ export function MealView({
     }
   }
 
-  async function discardDraft() {
-    if (!draft || !confirm("이 사진을 버릴까요?")) return;
-    const res = await fetch(`/api/meals/${draft.id}`, { method: "DELETE" });
-    if (res.ok) {
-      setDraft(null);
-      setReload((n) => n + 1);
-    }
-  }
-
   function openCell(userId: string, day: number) {
     setDayMeals(null);
     setSlide(0);
@@ -231,7 +222,6 @@ export function MealView({
           busy={draftBusy}
           onSave={saveDraft}
           onCancel={() => setDraft(null)}
-          onDiscard={discardDraft}
         />
       )}
 
