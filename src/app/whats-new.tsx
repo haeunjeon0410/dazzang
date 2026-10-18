@@ -8,59 +8,30 @@ import { CharacterSprite, CharPose, CharRow } from "./sprite";
 const UPDATE_ID = "2026-10-19";
 const SEEN_KEY = "dajjang_seen_update";
 
-type Slide = {
-  emoji: string;
-  title: string;
-  lines: string[];
-  row: (typeof CharRow)[keyof typeof CharRow];
-  pose: (typeof CharPose)[keyof typeof CharPose];
-  // 식단 인증(실험실)을 켠 사람에게만 해당하는 소식
-  mealOnly?: boolean;
-  // 식단 인증을 아직 안 켠 사람에게만 보여줄 소식
-  noMealOnly?: boolean;
-};
+// 방 친구 둘(마스코트 A, B)이 메신저로 수다 떨듯이 소식을 알려준다. 말풍선이 하나씩 떠오른다
+type Line = { from: "A" | "B"; text: string; pose?: (typeof CharPose)[keyof typeof CharPose] };
 
-const SLIDES: Slide[] = [
-  {
-    emoji: "📸",
-    title: "식단, 알아서 기록돼요!",
-    lines: ["사진만 올리면 AI가 음식과 칼로리를 바로 적어줘요", "아이폰 동작 버튼으로 찍어도 확인 없이 기록돼요"],
-    row: CharRow.A,
-    pose: CharPose.WIN,
-    mealOnly: true,
-  },
-  {
-    emoji: "✏️",
-    title: "틀렸으면 고치면 돼요",
-    lines: ["식단 창에서 [수정]을 누르면", "음식 이름도, 먹은 양(1/4 · 절반 · 3/4)도 바꿀 수 있어요"],
-    row: CharRow.B,
-    pose: CharPose.NEUTRAL,
-    mealOnly: true,
-  },
-  {
-    emoji: "🔔",
-    title: "밥 먹기 전에 콕!",
-    lines: ["내 정보 → 실험실에서 식사 알림을 켜면", "점심 · 저녁 시간에 식단 올리라고 알려줘요"],
-    row: CharRow.A,
-    pose: CharPose.NEUTRAL,
-    mealOnly: true,
-  },
-  {
-    emoji: "🧪",
-    title: "실험실이 생겼어요",
-    lines: ["내 정보 → 실험실에서 식단 인증을 켜 보세요", "AI가 칼로리를 알려줘요 (벌금과는 상관없어요)"],
-    row: CharRow.A,
-    pose: CharPose.WIN,
-    noMealOnly: true,
-  },
-  {
-    emoji: "🗑️",
-    title: "인증샷 지울 수 있어요",
-    lines: ["내가 올린 사진을 누르면 오른쪽 위에 ✕가 떠요", "잘못 올렸다면 지우고 다시 올려 주세요"],
-    row: CharRow.B,
-    pose: CharPose.SAD,
-  },
+const MEAL_CHAT: Line[] = [
+  { from: "A", text: "식단 이제 사진만 올리면 AI가 칼로리까지 알아서 적어줘! 📸", pose: CharPose.WIN },
+  { from: "B", text: "헐 틀리게 읽으면 어떡해? 😳", pose: CharPose.PLEAD },
+  { from: "A", text: "식단 창에서 [수정]! 음식 이름도 먹은 양도 고칠 수 있어 ✏️", pose: CharPose.NEUTRAL },
+  { from: "A", text: "식사 알림 켜면 점심·저녁에 콕 알려줘 🔔\n(내 정보 → 실험실)", pose: CharPose.NEUTRAL },
+  { from: "B", text: "인증샷 잘못 올렸는데ㅠㅠ", pose: CharPose.PLEAD },
+  { from: "A", text: "사진 누르고 오른쪽 위 ✕로 지우면 돼! 🗑️", pose: CharPose.WIN },
+  { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },
 ];
+
+const NO_MEAL_CHAT: Line[] = [
+  { from: "A", text: "실험실이 생겼어! 🧪 식단 인증을 켜면 AI가 칼로리를 알려줘", pose: CharPose.WIN },
+  { from: "B", text: "벌금이랑은 상관없는 거지?", pose: CharPose.PLEAD },
+  { from: "A", text: "응! 내 정보 → 실험실에서 켜 봐 💗", pose: CharPose.NEUTRAL },
+  { from: "B", text: "인증샷 잘못 올렸는데ㅠㅠ", pose: CharPose.PLEAD },
+  { from: "A", text: "사진 누르고 오른쪽 위 ✕로 지우면 돼! 🗑️", pose: CharPose.WIN },
+  { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },
+];
+
+// 말풍선이 하나씩 뜨는 간격(ms)
+const STEP_MS = 650;
 
 function alreadySeen(): boolean {
   try {
@@ -78,17 +49,24 @@ function markSeen() {
   }
 }
 
+// 마스코트 얼굴만 동그랗게 잘라 프로필 사진처럼 쓴다
+function Avatar({ who, pose }: { who: "A" | "B"; pose: (typeof CharPose)[keyof typeof CharPose] }) {
+  return (
+    <div className="h-10 w-10 flex-none overflow-hidden rounded-full border-2 border-white bg-[#fff0f6] shadow">
+      <div style={{ marginLeft: -22, marginTop: -14 }}>
+        <CharacterSprite row={who === "A" ? CharRow.A : CharRow.B} pose={pose} height={112} />
+      </div>
+    </div>
+  );
+}
+
 export function WhatsNew({ ready, labMeal }: { ready: boolean; labMeal: boolean }) {
   // 로그인 정보가 오기 전(ready=false)에는 아무것도 그리지 않으므로, 서버 렌더와 어긋날 일이 없다
   const [show, setShow] = useState(() => !alreadySeen());
-  const [page, setPage] = useState(0);
 
   if (!ready || !show) return null;
 
-  const slides = SLIDES.filter((s) => (s.mealOnly ? labMeal : s.noMealOnly ? !labMeal : true));
-  // 0쪽은 인사, 그다음부터 소식 한 장씩
-  const last = slides.length;
-  const slide = page > 0 ? slides[page - 1] : null;
+  const chat = labMeal ? MEAL_CHAT : NO_MEAL_CHAT;
 
   function close() {
     markSeen();
@@ -97,76 +75,60 @@ export function WhatsNew({ ready, labMeal }: { ready: boolean; labMeal: boolean 
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="celebrate-pop relative w-full max-w-[19.5rem] overflow-hidden rounded-3xl border-2 border-[#ffc2dc] bg-white p-5 text-center shadow-xl">
-        {/* 반짝이 장식 */}
-        <span className="pointer-events-none absolute left-4 top-4 animate-pulse text-sm text-[#ffc72c]">✦</span>
-        <span className="pointer-events-none absolute right-12 top-7 animate-pulse text-xs text-[#f472b6] [animation-delay:400ms]">✦</span>
-        <span className="pointer-events-none absolute left-7 top-24 animate-pulse text-xs text-[#f9a8d4] [animation-delay:800ms]">✦</span>
-
-        <button
-          onClick={close}
-          aria-label="닫기"
-          className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-[#ffeef5] text-sm text-[#c2679c]"
-        >
-          ✕
-        </button>
-
-        <div key={page} className="celebrate-pop space-y-3">
-          {slide === null ? (
-            <>
-              <div className="flex items-end justify-center gap-1 pt-2">
-                <CharacterSprite row={CharRow.A} pose={CharPose.WIN} height={104} className="celebrate-hop" />
-                <CharacterSprite row={CharRow.B} pose={CharPose.WIN} height={104} className="celebrate-hop [animation-delay:250ms]" />
-              </div>
-              <p className="text-base font-black text-[#4a2540]">다짱이 이만큼 좋아졌어요 ✨</p>
-              <p className="text-xs text-[#b4779b]">넘겨 보면서 뭐가 달라졌는지 확인해 보세요</p>
-            </>
-          ) : (
-            <>
-              <div className="pt-2">
-                <CharacterSprite row={slide.row} pose={slide.pose} height={92} className="mx-auto" />
-              </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-[#ffc2dc] bg-[#fff0f6] px-3 py-1 text-base font-black text-[#b4356f]">
-                <span>{slide.emoji}</span>
-                <span className="text-sm">{slide.title}</span>
-              </div>
-              <div className="space-y-1.5 rounded-2xl bg-[#fff0f6] px-3 py-3">
-                {slide.lines.map((l) => (
-                  <p key={l} className="break-keep text-[13px] font-semibold leading-snug text-[#4a2540]">
-                    {l}
-                  </p>
-                ))}
-              </div>
-            </>
-          )}
+      <div className="celebrate-pop flex max-h-[88vh] w-full max-w-[20rem] flex-col overflow-hidden rounded-3xl border-2 border-[#ffc2dc] bg-white shadow-xl">
+        {/* 메신저 상단 바 */}
+        <div className="flex flex-none items-center justify-between bg-[#ffe1ee] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="flex -space-x-2">
+              <Avatar who="A" pose={CharPose.NEUTRAL} />
+              <Avatar who="B" pose={CharPose.NEUTRAL} />
+            </span>
+            <div className="text-left leading-tight">
+              <p className="text-sm font-black text-[#4a2540]">다짱 새 소식</p>
+              <p className="text-[11px] font-semibold text-[#b4779b]">
+                <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#2f9e44] align-middle" />
+                방금 업데이트됐어요
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={close}
+            aria-label="닫기"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-sm text-[#c2679c]"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-1.5">
-          {Array.from({ length: last + 1 }, (_, i) => (
-            <span key={i} className={`h-1.5 rounded-full transition-all ${i === page ? "w-4 bg-[#de73a5]" : "w-1.5 bg-[#ffd6e8]"}`} />
-          ))}
+        {/* 수다: 말풍선이 하나씩 떠오른다 */}
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto bg-[#fff7fb] px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {chat.map((l, i) => {
+            const mine = l.from === "B";
+            return (
+              <div
+                key={i}
+                className={`celebrate-pop flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}
+                style={{ animationDelay: `${300 + i * STEP_MS}ms` }}
+              >
+                <Avatar who={l.from} pose={l.pose ?? CharPose.NEUTRAL} />
+                <p
+                  className={`max-w-[75%] whitespace-pre-line break-keep rounded-2xl px-3 py-2 text-left text-[13px] font-semibold leading-snug ${
+                    mine
+                      ? "rounded-br-sm bg-[#dbe9ff] text-[#2b3d5c]"
+                      : "rounded-bl-sm border border-[#ffd6e8] bg-white text-[#4a2540]"
+                  }`}
+                >
+                  {l.text}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
-        <div className="mt-4 grid grid-cols-[auto_1fr] gap-2">
-          {page > 0 ? (
-            <button onClick={() => setPage((p) => p - 1)} className="rounded-xl bg-[#ffeef5] px-4 py-3 text-sm font-semibold text-[#c2679c]">
-              이전
-            </button>
-          ) : (
-            <span />
-          )}
-          {page < last ? (
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              className="col-start-2 rounded-xl bg-[#de73a5] py-3 text-sm font-bold text-white"
-            >
-              {page === 0 ? "구경하기" : "다음"}
-            </button>
-          ) : (
-            <button onClick={close} className="col-start-2 rounded-xl bg-[#de73a5] py-3 text-sm font-bold text-white">
-              알겠어요! 💗
-            </button>
-          )}
+        <div className="flex-none bg-white p-3">
+          <button onClick={close} className="w-full rounded-xl bg-[#de73a5] py-3 text-sm font-bold text-white">
+            알겠어요! 💗
+          </button>
         </div>
       </div>
     </div>
