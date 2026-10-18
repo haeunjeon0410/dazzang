@@ -247,7 +247,8 @@ export function MealView({
             items:
               target.items && target.items.length
                 ? target.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? target.fraction ?? 1 }))
-                : [{ name: "", kcal: 0, fraction: 1 }],
+                : // 음식별 기록이 없는 식단은 제목을 음식 한 줄로 두어, 고쳐도 칼로리가 0으로 날아가지 않게 한다
+                  [{ name: target.title ?? "", kcal: target.kcal ?? 0, fraction: 1 }],
           }}
           aiRead={target.analyzed}
           busy={draftBusy}

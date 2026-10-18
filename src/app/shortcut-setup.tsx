@@ -127,7 +127,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             동작 버튼 → 음식 찍기 → <B>사진 사용</B>
           </Line>
           <Line n={9}>
-            &ldquo;식단 확인&rdquo; 알림이 오면 성공. 앱 식단 화면의 <B>확인하기</B> 배너에서 저장
+            &ldquo;식단 기록&rdquo; 알림이 오면 성공. 틀렸으면 앱 식단 화면에서 <B>수정</B>
           </Line>
         </>
       ),
