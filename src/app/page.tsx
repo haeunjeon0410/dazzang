@@ -596,7 +596,7 @@ export default function Home() {
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
       >
         <header className="flex items-center justify-between pt-4" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
-          <h1 className="text-xl font-black text-[#ec4899]">
+          <h1 className="text-xl font-black text-[#ec4899] [text-shadow:0_1px_0_#fff,0_0_6px_#fff]">
             다짱 <span className="text-[#4a2540] font-bold text-base">· {me.name}님</span>
           </h1>
           <div className="hdr-icons flex items-center gap-2">
@@ -743,12 +743,16 @@ export default function Home() {
             )}
 
             {myEntry.fine > 0 && !hasGroupAccount && (
-              <div className={`${CARD} space-y-1`}>
+              // 한 줄로 줄인 안내: 벌금 금액은 위 대결 카드에도 있어서 카드를 낮추고 통장 등록만 오른쪽에 둔다
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-4 py-3">
                 <p className="text-sm font-bold text-[#4a2540]">
                   지금 마감되면 벌금 {myEntry.fine.toLocaleString()}원
                 </p>
-                <button onClick={() => setGroupAccountOpen(true)} className="text-xs text-[#ec4899] underline">
-                  모임 통장을 등록하면 여기서 바로 송금 정보가 떠요
+                <button
+                  onClick={() => setGroupAccountOpen(true)}
+                  className="flex-none rounded-full bg-[#ffe1ee] px-3 py-1 text-xs font-bold text-[#b4356f]"
+                >
+                  통장 등록
                 </button>
               </div>
             )}
