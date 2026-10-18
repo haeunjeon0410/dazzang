@@ -10,7 +10,7 @@ export type LabFeature = (typeof LAB_FEATURES)[number];
 // 제안할 수 있는 금액 (0 = 벌금 없음)
 export const FINE_CHOICES = [0, 5000, 10000, 15000, 20000, 25000, 30000];
 
-export type LabUser = { id: string; labWeight: boolean };
+export type LabUser = { id: string };
 export type LabFine = { weight: number; total: number };
 
 export const noLabFine: LabFine = { weight: 0, total: 0 };
@@ -32,8 +32,9 @@ export async function labFinesFor(
   if (!rule || rule.amount <= 0 || !rule.sinceWeek) return out;
   const since = rule.sinceWeek.getTime();
 
-  const ids = users.filter((u) => u.labWeight).map((u) => u.id);
-  if (ids.length === 0) return out;
+  // 친구와 같이 하는 기능이라 두 사람이 모두 있는 방에서만 벌금이 있다
+  if (users.length < 2) return out;
+  const ids = users.map((u) => u.id);
   const maxWeek = Math.max(...weekStarts.map((w) => w.getTime()));
   const logs = await prisma.weightLog.findMany({
     where: { userId: { in: ids }, weekStart: { lte: new Date(maxWeek) } },
@@ -64,8 +65,8 @@ export type WeightTrend = "up" | "down" | "same";
 // 몸무게 인증을 켠 사람만, 이번 주 기록과 비교할 전 기록이 모두 있을 때만 값이 있다
 export async function weightTrendsFor(users: LabUser[], weekStart: Date): Promise<Map<string, WeightTrend>> {
   const out = new Map<string, WeightTrend>();
-  const ids = users.filter((u) => u.labWeight).map((u) => u.id);
-  if (ids.length === 0) return out;
+  if (users.length < 2) return out;
+  const ids = users.map((u) => u.id);
   const logs = await prisma.weightLog.findMany({
     where: { userId: { in: ids }, weekStart: { lte: weekStart } },
     orderBy: { weekStart: "desc" },

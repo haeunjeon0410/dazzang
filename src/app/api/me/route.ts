@@ -29,14 +29,11 @@ export async function GET() {
       name: user.name,
       caption: user.captions[0] ?? "",
       restUntil: restUntil?.toISOString() ?? null,
-      labMeal: user.labMeal,
-      labWeight: user.labWeight,
-      labDismissed: user.labDismissed,
-      // 몸무게 인증을 켰는데 이번 주 체중계 인증을 아직 안 했는지 (홈 배너용)
-      weightPending: user.labWeight && (await prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } })) === 0,
-      mealToken: user.labMeal ? user.mealToken : null,
+      // 이번 주 몸무게 인증(체중계 사진)을 아직 안 했는지 (홈 배너용). 식단/몸무게 인증은 모두에게 기본 기능이고, 친구가 들어온 방에서만 띄운다
+      weightPending: !!other && (await prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } })) === 0,
+      mealToken: user.mealToken,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
-      pendingMeals: user.labMeal ? await prisma.meal.count({ where: { userId: user.id, confirmed: false } }) : 0,
+      pendingMeals: await prisma.meal.count({ where: { userId: user.id, confirmed: false } }),
     },
     room: {
       inviteToken: user.room.inviteToken,
@@ -56,9 +53,6 @@ export async function GET() {
           name: other.name,
           caption: other.captions[0] ?? "",
           resting: other.rests.some((r) => r.fromWeek <= now && r.untilWeek > now),
-          // 친구가 켠 실험실 기능 (켰는지만 알려주고 기록은 내려보내지 않는다). "같이 할래요?" 팝업용
-          labMeal: other.labMeal,
-          labWeight: other.labWeight,
         }
       : null,
   });
@@ -68,37 +62,7 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption, labMeal, labWeight, dismissLab } = await req.json();
-
-  // 친구가 켠 실험실 기능에 "같이 하기"를 거절했다는 표시
-  if (dismissLab !== undefined) {
-    if (dismissLab !== "meal" && dismissLab !== "weight") {
-      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
-    }
-    const cur = await prisma.user.findUnique({ where: { id: userId }, select: { labDismissed: true } });
-    if (cur && !cur.labDismissed.includes(dismissLab)) {
-      await prisma.user.update({ where: { id: userId }, data: { labDismissed: [...cur.labDismissed, dismissLab] } });
-    }
-    return NextResponse.json({ ok: true });
-  }
-
-  // 실험실 몸무게 인증 켜기/끄기 (끄면 입력창만 사라지고 기록은 남는다)
-  if (labWeight !== undefined) {
-    if (typeof labWeight !== "boolean") {
-      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
-    }
-    await prisma.user.update({ where: { id: userId }, data: { labWeight } });
-    return NextResponse.json({ ok: true });
-  }
-
-  // 실험실 식단 인증 켜기/끄기
-  if (labMeal !== undefined) {
-    if (typeof labMeal !== "boolean") {
-      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
-    }
-    await prisma.user.update({ where: { id: userId }, data: { labMeal } });
-    return NextResponse.json({ ok: true });
-  }
+  const { name, caption } = await req.json();
 
   // 말풍선 멘트 수정 (User.captions[0]에 하나만 저장, 비우면 인증 횟수별 기본 멘트)
   if (caption !== undefined) {

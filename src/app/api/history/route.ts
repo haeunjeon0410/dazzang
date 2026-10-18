@@ -30,13 +30,11 @@ export async function GET() {
     prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
     prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } } }),
-    // 실험실 식단 인증을 켠 사람에게만 평균 칼로리를 보여주려고 식단은 칼로리와 시각만 가져온다
-    me.labMeal
-      ? prisma.meal.findMany({
-          where: { userId: { in: userIds }, createdAt: { gte: oldest, lt: currentWeekStart } },
-          select: { userId: true, kcal: true, createdAt: true },
-        })
-      : Promise.resolve([] as { userId: string; kcal: number | null; createdAt: Date }[]),
+    // 주별 하루 평균 칼로리를 내려주려고 식단은 칼로리와 시각만 가져온다
+    prisma.meal.findMany({
+      where: { userId: { in: userIds }, createdAt: { gte: oldest, lt: currentWeekStart } },
+      select: { userId: true, kcal: true, createdAt: true },
+    }),
   ]);
 
   const labFines = await labFinesFor(me.roomId, users, weekStarts);

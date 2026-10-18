@@ -5,19 +5,20 @@ import { CharacterSprite, CharPose, CharRow } from "./sprite";
 
 // 새 소식 팝업. 업데이트가 있을 때마다 UPDATE_ID를 바꾸면, 앱을 처음 여는 순간 한 번만 보여준다.
 // 어느 소식을 이 기기에서 이미 봤는지는 localStorage에 기억한다 (못 쓰면 열 때마다 뜨는 정도)
-const UPDATE_ID = "2026-10-19";
+const UPDATE_ID = "2026-10-20";
 const SEEN_KEY = "dajjang_seen_update";
 
 // 방 친구 둘(마스코트 A, B)이 메신저로 수다 떨듯이 소식을 알려준다. 말풍선이 하나씩 떠오른다
 type Line = { from: "A" | "B"; text: string; pose?: (typeof CharPose)[keyof typeof CharPose] };
 
 const CHAT: Line[] = [
-  { from: "A", text: "설정 → 실험실에 AI 식단 기능이 생겼어! 🧪\n사진만 올리면 칼로리를 계산해 줘", pose: CharPose.WIN },
+  { from: "A", text: "이제 식단 인증이 기본 기능이 됐어! 🍱\n사진만 올리면 AI가 칼로리를 계산해 줘", pose: CharPose.WIN },
   { from: "B", text: "올리기 귀찮은데…", pose: CharPose.SAD },
-  { from: "A", text: "동작 버튼 연동하면 훨씬 간단하게 등록돼! 📸", pose: CharPose.NEUTRAL },
-  { from: "B", text: "AI가 틀리게 읽으면?", pose: CharPose.PLEAD },
-  { from: "A", text: "메뉴랑 먹은 양을 직접 수정할 수 있어! ✏️", pose: CharPose.WIN },
-  { from: "B", text: "완전 좋다 💗", pose: CharPose.WIN },
+  { from: "A", text: "아이폰이면 설정 → 실험실에서\n동작 버튼을 연동하면 훨씬 간단해! 📸", pose: CharPose.NEUTRAL },
+  { from: "B", text: "몸무게도 있다던데?", pose: CharPose.NEUTRAL },
+  { from: "A", text: "일주일에 한 번 체중계 사진으로 인증해!\n몸무게는 AI만 확인하고 친구는 ▲▼만 보여", pose: CharPose.WIN },
+  { from: "B", text: "안 하면…?", pose: CharPose.PLEAD },
+  { from: "A", text: "늘거나 인증을 안 하면 벌금! 💸\n금액은 설정 → 실험실에서 친구랑 정해", pose: CharPose.SAD },
 ];
 
 // 말풍선이 하나씩 뜨는 간격(ms)

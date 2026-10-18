@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { estimateKcals } from "@/lib/meal-ai";
 import { tooManyRequests } from "@/lib/rate-limit";
@@ -9,8 +8,6 @@ import { takeAiQuota } from "@/lib/ai-quota";
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  const me = await prisma.user.findUnique({ where: { id: userId }, select: { labMeal: true } });
-  if (!me?.labMeal) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
   if (tooManyRequests(`meal-est:${userId}`, 30)) {
     return NextResponse.json({ error: "너무 빨라요. 잠시 뒤에 다시 해 주세요" }, { status: 429 });
   }

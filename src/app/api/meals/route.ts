@@ -53,7 +53,6 @@ export async function GET(req: Request) {
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  if (!me.labMeal) return NextResponse.json({ people: [], week: [], day: 0, meals: [], pendingCount: 0 });
 
   const url = new URL(req.url);
   if (url.searchParams.get("pending")) {
@@ -116,7 +115,6 @@ export async function POST(req: Request) {
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   // 식단이나 몸무게 인증 중 하나라도 켜져 있어야 사진을 AI로 가려낼 수 있다 (저장은 식단 인증이 켜진 사람만)
-  if (!me.labMeal && !me.labWeight) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
   // 사진 분석에는 크레딧이 들어서 사람당 분당 6장까지
   if (tooManyRequests(`meal:${userId}`, 6)) {
     return NextResponse.json({ error: "너무 빨라요. 잠시 뒤에 다시 올려 주세요" }, { status: 429 });
@@ -132,7 +130,6 @@ export async function POST(req: Request) {
   }
 
   if (mode === "save") {
-    if (!me.labMeal) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
     const input = parseMealInput(body);
     if (!input) return NextResponse.json({ error: "음식 이름을 적어 주세요" }, { status: 400 });
     const meal = await prisma.meal.create({
@@ -156,15 +153,14 @@ export async function POST(req: Request) {
   if (quota !== "ok") return NextResponse.json({ kind: "limit", reason: quota });
   const analysis = await analyzeMealPhoto(photoDataUrl);
   if (!analysis) return NextResponse.json({ kind: "unknown" });
-  // 체중계/체중 앱 사진은 몸무게 인증을 켠 사람만 몸무게로 보낸다 (사진은 저장하지 않고 숫자만 돌려준다)
-  if (analysis.scaleKg && me.labWeight) {
+  // 체중계/체중 앱 사진은 몸무게로 보낸다 (사진은 저장하지 않고 숫자만 돌려준다)
+  if (analysis.scaleKg) {
     // 이번 주에 찍은 사진만 인정한다 (운동 인증과 같은 규칙)
     const dateCheck = checkThisWeek(body.takenAt);
     if (!dateCheck.ok) return NextResponse.json({ error: dateCheck.error }, { status: 400 });
     // 바로 기록하지 않는다: 읽은 숫자에 서명한 토큰을 돌려주고, 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록한다
     return NextResponse.json({ kind: "weight", kg: analysis.scaleKg, token: signWeight(userId, analysis.scaleKg) });
   }
-  // 음식 사진이라도 식단 인증이 꺼져 있으면 식단으로 만들지 않는다
-  if (!analysis.isFood || !me.labMeal) return NextResponse.json({ kind: "other" });
+  if (!analysis.isFood) return NextResponse.json({ kind: "other" });
   return NextResponse.json({ kind: "draft", draft: draftFromAnalysis(analysis) });
 }

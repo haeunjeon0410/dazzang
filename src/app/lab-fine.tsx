@@ -122,9 +122,9 @@ export function FineSetting({
   }
 
   return (
-    <div className="ml-2 mt-2 flex items-center gap-2 border-l-2 border-[#f6c3d8] pl-3">
+    <div className="flex items-center gap-2 border-t border-[#ffd6e8] pt-2">
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-[#4a2540]">벌금</span>
+        <span className="block text-sm font-semibold text-[#4a2540]">몸무게 벌금</span>
         <span className="block text-xs text-[#b4779b]">늘거나 인증을 안 하면 벌금이에요</span>
       </span>
       <span className="flex min-w-0 items-center gap-1.5">{right}</span>

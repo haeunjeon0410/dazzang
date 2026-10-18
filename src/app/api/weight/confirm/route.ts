@@ -9,8 +9,6 @@ import { verifyWeight } from "@/lib/weight-token";
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  const me = await prisma.user.findUnique({ where: { id: userId }, select: { labWeight: true } });
-  if (!me?.labWeight) return NextResponse.json({ error: "실험실에서 몸무게 인증을 먼저 켜 주세요" }, { status: 403 });
 
   const body = await req.json().catch(() => null);
   const kg = verifyWeight(body?.token, userId);

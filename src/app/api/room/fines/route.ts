@@ -45,16 +45,12 @@ export async function POST(req: NextRequest) {
   const feature = body?.feature as LabFeature;
   if (!LAB_FEATURES.includes(feature)) return NextResponse.json({ error: "요청 형식이 올바르지 않아요" }, { status: 400 });
 
-  // 합의는 두 사람이 모두 그 기능을 켠 방에서만 할 수 있다
+  // 합의는 친구가 들어온 방에서만 할 수 있다
   const other = await prisma.user.findFirst({
     where: { roomId: me.roomId, id: { not: userId } },
     include: { subscriptions: true },
   });
-  const isOn = (u: { labWeight: boolean }) => u.labWeight;
   if (!other) return NextResponse.json({ error: "친구가 들어온 뒤에 정할 수 있어요" }, { status: 400 });
-  if (!isOn(me) || !isOn(other)) {
-    return NextResponse.json({ error: "두 사람 모두 이 기능을 켜야 벌금을 정할 수 있어요" }, { status: 400 });
-  }
 
   const where = { roomId_feature: { roomId: me.roomId, feature } };
   const rule = await prisma.labFineRule.findUnique({ where });

@@ -9,9 +9,6 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const me = await prisma.user.findUnique({ where: { id: userId }, select: { labWeight: true } });
-  if (!me?.labWeight) return NextResponse.json({ enabled: false });
-
   const logs = await prisma.weightLog.findMany({
     where: { userId },
     orderBy: { weekStart: "desc" },

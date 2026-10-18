@@ -50,9 +50,6 @@ type Me = {
   name: string;
   caption?: string;
   restUntil?: string | null;
-  labMeal?: boolean;
-  labWeight?: boolean;
-  labDismissed?: string[];
   weightPending?: boolean;
   mealToken?: string | null;
   pendingMeals?: number;
@@ -209,9 +206,7 @@ export default function Home() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
   const [otherResting, setOtherResting] = useState(false);
-  // 친구가 켠 실험실 기능 (같이 할래요? 팝업용)
   const [fines, setFines] = useState<FineSnapshot | null>(null);
-  const [otherLab, setOtherLab] = useState<{ meal: boolean; weight: boolean }>({ meal: false, weight: false });
   const [room, setRoom] = useState<Room | null>(null);
   // 쉬어가기를 수락하는 순간: 카드들이 우수수 떨어지고 앱 전체가 흑백으로 변한다
   const [pauseFalling, setPauseFalling] = useState(false);
@@ -271,7 +266,6 @@ export default function Home() {
     setRoom(data.room ?? null);
     setOtherCaption(data.other?.caption);
     setOtherResting(!!data.other?.resting);
-    setOtherLab({ meal: !!data.other?.labMeal, weight: !!data.other?.labWeight });
     if (data.user) setNameForm(data.user.name ?? "");
     if (data.room) {
       setGroupForm({
@@ -480,7 +474,7 @@ export default function Home() {
     if (!file) return;
     setUploading(true);
     try {
-      if (me?.labMeal || me?.labWeight) {
+      if (me) {
         // 실험실 식단/몸무게 인증이 켜져 있으면 AI가 사진을 보고 체중계면 몸무게에, 음식이면 식단에, 아니면 운동 인증으로 보낸다.
         // AI가 판단하지 못하면(키 없음/실패) 지금 보고 있는 보기(운동 | 식단)를 따른다
         const [mealPhoto, shotAt] = await Promise.all([compressImage(file, 1024, 0.7), readTakenAt(file)]);
@@ -522,21 +516,21 @@ export default function Home() {
           setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
-        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet" && me.labMeal) {
+        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
           // AI를 못 쓰는 상태(키 없음, 실패, 오늘 한도 초과): 직접 적을 수 있게 빈 확인 창을 연다
           if (data.kind === "limit") setToast(`${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 직접 적어 주세요`);
           setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
           return;
         }
         // 식단 보기에서 올렸는데 AI가 음식으로 못 읽었으면 운동으로 보내지 말고 직접 적게 한다 (음식 사진을 잘못 읽어도 사진이 사라지지 않게)
-        if (data?.kind === "other" && viewMode === "diet" && me.labMeal) {
+        if (data?.kind === "other" && viewMode === "diet") {
           setToast("음식으로 읽지 못했어요. 직접 적어 주세요");
           setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다
-        if (data?.kind === "other" && me.labMeal) setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
-        if (me.labMeal) setViewMode("workout");
+        if (data?.kind === "other") setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
+        setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
       const res = await fetch("/api/checkins", {
@@ -693,8 +687,8 @@ export default function Home() {
   const myEntry = weekData?.summary.find((s) => s.userId === me.id);
   const otherEntry = weekData?.summary.find((s) => s.userId !== me.id);
   const hasGroupAccount = !!room?.groupAccountNumber;
-  // 실험실 식단 인증을 켜면 주간 표 카드 맨 위에 제목과 운동 | 식단 전환이 생긴다. 끄면 기존 화면 그대로
-  const calendarHeader = me.labMeal ? (
+  // 주간 표 카드 맨 위에 제목과 운동 | 식단 전환
+  const calendarHeader = (
     <div className="mb-3 flex items-center justify-between">
       <p className="text-sm font-bold text-[#4a2540]">{viewMode === "diet" ? "먹은 칼로리" : "운동 인증"}</p>
       <div className="grid w-28 grid-cols-2 gap-0.5 rounded-full bg-[#fff0f6] border border-[#ffd6e8] p-0.5" role="tablist">
@@ -727,7 +721,7 @@ export default function Home() {
         ))}
       </div>
     </div>
-  ) : null;
+  );
 
   return (
     <>
@@ -755,7 +749,7 @@ export default function Home() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/nav/total.webp" alt="" className="w-6 h-6 object-contain" />
             </button>
-            {me.labWeight && (
+            {(
               <button
                 onClick={() => setGraphOpen(true)}
                 className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
@@ -844,7 +838,7 @@ export default function Home() {
           <section className="space-y-3">
             {/* 몸무게 인증을 켰는데 이번 주 인증을 아직 안 했으면 맨 위에 알려준다 (다른 카드와 구분되게 노란 픽셀 테두리).
                 마감 하루 전부터는 빨간색으로 바뀌고 자동 벌금을 알려준다 */}
-            {me.labWeight && me.weightPending && (() => {
+            {me.weightPending && (() => {
               const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0;
               const lastDay = !!weekData && new Date(weekData.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000;
               return (
@@ -932,7 +926,7 @@ export default function Home() {
             )}
 
 
-            {me.labMeal && viewMode === "diet" ? (
+            {viewMode === "diet" ? (
               <MealView
                 meId={me.id}
                 refreshKey={mealRefresh}
@@ -998,7 +992,7 @@ export default function Home() {
         </div>
       )}
 
-      {graphOpen && me.labWeight && (
+      {graphOpen && (
         <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0} onClose={() => setGraphOpen(false)} />
       )}
 
@@ -1092,71 +1086,13 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 실험실: 아직 다듬는 중인 기능을 켜고 끈다 */}
+            {/* 실험실: 아직 다듬는 중인 기능 (식단/몸무게 인증은 이제 모두의 기본 기능이라 여기 없다) */}
             <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
               <p className="text-sm font-bold text-[#4a2540]">
                 실험실 <span className="ml-1 rounded-full bg-[#ffc72c] px-2 py-0.5 text-[10px] font-bold text-[#6b4a00]">BETA</span>
               </p>
-              <label className="flex items-center justify-between gap-3">
-                <span className="space-y-0.5">
-                  <span className="block text-sm font-semibold text-[#4a2540]">식단 인증</span>
-                  <span className="block text-xs text-[#b4779b]">
-                    먹은 걸 올리면 AI가 칼로리를 알려줘요.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!!me.labMeal}
-                  onChange={async (e) => {
-                    const next = e.target.checked;
-                    setMe((m) => (m ? { ...m, labMeal: next } : m));
-                    const res = await fetch("/api/me", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ labMeal: next }),
-                    });
-                    if (!res.ok) {
-                      alert("저장에 실패했어요");
-                      await loadMe();
-                    }
-                  }}
-                  className="h-6 w-6 flex-none accent-[#de73a5]"
-                />
-              </label>
-              {me.labMeal && <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />}
-              <label className="flex items-center justify-between gap-3 border-t border-[#ffd6e8] pt-2">
-                <span className="space-y-0.5">
-                  <span className="block text-sm font-semibold text-[#4a2540]">몸무게 인증</span>
-                  <span className="block text-xs text-[#b4779b]">
-                    일주일에 한 번 체중계 사진으로 기록해요.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!!me.labWeight}
-                  onChange={async (e) => {
-                    const next = e.target.checked;
-                    // 저장이 끝난 뒤에 카드를 띄워야 카드가 켜진 상태를 바로 읽는다
-                    const res = await fetch("/api/me", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ labWeight: next }),
-                    });
-                    if (!res.ok) {
-                      alert("저장에 실패했어요");
-                      await loadMe();
-                      return;
-                    }
-                    setMe((m) => (m ? { ...m, labWeight: next } : m));
-                    // 켜면 설정 창을 닫아서 홈의 몸무게 인증 배너가 바로 보이게 한다 (첫 몸무게도 배너의 인증하기로 올린다)
-                    if (next) setSettingsOpen(false);
-                  }}
-                  className="h-6 w-6 flex-none accent-[#de73a5]"
-                />
-              </label>
-              {me.labWeight && (
-                <FineSetting data={fines} otherName={otherEntry?.name ?? ""} bothOn={otherLab.weight} onChange={setFines} />
-              )}
+              <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />
+              <FineSetting data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
             </div>
 
             {/* 쉬어가기 요청 */}
@@ -1366,55 +1302,10 @@ export default function Home() {
       {(() => {
         if (!me || !otherEntry || !fines || roomPaused || incomingPause || weekResultPopup || mealConfirm || !historyReady || settingsOpen) return null;
         const rule = fines.rules.find(
-          (r) => r.proposedAmount !== null && !r.proposedByMe && me.labWeight && otherLab.weight,
+          (r) => r.proposedAmount !== null && !r.proposedByMe,
         );
         if (!rule) return null;
         return <FineProposalPopup rule={rule} otherName={otherEntry.name} onChange={(d) => { setFines(d); loadWeek(); }} />;
-      })()}
-
-      {/* 친구가 실험실 기능을 켰는데 나는 아직 꺼져 있으면 "같이 할래요?" 팝업 (방마다 함께 쓰는 기능). 쉬어가는 방에서는 띄우지 않는다 */}
-      {(() => {
-        if (!me || !otherEntry || roomPaused || incomingPause || weekResultPopup || mealConfirm || !historyReady) return null;
-        const skipped = me.labDismissed ?? [];
-        const invite =
-          otherLab.meal && !me.labMeal && !skipped.includes("meal")
-            ? ({ key: "meal", field: "labMeal", title: "식단 인증", desc: "먹은 걸 올리면 AI가 칼로리를 알려줘요. 친구와 식단을 같이 볼 수 있어요." } as const)
-            : otherLab.weight && !me.labWeight && !skipped.includes("weight")
-              ? ({ key: "weight", field: "labWeight", title: "몸무게 인증", desc: "일주일에 한 번 체중계 사진을 올리면 AI가 늘었는지 줄었는지 알려줘요." } as const)
-              : null;
-        if (!invite) return null;
-        async function answer(join: boolean) {
-          if (!invite) return;
-          const body = join ? { [invite.field]: true } : { dismissLab: invite.key };
-          const res = await fetch("/api/me", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          if (!res.ok) { alert("저장에 실패했어요"); return; }
-          await loadMe();
-        }
-        return (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-            <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
-              <CharacterSprite row={CharRow.A} pose={CharPose.WIN} height={76} className="mx-auto" />
-              <p className="font-bold text-[#4a2540]">
-                {otherEntry.name}님이 실험실 <span className="text-[#de73a5]">{invite.title}</span>을 켰어요 🧪
-              </p>
-              <p className="text-xs text-[#b4779b]">{invite.desc}</p>
-              <p className="text-sm font-semibold text-[#4a2540]">같이 해볼래요?</p>
-              <div className="flex gap-2">
-                <button onClick={() => answer(true)} className="flex-1 rounded-xl bg-[#f472b6] px-2 py-2.5 text-sm font-bold text-white">
-                  같이 하기
-                </button>
-                <button onClick={() => answer(false)} className="flex-1 rounded-xl bg-white border border-[#ffd6e8] px-2 py-2.5 text-sm font-semibold text-[#b4779b]">
-                  괜찮아요
-                </button>
-              </div>
-              <p className="text-[11px] text-[#d9a9c4]">나중에 설정 → 실험실에서 켤 수도 있어요</p>
-            </div>
-          </div>
-        );
       })()}
 
       {/* 업데이트 소식: 다른 팝업이 떠 있을 땐 기다렸다가, 앱을 처음 여는 한 번만 보여준다.

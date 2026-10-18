@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
     const weightRules = await prisma.labFineRule.findMany({ where: { feature: "weight", amount: { gt: 0 } } });
     const weightLogs = await prisma.weightLog.findMany({ where: { weekStart }, select: { userId: true } });
     for (const user of users) {
-      if (!user.labWeight) continue;
+      // 몸무게 인증은 모두의 기본 기능이고 친구와 같이 하는 거라, 친구가 들어온 방에서만 알린다
+      if (users.filter((x) => x.roomId === user.roomId).length < 2) continue;
       if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
       if (isWeekPaused(user.rests, weekStart)) continue;
       if (approvedExcuses.some((e) => e.userId === user.id)) continue;

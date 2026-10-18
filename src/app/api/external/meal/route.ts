@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
     await sendPushToUser(user, { title: "식단을 못 올렸어요", body: message }).catch(() => {});
     return reply(false, message, status);
   };
-  if (!user.labMeal && !user.labWeight) return fail("앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
   if (tooManyRequests(`meal-ext:${user.id}`, 10)) return fail("너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
 
   // 너무 큰 요청은 본문을 읽기 전에 거절한다 (사진 3MB, 양식 머리글 여유 포함)
@@ -80,7 +79,7 @@ export async function POST(req: NextRequest) {
   const analysis = await analyzeMealPhoto(photoUrl);
 
   // 체중계 사진은 식단이 아니라 몸무게로 기록한다 (몸무게 인증을 켠 사람만). 숫자가 틀렸으면 앱의 몸무게 창에서 다시 기록한다
-  if (analysis?.scaleKg && user.labWeight) {
+  if (analysis?.scaleKg) {
     const dateCheck = checkThisWeek(await readTakenAt(image));
     if (!dateCheck.ok) return fail(dateCheck.error);
     const weekStart = getWeekStart();
@@ -93,7 +92,6 @@ export async function POST(req: NextRequest) {
     await sendPushToUser(user, { title: "몸무게 기록", body: message }).catch(() => {});
     return reply(true, message);
   }
-  if (!user.labMeal) return fail("음식 사진이 아닌 것 같아요");
 
   // 음식으로 못 읽었어도(음식이 아니라고 했거나 분석 실패) 사진은 버리지 않는다: 확인 대기로 남겨 앱에서 직접 적거나 지운다
   const draft = analysis?.isFood ? draftFromAnalysis(analysis) : null;
