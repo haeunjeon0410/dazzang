@@ -16,7 +16,8 @@ export async function GET() {
   const userIds = users.map((u) => u.id);
 
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
-  const checkins = await prisma.checkin.findMany({ where: { userId: { in: userIds } } });
+  // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
+  const checkins = await prisma.checkin.findMany({ where: { userId: { in: userIds } }, select: { userId: true, weekStart: true } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } });
   const usedRibbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } });
 

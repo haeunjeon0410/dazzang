@@ -26,7 +26,8 @@ export async function GET() {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const oldest = weekStarts[weekStarts.length - 1];
   const [allCheckins, allSettlements, allExcuses, allRibbons, allMeals] = await Promise.all([
-    prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
+    // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
+    prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
     prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
     prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
     prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } } }),

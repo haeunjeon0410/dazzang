@@ -18,25 +18,28 @@ export async function GET(req: NextRequest) {
   const weekStart = weekParam ? new Date(weekParam) : getWeekStart();
   const deadline = getWeekDeadline(weekStart);
 
-  // 이번 주 화면을 열 때 지난 주 리본(획득/사용)을 바로 반영한다. 마감(월요일 오전 6시)이 지나면 9시 정산 작업을 기다리지 않는다
-  if (!weekParam) await settleLastWeekLazily(me.roomId);
+  // 이번 주 화면을 열 때 지난 주 리본(획득/사용)을 바로 반영한다. 마감(월요일 오전 6시)이 지나면 9시 정산 작업을 기다리지 않는다.
+  // 다른 조회와 같이 돌려서, 리본을 읽기 전까지만 기다린다
+  const settling = weekParam ? Promise.resolve() : settleLastWeekLazily(me.roomId);
 
   const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
   const userIds = users.map((u) => u.id);
-  const checkins = await prisma.checkin.findMany({
-    where: { weekStart, userId: { in: userIds } },
-    orderBy: { createdAt: "asc" },
-  });
-  const approvedExcuses = await prisma.excuse.findMany({
-    where: { weekStart, status: "APPROVED", userId: { in: userIds } },
-  });
-
-  const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
+  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다).
+  // 인증 사진 데이터(base64)는 크니까 목록에는 넣지 않고, 사진은 따로 받는다 (/api/checkins/[id]/photo)
+  const [checkins, approvedExcuses, pauses] = await Promise.all([
+    prisma.checkin.findMany({
+      where: { weekStart, userId: { in: userIds } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, userId: true, weekStart: true, liked: true, createdAt: true },
+    }),
+    prisma.excuse.findMany({ where: { weekStart, status: "APPROVED", userId: { in: userIds } } }),
+    prisma.roomPause.findMany({ where: { roomId: me.roomId } }),
+  ]);
+  await settling;
   const ribbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds } } });
   const roomPaused = isWeekPaused(pauses, weekStart);
   // 실험실(식단/몸무게 인증) 벌금: 방 두 사람이 합의한 금액. 친구에게는 몸무게 숫자 없이 벌금만 보인다
-  const labFines = await labFinesFor(me.roomId, users, [weekStart]);
-  const weightTrends = await weightTrendsFor(users, weekStart);
+  const [labFines, weightTrends] = await Promise.all([labFinesFor(me.roomId, users, [weekStart]), weightTrendsFor(users, weekStart)]);
 
   // 최근 2주 안에 쓴 리본이 면제한 주의 인증 횟수 (면제된 벌금 금액 계산용)
   const recentCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest) {
       // 몸무게가 지난 기록보다 늘었는지/줄었는지만 (수치는 없음). 친구에게도 보인다
       weightTrend: weightTrends.get(u.id) ?? null,
       fine: pardoned ? 0 : shortfall * FINE_PER_MISS + lab.total,
-      checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
+      checkins: mine.map((c) => ({ id: c.id, photoUrl: `/api/checkins/${c.id}/photo`, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
     };
   });
 

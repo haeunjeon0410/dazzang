@@ -11,10 +11,15 @@ export async function GET() {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { room: true, rests: true } });
   if (!user) return NextResponse.json({ user: null });
 
-  const other = await prisma.user.findFirst({
-    where: { roomId: user.roomId, id: { not: userId } },
-    include: { rests: true },
-  });
+  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다)
+  const [other, weekWeights, pendingMeals] = await Promise.all([
+    prisma.user.findFirst({
+      where: { roomId: user.roomId, id: { not: userId } },
+      include: { rests: true },
+    }),
+    prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } }),
+    prisma.meal.count({ where: { userId: user.id, confirmed: false } }),
+  ]);
 
   // 지금 진행 중인(끝나지 않은) 혼자 쉬는 기간 중 가장 늦게 끝나는 것
   const now = new Date();
@@ -30,10 +35,10 @@ export async function GET() {
       caption: user.captions[0] ?? "",
       restUntil: restUntil?.toISOString() ?? null,
       // 이번 주 몸무게 인증(체중계 사진)을 아직 안 했는지 (홈 배너용). 식단/몸무게 인증은 모두에게 기본 기능이고, 친구가 들어온 방에서만 띄운다
-      weightPending: !!other && (await prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } })) === 0,
+      weightPending: !!other && weekWeights === 0,
       mealToken: user.mealToken,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
-      pendingMeals: await prisma.meal.count({ where: { userId: user.id, confirmed: false } }),
+      pendingMeals,
     },
     room: {
       inviteToken: user.room.inviteToken,

@@ -260,6 +260,7 @@ export default function Home() {
   const [historyReady, setHistoryReady] = useState(false);
 
   async function loadMe() {
+    loadFines();
     const res = await fetch("/api/me");
     const data = await res.json();
     setMe(data.user);
@@ -273,7 +274,6 @@ export default function Home() {
         groupAccountNumber: data.room.groupAccountNumber ?? "",
       });
     }
-    if (data.user) loadFines();
   }
 
   async function loadFines() {
@@ -322,16 +322,12 @@ export default function Home() {
   }
 
   useEffect(() => {
+    // 내 정보, 이번 주 기록, 지난 기록, 벌금 약속을 한꺼번에 요청한다 (내 정보를 기다렸다가 이어서 요청하면 한 번 더 왕복해서 느리다).
+    // 로그인하지 않았으면 나머지는 조용히 실패하고 로그인 화면이 뜬다
     loadMe();
+    loadWeek();
+    loadHistory();
   }, []);
-
-  useEffect(() => {
-    // loadMe가 매번 새 객체를 만들기 때문에 me 전체가 아니라 id로만 감시한다 (쉬어가기 등 액션마다 주/기록을 다시 불러오지 않도록)
-    if (me?.id) {
-      loadWeek();
-      loadHistory();
-    }
-  }, [me?.id]);
 
   const incomingPause = !!room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil;
   const roomPaused = !!room?.pausedUntil && new Date(room.pausedUntil) > new Date();
