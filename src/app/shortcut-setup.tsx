@@ -103,8 +103,7 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             주소 복사하기
           </button>
           <Line n={6}>
-            <B>동작 검색</B> → <B>결과 보기</B>
-            <span className="text-xs text-[#b4779b]"> (없으면 <B>콘텐츠 보기</B>)</span> → 오른쪽 위 <B>완료</B>
+            <B>동작 검색</B> → <B>콘텐츠 보기</B> → 오른쪽 위 <B>완료</B>
           </Line>
         </>
       ),

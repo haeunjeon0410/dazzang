@@ -966,15 +966,16 @@ export default function Home() {
             </button>
             <p className="font-bold text-[#4a2540]">내 정보</p>
 
-            <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
-              <p className="text-sm font-bold text-[#4a2540]">내 이름</p>
+            {/* 이름: 입력칸과 저장 버튼을 한 줄에 둔다 */}
+            <div className="flex items-center gap-2 rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-3">
               <input
+                aria-label="내 이름"
                 placeholder="내 이름"
                 value={nameForm}
                 onChange={(e) => setNameForm(e.target.value)}
-                className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
+                className="min-w-0 flex-1 rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
               />
-              <button onClick={saveName} className="w-full rounded-xl bg-[#f472b6] py-2.5 text-sm font-bold text-white">
+              <button onClick={saveName} className="flex-none rounded-xl bg-[#f472b6] px-4 py-2 text-sm font-bold text-white">
                 저장
               </button>
             </div>
