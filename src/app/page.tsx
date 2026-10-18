@@ -1025,7 +1025,7 @@ export default function Home() {
             {!roomPaused && !room?.pauseRequestedBy && (
               <div className="rounded-2xl bg-[#fff0f6] border border-[#ffd6e8] p-4 space-y-2">
                 <p className="text-sm font-bold text-[#4a2540]">잠깐 쉬어갈까요?</p>
-                <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요. 이번 주부터 세고, 끝나는 주 다음 월요일에 다시 시작해요.</p>
+                <p className="text-xs text-[#b4779b]">상대방이 수락하면 해당 기간 동안 인증과 벌금이 없어요.</p>
                 <input
                   placeholder="쉬어가려는 사유 (예: 여행, 시험기간)"
                   value={pauseReason}
