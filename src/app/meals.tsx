@@ -65,6 +65,9 @@ export function MealView({
   // 단축어로 올라와 아직 확인하지 않은 내 식단 (확인 창에 하나씩 띄운다)
   const [draft, setDraft] = useState<Meal | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
+  // 이미 기록된 내 식단을 고치는 중이면 그 식단 (확인 창을 그대로 쓴다)
+  const [editMeal, setEditMeal] = useState<Meal | null>(null);
+  const target = editMeal ?? draft;
   // 마우스로 끌어 넘기는 중인지 (터치는 브라우저가 알아서 스와이프를 처리한다)
   const [dragging, setDragging] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -100,10 +103,10 @@ export function MealView({
   }
 
   async function saveDraft(values: ConfirmValues) {
-    if (!draft) return;
+    if (!target) return;
     setDraftBusy(true);
     try {
-      const res = await fetch(`/api/meals/${draft.id}`, {
+      const res = await fetch(`/api/meals/${target.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -114,6 +117,7 @@ export function MealView({
       }
       const saved = await res.json().catch(() => null);
       setDraft(null);
+      setEditMeal(null);
       setReload((n) => n + 1);
       onSaved?.(`저장했어요 · 약 ${(saved?.kcal ?? 0).toLocaleString()} kcal`);
       onChanged?.();
@@ -124,6 +128,11 @@ export function MealView({
 
   // 취소: 아이폰으로 올린 초안은 등록을 그만두는 것이라 사진도 지운다 (안 지우면 "확인 대기 1건"이 계속 남는다)
   async function cancelDraft() {
+    // 기록된 식단을 고치다 취소한 거면 아무것도 바꾸지 않고 닫기만 한다
+    if (editMeal) {
+      setEditMeal(null);
+      return;
+    }
     const id = draft?.id;
     setDraft(null);
     if (!id) return;
@@ -229,17 +238,18 @@ export function MealView({
         </div>
       ))}
 
-      {draft && (
+      {target && (
         <MealConfirm
-          photoUrl={draft.photoUrl}
+          key={target.id}
+          photoUrl={target.photoUrl}
           initial={{
-            title: draft.title ?? "",
+            title: target.title ?? "",
             items:
-              draft.items && draft.items.length
-                ? draft.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? 1 }))
+              target.items && target.items.length
+                ? target.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? target.fraction ?? 1 }))
                 : [{ name: "", kcal: 0, fraction: 1 }],
           }}
-          aiRead={draft.analyzed}
+          aiRead={target.analyzed}
           busy={draftBusy}
           onSave={saveDraft}
           onCancel={cancelDraft}
@@ -273,7 +283,21 @@ export function MealView({
                         <p className="text-[11px] font-semibold text-[#c2679c]">
                           {m.userId === meId ? "나" : m.name} · {timeLabel(m.createdAt)}
                         </p>
-                        <p className="truncate text-lg font-black text-[#4a2540]">{m.title ?? "이름 없음"}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-lg font-black text-[#4a2540]">{m.title ?? "이름 없음"}</p>
+                          {m.userId === meId && (
+                            <button
+                              onClick={() => {
+                                // 수정 창이 식단 창 위에 뜨도록 식단 창은 닫는다
+                                setPopup(null);
+                                setEditMeal(m);
+                              }}
+                              className="flex-none rounded-lg border border-dashed border-[#de73a5] bg-white px-3 py-1 text-xs font-bold text-[#de73a5]"
+                            >
+                              수정
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">

@@ -465,15 +465,26 @@ export default function Home() {
           return;
         }
         if (data?.kind === "draft") {
-          // AI가 읽은 값을 바로 올리지 않고 확인 창을 먼저 보여준다
-          setMealConfirm({
-            photo: mealPhoto,
-            initial: {
+          // AI가 읽은 값으로 바로 기록한다. 틀렸으면 식단 창의 "수정"으로 고친다
+          const saveRes = await fetch("/api/meals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              photoDataUrl: mealPhoto,
+              mode: "save",
+              analyzed: true,
               title: data.draft.title,
               items: data.draft.items.map((i: { name: string; kcal: number }) => ({ ...i, fraction: 1 })),
-            },
-            aiRead: true,
+            }),
           });
+          if (!saveRes.ok) {
+            alert((await saveRes.json().catch(() => null))?.error || "저장하지 못했어요");
+            return;
+          }
+          const saved = await saveRes.json().catch(() => null);
+          setViewMode("diet");
+          setMealRefresh((n) => n + 1);
+          setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
         if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
