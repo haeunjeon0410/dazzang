@@ -755,7 +755,7 @@ export default function Home() {
 
             {/* 실험실 식단 인증을 켜면 주간 표만 운동 | 식단으로 바뀐다. 끄면 기존 화면 그대로 */}
             {me.labMeal && (
-              <div className="grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
+              <div className="ml-auto grid w-36 grid-cols-2 gap-0.5 rounded-full bg-white/80 border border-[#ffd6e8] p-0.5" role="tablist">
                 {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
                   <button
                     key={mode}
