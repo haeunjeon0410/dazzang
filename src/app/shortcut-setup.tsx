@@ -48,13 +48,20 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
             className="relative max-h-[85vh] w-full max-w-sm space-y-3 overflow-y-auto rounded-3xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-[#ffeef5] font-bold text-[#c2679c]"
-              aria-label="닫기"
-            >
-              ✕
-            </button>
+            <div className="absolute right-4 top-4 flex items-center gap-2">
+              {token && (
+                <button onClick={make} disabled={busy} className="text-[11px] text-[#d9a9c4] underline">
+                  코드 다시 만들기
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffeef5] font-bold text-[#c2679c]"
+                aria-label="닫기"
+              >
+                ✕
+              </button>
+            </div>
             <p className="font-bold text-[#4a2540]">아이폰 액션 버튼 연동</p>
 
             {!token ? (
@@ -75,9 +82,6 @@ export function ShortcutSetup({ token, onChanged }: { token: string | null; onCh
                     복사
                   </button>
                 </div>
-                <button onClick={make} disabled={busy} className="text-[11px] text-[#d9a9c4] underline">
-                  코드 다시 만들기
-                </button>
               </div>
             )}
 

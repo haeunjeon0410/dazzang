@@ -106,6 +106,13 @@ export function MealConfirm({
                 className="w-16 rounded-lg border border-[#ffd6e8] px-2 py-1.5 text-right text-sm text-[#4a2540]"
               />
               <span className="text-[11px] text-[#b4779b]">kcal</span>
+              <button
+                onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                aria-label="이 음식 빼기"
+                className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-xs text-[#c2679c]"
+              >
+                ✕
+              </button>
             </div>
           ))}
           {items.length < 8 && (
