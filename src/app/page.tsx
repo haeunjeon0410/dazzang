@@ -12,6 +12,7 @@ import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 import { ShortcutSetup } from "./shortcut-setup";
 import { MealReminderSetting } from "./meal-reminder-setting";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
+import { WhatsNew } from "./whats-new";
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
 async function compressImage(file: File, maxDim = 1280, quality = 0.75): Promise<string> {
@@ -1237,6 +1238,9 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* 업데이트 소식: 다른 팝업이 떠 있을 땐 기다렸다가, 앱을 처음 여는 한 번만 보여준다 */}
+      <WhatsNew ready={!!me && historyReady && !weekResultPopup && !incomingPause && !pauseFalling && !mealConfirm} labMeal={!!me?.labMeal} />
 
       {weekResultPopup && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => closeWeekResultPopup(false)}>
