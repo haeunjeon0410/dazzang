@@ -30,6 +30,8 @@ export async function GET() {
       restUntil: restUntil?.toISOString() ?? null,
       labMeal: user.labMeal,
       mealToken: user.labMeal ? user.mealToken : null,
+      // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
+      pendingMeals: user.labMeal ? await prisma.meal.count({ where: { userId: user.id, confirmed: false } }) : 0,
     },
     room: {
       inviteToken: user.room.inviteToken,

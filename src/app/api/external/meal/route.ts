@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
   if (!user.labMeal) return reply(false, "앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
   if (tooManyRequests(`meal-ext:${user.id}`, 10)) return reply(false, "너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
 
+  // 너무 큰 요청은 본문을 읽기 전에 거절한다 (사진 3MB, 양식 머리글 여유 포함)
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_IMAGE_BYTES * 1.5) {
+    return reply(false, "사진이 너무 커요. 이미지 크기 변경 단계를 확인해 주세요", 413);
+  }
+
   // 사진 꺼내기
   let image: Buffer | null = null;
   if (asJson) {

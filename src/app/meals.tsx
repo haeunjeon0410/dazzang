@@ -263,8 +263,14 @@ export function MealView({
                       </div>
 
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={m.photoUrl} alt="식단" draggable={false} className="aspect-square w-full object-cover" />
+                        {m.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={m.photoUrl} alt="식단" draggable={false} className="aspect-square w-full object-cover" />
+                        ) : (
+                          <div className="flex aspect-square w-full items-center justify-center bg-[#fff0f6] px-6 text-center text-xs text-[#b4779b]">
+                            사진은 30일이 지나 지웠어요
+                          </div>
+                        )}
                         {m.kcal != null && (
                           <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#de73a5] px-3 py-1 text-sm font-black text-white shadow-md">
                             약 {m.kcal.toLocaleString()} kcal

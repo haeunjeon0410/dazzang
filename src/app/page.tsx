@@ -56,7 +56,7 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean; mealToken?: string | null };
+type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean; mealToken?: string | null; pendingMeals?: number };
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -651,6 +651,13 @@ export default function Home() {
             }`}
           >
             {label}
+            {mode === "diet" && (me.pendingMeals ?? 0) > 0 && (
+              <span
+                className={`ml-1 rounded-full px-1.5 text-[10px] ${viewMode === "diet" ? "bg-white text-[#de73a5]" : "bg-[#de73a5] text-white"}`}
+              >
+                {me.pendingMeals}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -829,7 +836,15 @@ export default function Home() {
 
 
             {me.labMeal && viewMode === "diet" ? (
-              <MealView meId={me.id} refreshKey={mealRefresh} header={calendarHeader} onSaved={setToast} />
+              <MealView
+                meId={me.id}
+                refreshKey={mealRefresh}
+                header={calendarHeader}
+                onSaved={(t) => {
+                  setToast(t);
+                  loadMe();
+                }}
+              />
             ) : (
               <WeekCalendar
                 meId={me.id}

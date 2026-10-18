@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isCronAuthorized } from "@/lib/cron-auth";
 
 // 매주 일요일 03:00 UTC (= 12:00 KST) 실행
 // 30일 지난 체크인 사진(base64)만 지우고, 레코드(횟수)는 보존
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const authHeader = req.headers.get("authorization");
-  const authorized =
-    secret === process.env.CRON_SECRET ||
-    authHeader === `Bearer ${process.env.CRON_SECRET}`;
-  if (!authorized) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -23,5 +19,11 @@ export async function GET(req: NextRequest) {
     data: { photoUrl: "" },
   });
 
-  return NextResponse.json({ ok: true, cleaned: count });
+  // 식단 사진(base64)도 같은 기준으로 지우고 이름, 음식별 칼로리 기록만 남긴다
+  const meals = await prisma.meal.updateMany({
+    where: { createdAt: { lt: cutoff }, photoUrl: { not: "" } },
+    data: { photoUrl: "" },
+  });
+
+  return NextResponse.json({ ok: true, cleaned: count, cleanedMeals: meals.count });
 }

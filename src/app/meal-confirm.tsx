@@ -47,7 +47,8 @@ export function MealConfirm({
   // 이름이 바뀌었는데 아직 칼로리를 계산하지 않은 음식
   const stale = (r: Row) => r.name.trim() !== "" && r.name.trim() !== r.est;
   const pending = rows.some(stale);
-  const staleKey = rows.map((r) => (stale(r) ? r.name.trim() : "")).join("|");
+  // 이름에 어떤 글자가 들어 있어도 구분이 깨지지 않게 JSON 글자로 만든다
+  const staleKey = JSON.stringify(rows.map((r) => (stale(r) ? r.name.trim() : "")));
 
   useEffect(() => {
     alive.current = true;
@@ -58,7 +59,7 @@ export function MealConfirm({
 
   // 이름 입력이 잠깐 멈추면 바뀐 음식들의 칼로리를 AI에게 다시 물어본다
   useEffect(() => {
-    const names = staleKey.split("|");
+    const names = JSON.parse(staleKey) as string[];
     if (!names.some(Boolean)) return;
     const t = setTimeout(async () => {
       const asked = names.map((n, i) => ({ n, i })).filter((x) => x.n);
@@ -92,10 +93,9 @@ export function MealConfirm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         className="max-h-[90vh] w-full max-w-[22rem] space-y-3 overflow-y-auto rounded-3xl bg-white p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
