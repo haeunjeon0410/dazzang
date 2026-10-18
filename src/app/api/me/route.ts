@@ -29,6 +29,8 @@ export async function GET() {
       caption: user.captions[0] ?? "",
       restUntil: restUntil?.toISOString() ?? null,
       labMeal: user.labMeal,
+      labWeight: user.labWeight,
+      labDismissed: user.labDismissed,
       mealToken: user.labMeal ? user.mealToken : null,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
       pendingMeals: user.labMeal ? await prisma.meal.count({ where: { userId: user.id, confirmed: false } }) : 0,
@@ -51,6 +53,9 @@ export async function GET() {
           name: other.name,
           caption: other.captions[0] ?? "",
           resting: other.rests.some((r) => r.fromWeek <= now && r.untilWeek > now),
+          // 친구가 켠 실험실 기능 (켰는지만 알려주고 기록은 내려보내지 않는다). "같이 할래요?" 팝업용
+          labMeal: other.labMeal,
+          labWeight: other.labWeight,
         }
       : null,
   });
@@ -60,7 +65,28 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption, labMeal } = await req.json();
+  const { name, caption, labMeal, labWeight, dismissLab } = await req.json();
+
+  // 친구가 켠 실험실 기능에 "같이 하기"를 거절했다는 표시
+  if (dismissLab !== undefined) {
+    if (dismissLab !== "meal" && dismissLab !== "weight") {
+      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
+    }
+    const cur = await prisma.user.findUnique({ where: { id: userId }, select: { labDismissed: true } });
+    if (cur && !cur.labDismissed.includes(dismissLab)) {
+      await prisma.user.update({ where: { id: userId }, data: { labDismissed: [...cur.labDismissed, dismissLab] } });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // 실험실 몸무게 인증 켜기/끄기 (끄면 입력창만 사라지고 기록은 남는다)
+  if (labWeight !== undefined) {
+    if (typeof labWeight !== "boolean") {
+      return NextResponse.json({ error: "형식이 올바르지 않아요" }, { status: 400 });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { labWeight } });
+    return NextResponse.json({ ok: true });
+  }
 
   // 실험실 식단 인증 켜기/끄기
   if (labMeal !== undefined) {

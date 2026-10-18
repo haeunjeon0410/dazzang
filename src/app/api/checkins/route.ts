@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { labFinesFor, labFineKey, noLabFine, weightTrendsFor } from "@/lib/lab-fine";
 import { getWeekStart, getWeekDeadline, getDayRange, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
   const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
   const ribbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds } } });
   const roomPaused = isWeekPaused(pauses, weekStart);
+  // 실험실(식단/몸무게 인증) 벌금: 방 두 사람이 합의한 금액. 친구에게는 몸무게 숫자 없이 벌금만 보인다
+  const labFines = await labFinesFor(me.roomId, users, [weekStart]);
+  const weightTrends = await weightTrendsFor(users, weekStart);
 
   // 최근 2주 안에 쓴 리본이 면제한 주의 인증 횟수 (면제된 벌금 금액 계산용)
   const recentCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
@@ -49,6 +53,7 @@ export async function GET(req: NextRequest) {
       approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || roomPaused || ribbonUsed;
     const count = mine.length;
     const shortfall = Math.max(0, REQUIRED_COUNT - count);
+    const lab = pardoned ? noLabFine : (labFines.get(labFineKey(u.id, weekStart)) ?? noLabFine);
     return {
       userId: u.id,
       name: u.name,
@@ -71,7 +76,10 @@ export async function GET(req: NextRequest) {
           return { id: r.id, usedWeek: r.usedWeek, waivedFine: Math.max(0, REQUIRED_COUNT - cnt) * FINE_PER_MISS };
         }),
       shortfall,
-      fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
+      labFine: lab,
+      // 몸무게가 지난 기록보다 늘었는지/줄었는지만 (수치는 없음). 친구에게도 보인다
+      weightTrend: weightTrends.get(u.id) ?? null,
+      fine: pardoned ? 0 : shortfall * FINE_PER_MISS + lab.total,
       checkins: mine.map((c) => ({ id: c.id, photoUrl: c.photoUrl, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
     };
   });

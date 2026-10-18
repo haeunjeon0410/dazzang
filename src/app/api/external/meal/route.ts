@@ -5,6 +5,11 @@ import { draftFromAnalysis } from "@/lib/meal-input";
 import { sendPushToUser } from "@/lib/push";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { quotaMessage, takeAiQuota } from "@/lib/ai-quota";
+import { getWeekStart } from "@/lib/week";
+import { checkThisWeek, readTakenAt } from "@/lib/photo-date";
+
+// AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 // 저장하는 사진은 글자(base64)로 바뀌며 3분의 1 커지고, Vercel은 요청 하나를 4.5MB까지만 받는다
 const MAX_IMAGE_BYTES = 3_000_000;
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
     await sendPushToUser(user, { title: "식단을 못 올렸어요", body: message }).catch(() => {});
     return reply(false, message, status);
   };
-  if (!user.labMeal) return fail("앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
+  if (!user.labMeal && !user.labWeight) return fail("앱의 실험실에서 식단 인증을 먼저 켜 주세요", 403);
   if (tooManyRequests(`meal-ext:${user.id}`, 10)) return fail("너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
 
   // 너무 큰 요청은 본문을 읽기 전에 거절한다 (사진 3MB, 양식 머리글 여유 포함)
@@ -73,9 +78,25 @@ export async function POST(req: NextRequest) {
   const quota = await takeAiQuota(user.id, "photo");
   if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
   const analysis = await analyzeMealPhoto(photoUrl);
-  if (analysis && !analysis.isFood) return fail("음식 사진이 아닌 것 같아요");
 
-  const draft = analysis ? draftFromAnalysis(analysis) : null;
+  // 체중계 사진은 식단이 아니라 몸무게로 기록한다 (몸무게 인증을 켠 사람만). 숫자가 틀렸으면 앱의 몸무게 창에서 다시 기록한다
+  if (analysis?.scaleKg && user.labWeight) {
+    const dateCheck = checkThisWeek(await readTakenAt(image));
+    if (!dateCheck.ok) return fail(dateCheck.error);
+    const weekStart = getWeekStart();
+    await prisma.weightLog.upsert({
+      where: { userId_weekStart: { userId: user.id, weekStart } },
+      create: { userId: user.id, weekStart, kg: analysis.scaleKg },
+      update: { kg: analysis.scaleKg },
+    });
+    const message = `몸무게 ${analysis.scaleKg}kg로 기록했어요`;
+    await sendPushToUser(user, { title: "몸무게 기록", body: message }).catch(() => {});
+    return reply(true, message);
+  }
+  if (!user.labMeal) return fail("음식 사진이 아닌 것 같아요");
+
+  // 음식으로 못 읽었어도(음식이 아니라고 했거나 분석 실패) 사진은 버리지 않는다: 확인 대기로 남겨 앱에서 직접 적거나 지운다
+  const draft = analysis?.isFood ? draftFromAnalysis(analysis) : null;
   await prisma.meal.create({
     data: {
       userId: user.id,
@@ -93,7 +114,9 @@ export async function POST(req: NextRequest) {
 
   const message = draft
     ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 기록했어요`
-    : "사진은 올렸어요. 분석은 못 했으니 앱에서 직접 적어 주세요";
+    : analysis
+      ? "음식으로 읽지 못했어요. 앱에서 확인하고 직접 적어 주세요"
+      : "사진은 올렸어요. 분석은 못 했으니 앱에서 직접 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
   await sendPushToUser(user, { title: draft ? "식단 기록" : "식단 확인", body: message }).catch(() => {});
   return reply(true, message);

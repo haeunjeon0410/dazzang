@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import { labFinesFor, labFineKey, noLabFine } from "@/lib/lab-fine";
 import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const WEEKS_BACK = 8;
@@ -38,6 +39,8 @@ export async function GET() {
       : Promise.resolve([] as { userId: string; kcal: number | null; createdAt: Date }[]),
   ]);
 
+  const labFines = await labFinesFor(me.roomId, users, weekStarts);
+
   const weeks = [];
   for (let i = 1; i <= WEEKS_BACK; i++) {
     const weekStart = weekStarts[i - 1];
@@ -56,6 +59,8 @@ export async function GET() {
       const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart) || ribbonUsed;
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
+      const rawLab = labFines.get(labFineKey(u.id, weekStart)) ?? noLabFine;
+      const lab = pardoned ? noLabFine : rawLab;
       // 식단을 올린 날만 세어 하루 평균을 낸다 (하루는 오전 6시에 바뀐다)
       const dayKcal = new Map<number, number>();
       for (const m of allMeals) {
@@ -75,9 +80,10 @@ export async function GET() {
         pardoned,
         ribbonUsed,
         // 리본이 대신 내준 벌금 (주간 결과 팝업에서 "리본을 써서 면제" 안내용)
-        waivedFine: ribbonUsed ? shortfall * FINE_PER_MISS : 0,
+        waivedFine: ribbonUsed ? shortfall * FINE_PER_MISS + rawLab.total : 0,
+        labFine: lab,
         shortfall,
-        fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
+        fine: pardoned ? 0 : shortfall * FINE_PER_MISS + lab.total,
         settled: settlement?.settled ?? false,
       };
     });

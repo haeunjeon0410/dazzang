@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
-import { REQUIRED_COUNT, FINE_PER_MISS, isWeekFinalized, isWeekPaused } from "@/lib/week";
+import { labFinesFor, labFineKey } from "@/lib/lab-fine";
+import { REQUIRED_COUNT, FINE_PER_MISS, getWeekStart, getWeekDeadline, isWeekFinalized, isWeekPaused } from "@/lib/week";
 
 // 통산전적: 전체 기간 누적 인증 횟수 / 승리한 주 수 / 누적 벌금
 export async function GET() {
@@ -18,6 +19,17 @@ export async function GET() {
   const checkins = await prisma.checkin.findMany({ where: { userId: { in: userIds } } });
   const approvedExcuses = await prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } });
   const usedRibbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } });
+
+  // 실험실 벌금: 합의한 주부터 마감된 지난 주까지 (진행 중인 이번 주는 아직 결과가 아니다)
+  const labRules = await prisma.labFineRule.findMany({ where: { roomId: me.roomId, amount: { gt: 0 } } });
+  const labWeeks: Date[] = [];
+  const since = labRules.map((r) => r.sinceWeek?.getTime()).filter((t): t is number => typeof t === "number");
+  if (since.length > 0) {
+    for (let t = Math.min(...since); t < getWeekStart().getTime(); t += 7 * 24 * 60 * 60 * 1000) {
+      if (getWeekDeadline(new Date(t)).getTime() < Date.now()) labWeeks.push(new Date(t));
+    }
+  }
+  const labFines = await labFinesFor(me.roomId, users, labWeeks);
 
   const stats = users.map((u) => {
     const myCheckins = checkins.filter((c) => c.userId === u.id);
@@ -43,6 +55,12 @@ export async function GET() {
       const count = byWeek.get(key) ?? 0;
       if (count >= REQUIRED_COUNT) weeksWon++;
       else if (!pardonedWeeks.has(key) && !isWeekPaused(u.rests, new Date(key)) && !isWeekPaused(pauses, new Date(key))) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
+    }
+
+    for (const w of labWeeks) {
+      const key = w.toISOString();
+      if (pardonedWeeks.has(key) || isWeekPaused(u.rests, w) || isWeekPaused(pauses, w)) continue;
+      totalFine += labFines.get(labFineKey(u.id, w))?.total ?? 0;
     }
 
     return {

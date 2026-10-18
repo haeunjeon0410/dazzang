@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
+import { labFinesFor, labFineKey } from "@/lib/lab-fine";
 import { getWeekStart, formatResumeDate, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest) {
     // 지난 주가 정지 기간에 포함되면 마감 스킵
     if ((room.pausedUntil && room.pausedUntil > lastWeekStart) || isWeekPaused(room.pauses, lastWeekStart)) continue;
 
+    const labFines = await labFinesFor(room.id, room.users, [lastWeekStart]);
+
     const results = room.users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
       const excused = approvedExcuses.some((e) => e.userId === u.id);
@@ -54,7 +57,7 @@ export async function GET(req: NextRequest) {
         excused,
         ribbonUsed: false,
         shortfall,
-        fine: pardoned ? 0 : shortfall * FINE_PER_MISS,
+        fine: pardoned ? 0 : shortfall * FINE_PER_MISS + (labFines.get(labFineKey(u.id, lastWeekStart))?.total ?? 0),
       };
     });
 
@@ -124,7 +127,7 @@ export async function GET(req: NextRequest) {
     for (const r of results) allResults.push({ name: r.user.name, count: r.count, fine: r.fine });
 
     // 모두 목표를 채웠으면 알릴 게 없으니 결과 알림은 생략
-    if (results.every((r) => r.count >= REQUIRED_COUNT)) continue;
+    if (results.every((r) => r.count >= REQUIRED_COUNT && !labFines.get(labFineKey(r.user.id, lastWeekStart))?.total)) continue;
 
     await Promise.allSettled(
       results.map((r) =>

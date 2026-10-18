@@ -117,6 +117,8 @@ export function Battle({
   otherName,
   myFine,
   otherFine,
+  myWeight,
+  otherWeight,
   myRibbons = 0,
   otherRibbons = 0,
   myUsedRibbons = [],
@@ -136,6 +138,9 @@ export function Battle({
   otherName: string;
   myFine: number;
   otherFine: number;
+  // 몸무게가 지난 기록보다 늘었는지/줄었는지 (몸무게 인증을 켠 사람만, 수치 없음)
+  myWeight?: "up" | "down" | "same" | null;
+  otherWeight?: "up" | "down" | "same" | null;
   // 친구가 혼자 쉬는 동안 목표를 채워 모은 리본 (벌금이 생기면 자동으로 면제에 쓰인다)
   myRibbons?: number;
   otherRibbons?: number;
@@ -329,13 +334,25 @@ export function Battle({
 
       <div className="grid grid-cols-2 divide-x divide-[#ffd6e8] border-t border-[#ffd6e8]">
         {[
-          { name: myName, count: myCount, fine: myFine },
-          { name: otherName, count: otherCount, fine: otherFine },
+          { name: myName, count: myCount, fine: myFine, weight: myWeight },
+          { name: otherName, count: otherCount, fine: otherFine, weight: otherWeight },
         ].map((p) => (
           <div key={p.name} className="p-3 text-center">
-            <p className="text-xs text-[#b4779b] font-semibold truncate">{p.name}</p>
+            <p className="text-xs text-[#b4779b] font-semibold truncate">
+              {p.name}
+              {/* 주식처럼 삼각형만: 몸무게가 지난 기록보다 늘면 빨강 ▲, 줄면 초록 ▼ (수치는 없다) */}
+              {p.weight && p.weight !== "same" && (
+                <span
+                  className={`ml-1 ${p.weight === "up" ? "text-[#e03e6e]" : "text-[#2f9e44]"}`}
+                  aria-label={p.weight === "up" ? "몸무게 늘었어요" : "몸무게 줄었어요"}
+                >
+                  {p.weight === "up" ? "▲" : "▼"}
+                </span>
+              )}
+            </p>
             <p className={`text-lg font-black ${p.count >= 3 ? "text-[#2f9e44]" : "text-[#4a2540]"}`}>{p.count}/3</p>
             {p.fine > 0 && <p className="text-[11px] text-[#de73a5] font-bold">벌금 {p.fine.toLocaleString()}원</p>}
+
           </div>
         ))}
       </div>

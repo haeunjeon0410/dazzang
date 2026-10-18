@@ -29,6 +29,23 @@ model Room {
 
   users  User[]
   pauses RoomPause[]
+  labFines LabFineRule[]
+}
+
+// 실험실 몸무게 인증의 벌금 약속. 방의 두 사람이 합의해야 바뀐다 (한쪽이 제안하고 상대가 수락)
+// - feature는 지금 weight만 쓴다: 이번 주 몸무게가 지난 기록보다 늘었으면 amount원
+// - sinceWeek: 이 주(월요일 00:00 KST 키)부터 적용된다. 합의한 다음 주부터라서 지난 주를 소급하지 않는다
+model LabFineRule {
+  id             String    @id @default(cuid())
+  roomId         String
+  room           Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  feature        String // meal | weight
+  amount         Int       @default(0)
+  sinceWeek      DateTime?
+  proposedAmount Int?
+  proposedBy     String?
+
+  @@unique([roomId, feature])
 }
 
 // 확정된 쉬어가기 이력. fromWeek <= 주 < untilWeek 인 주는 두 사람 모두 벌금이 없다 (모두 주 월요일 00:00 KST 키)
@@ -92,6 +109,14 @@ model User {
   mealReminder Boolean @default(false)
   lunchTime    String  @default("12:30")
   dinnerTime   String  @default("18:30")
+  // 실험실: 몸무게 인증 켜기. 나이/키/몸무게 기록은 본인과 AI만 보고, 친구 쪽 API에는 절대 내려가지 않는다
+  labWeight     Boolean     @default(false)
+  weightAge     Int?
+  weightHeight  Float? // cm
+  weightSetup   Boolean     @default(false) // 처음 기본 정보 입력을 마쳤거나 건너뛰었는지
+  weightLogs    WeightLog[]
+  // 방 친구가 켠 실험실 기능에 "같이 하기"를 거절한 기능 이름들 (meal | weight). 거절한 기능은 다시 묻지 않는다
+  labDismissed  String[]    @default([])
 
   checkins      Checkin[]
   settlements   Settlement[]
@@ -126,6 +151,18 @@ model Meal {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// 실험실 몸무게 인증. 사진은 저장하지 않고 AI가 읽은(본인이 확인한) 숫자만 남긴다. 본인에게만 보인다
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime // 인증한 주의 월요일 00:00 KST 키 (한 주에 한 번, 다시 올리면 덮어쓴다)
+  kg        Float
+  createdAt DateTime @default(now())
+
+  @@unique([userId, weekStart])
 }
 
 // 식사 알림을 이미 보낸 기록 (같은 날 같은 알림이 두 번 가지 않게). day는 KST 날짜, kind는 lunch | dinner

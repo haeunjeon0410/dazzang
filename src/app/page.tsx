@@ -3,13 +3,16 @@
 import { formatPauseEnd } from "@/lib/week";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { subscribeToPush } from "./push-setup";
+import { PushToggle } from "./push-setup";
 import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
 import { MealView } from "./meals";
 import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 import { ShortcutSetup } from "./shortcut-setup";
+import { WeightGraph } from "./weight";
+import { readTakenAt } from "@/lib/photo-date";
+import { FineSetting, FineProposalPopup, type FineSnapshot } from "./lab-fine";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 import { WhatsNew } from "./whats-new";
 
@@ -28,22 +31,6 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.75): Promise
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-// 사진 조작 방지: 사진에 찍힌 촬영 시각(EXIF)을 읽는다. 압축(canvas)하면 EXIF가 지워지므로 원본 파일에서 읽어야 한다.
-// EXIF 시각은 시간대 없는 "현지 시각"이라 한국 시간(KST)으로 해석한다. 날짜 정보가 없으면 null (= 오늘로 인정)
-async function readTakenAt(file: File): Promise<string | null> {
-  try {
-    const { default: exifr } = await import("exifr");
-    const exif = await exifr.parse(file, { pick: ["DateTimeOriginal", "CreateDate"], reviveValues: false });
-    const raw: unknown = exif?.DateTimeOriginal ?? exif?.CreateDate;
-    const m = typeof raw === "string" && raw.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-    if (!m) return null;
-    const [, y, mo, d, h, mi, sec] = m.map(Number);
-    return new Date(Date.UTC(y, mo - 1, d, h - 9, mi, sec)).toISOString();
-  } catch {
-    return null;
-  }
-}
-
 type Summary = {
   userId: string;
   name: string;
@@ -53,6 +40,7 @@ type Summary = {
   ribbons?: number;
   recentUsedRibbons?: { id: string; usedWeek: string; waivedFine: number }[];
   ribbonIds?: string[];
+  weightTrend?: "up" | "down" | "same" | null;
   recentEarnedRibbonIds?: string[];
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
@@ -63,6 +51,8 @@ type Me = {
   caption?: string;
   restUntil?: string | null;
   labMeal?: boolean;
+  labWeight?: boolean;
+  labDismissed?: string[];
   mealToken?: string | null;
   pendingMeals?: number;
 };
@@ -218,6 +208,9 @@ export default function Home() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
   const [otherResting, setOtherResting] = useState(false);
+  // 친구가 켠 실험실 기능 (같이 할래요? 팝업용)
+  const [fines, setFines] = useState<FineSnapshot | null>(null);
+  const [otherLab, setOtherLab] = useState<{ meal: boolean; weight: boolean }>({ meal: false, weight: false });
   const [room, setRoom] = useState<Room | null>(null);
   // 쉬어가기를 수락하는 순간: 카드들이 우수수 떨어지고 앱 전체가 흑백으로 변한다
   const [pauseFalling, setPauseFalling] = useState(false);
@@ -247,6 +240,10 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [toast]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
+  // 인증하기로 올린 체중계 사진에서 AI가 읽은 몸무게: 사용자가 맞다고 확인해야 기록된다 (token은 서버가 서명한 값)
+  const [weightConfirm, setWeightConfirm] = useState<{ kg: number; token: string } | null>(null);
+  const [weightSaving, setWeightSaving] = useState(false);
   const [groupAccountOpen, setGroupAccountOpen] = useState(false);
   // 설정의 "잠깐 쉬어갈까요?"는 평소엔 접어 두고 누르면 펼친다
   const [pauseOpen, setPauseOpen] = useState(false);
@@ -272,6 +269,7 @@ export default function Home() {
     setRoom(data.room ?? null);
     setOtherCaption(data.other?.caption);
     setOtherResting(!!data.other?.resting);
+    setOtherLab({ meal: !!data.other?.labMeal, weight: !!data.other?.labWeight });
     if (data.user) setNameForm(data.user.name ?? "");
     if (data.room) {
       setGroupForm({
@@ -279,6 +277,12 @@ export default function Home() {
         groupAccountNumber: data.room.groupAccountNumber ?? "",
       });
     }
+    if (data.user) loadFines();
+  }
+
+  async function loadFines() {
+    const res = await fetch("/api/room/fines").catch(() => null);
+    if (res?.ok) setFines(await res.json());
   }
 
   async function loadWeek() {
@@ -444,23 +448,51 @@ export default function Home() {
     router.push(`/join/${encodeURIComponent(code)}`);
   }
 
+  // 확인 창에서 "맞아요"를 누르면 그때 서버에 몸무게를 기록한다
+  async function saveWeight() {
+    if (!weightConfirm) return;
+    setWeightSaving(true);
+    try {
+      const res = await fetch("/api/weight/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: weightConfirm.token }),
+      });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(d?.error || "저장하지 못했어요");
+        return;
+      }
+      setWeightConfirm(null);
+      setToast(`몸무게 ${weightConfirm.kg}kg로 기록했어요`);
+      setGraphOpen(true);
+    } finally {
+      setWeightSaving(false);
+    }
+  }
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      if (me?.labMeal) {
-        // 실험실 식단 인증이 켜져 있으면 AI가 사진을 보고 음식이면 식단에, 아니면 운동 인증으로 보낸다.
+      if (me?.labMeal || me?.labWeight) {
+        // 실험실 식단/몸무게 인증이 켜져 있으면 AI가 사진을 보고 체중계면 몸무게에, 음식이면 식단에, 아니면 운동 인증으로 보낸다.
         // AI가 판단하지 못하면(키 없음/실패) 지금 보고 있는 보기(운동 | 식단)를 따른다
-        const mealPhoto = await compressImage(file, 1024, 0.7);
+        const [mealPhoto, shotAt] = await Promise.all([compressImage(file, 1024, 0.7), readTakenAt(file)]);
         const res = await fetch("/api/meals", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ photoDataUrl: mealPhoto }),
+          body: JSON.stringify({ photoDataUrl: mealPhoto, takenAt: shotAt }),
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) {
           alert(data?.error || "업로드 실패");
+          return;
+        }
+        if (data?.kind === "weight") {
+          // 체중계 사진: 운동/식단이 아니라 몸무게다 (이번 주에 찍은 사진만 여기까지 온다). 서버에 기록하기 전에 읽은 숫자가 맞는지 한 번 확인한다
+          setWeightConfirm({ kg: data.kg, token: data.token });
           return;
         }
         if (data?.kind === "draft") {
@@ -486,15 +518,21 @@ export default function Home() {
           setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
-        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
+        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet" && me.labMeal) {
           // AI를 못 쓰는 상태(키 없음, 실패, 오늘 한도 초과): 직접 적을 수 있게 빈 확인 창을 연다
           if (data.kind === "limit") setToast(`${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 직접 적어 주세요`);
           setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
           return;
         }
+        // 식단 보기에서 올렸는데 AI가 음식으로 못 읽었으면 운동으로 보내지 말고 직접 적게 한다 (음식 사진을 잘못 읽어도 사진이 사라지지 않게)
+        if (data?.kind === "other" && viewMode === "diet" && me.labMeal) {
+          setToast("음식으로 읽지 못했어요. 직접 적어 주세요");
+          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
+          return;
+        }
         // 그 밖에는 운동 인증으로 이어진다
-        if (data?.kind === "other") setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
-        setViewMode("workout");
+        if (data?.kind === "other" && me.labMeal) setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
+        if (me.labMeal) setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
       const res = await fetch("/api/checkins", {
@@ -713,16 +751,16 @@ export default function Home() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/nav/total.webp" alt="" className="w-6 h-6 object-contain" />
             </button>
-            <button
-              onClick={() =>
-                subscribeToPush().then((result) => alert(result.ok ? "알림이 설정됐어요" : result.reason || "알림 설정 실패"))
-              }
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
-              aria-label="마감 알림 받기"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/nav/alarm.webp" alt="" className="w-6 h-6 object-contain" />
-            </button>
+            {me.labWeight && (
+              <button
+                onClick={() => setGraphOpen(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
+                aria-label="몸무게 그래프"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/nav/graph.webp" alt="" className="w-5 h-5 object-contain" />
+              </button>
+            )}
             <button
               onClick={() => setSettingsOpen(true)}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
@@ -811,6 +849,8 @@ export default function Home() {
               otherName={otherEntry.name}
               myFine={myEntry.fine}
               otherFine={otherEntry.fine}
+              myWeight={myEntry.weightTrend}
+              otherWeight={otherEntry.weightTrend}
               myRibbons={myEntry.ribbons ?? 0}
               otherRibbons={otherEntry.ribbons ?? 0}
               fxEnabled={historyReady && !weekResultPopup}
@@ -903,6 +943,30 @@ export default function Home() {
         </label>
       )}
 
+      {weightConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+            <p className="font-bold text-[#4a2540]">체중계 숫자가 맞나요?</p>
+            <p className="text-3xl font-black text-[#de73a5]">
+              {weightConfirm.kg}
+              <span className="ml-1 text-base font-bold text-[#b4779b]">kg</span>
+            </p>
+            <div className="flex gap-2">
+              <button disabled={weightSaving} onClick={saveWeight} className="flex-1 rounded-xl bg-[#f472b6] px-2 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                맞아요
+              </button>
+              <button disabled={weightSaving} onClick={() => setWeightConfirm(null)} className="flex-1 rounded-xl border border-[#ffd6e8] bg-white px-2 py-2.5 text-sm font-semibold text-[#b4779b] disabled:opacity-50">
+                다시 찍을게요
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {graphOpen && me.labWeight && (
+        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.amount ?? 0} onToast={setToast} onClose={() => setGraphOpen(false)} />
+      )}
+
       {toast && (
         <div
           role="status"
@@ -974,6 +1038,9 @@ export default function Home() {
             >
               ✕
             </button>
+            <div className="absolute right-14 top-4 flex h-8 items-center">
+              <PushToggle />
+            </div>
             <p className="font-bold text-[#4a2540]">내 정보</p>
 
             {/* 이름: 입력칸과 저장 버튼을 한 줄에 둔다 */}
@@ -999,7 +1066,7 @@ export default function Home() {
                 <span className="space-y-0.5">
                   <span className="block text-sm font-semibold text-[#4a2540]">식단 인증</span>
                   <span className="block text-xs text-[#b4779b]">
-                    먹은 걸 올리면 AI가 칼로리를 알려줘요. 벌금과는 상관없어요.
+                    먹은 걸 올리면 AI가 칼로리를 알려줘요.
                   </span>
                 </span>
                 <input
@@ -1022,6 +1089,42 @@ export default function Home() {
                 />
               </label>
               {me.labMeal && <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />}
+              <label className="flex items-center justify-between gap-3 border-t border-[#ffd6e8] pt-2">
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-semibold text-[#4a2540]">몸무게 인증</span>
+                  <span className="block text-xs text-[#b4779b]">
+                    일주일에 한 번 체중계 사진으로 기록해요.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!!me.labWeight}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    // 저장이 끝난 뒤에 카드를 띄워야 카드가 켜진 상태를 바로 읽는다
+                    const res = await fetch("/api/me", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ labWeight: next }),
+                    });
+                    if (!res.ok) {
+                      alert("저장에 실패했어요");
+                      await loadMe();
+                      return;
+                    }
+                    setMe((m) => (m ? { ...m, labWeight: next } : m));
+                    // 켜면 곧바로 몸무게 창(처음엔 기본 정보)을 띄우니까 설정 창은 닫는다
+                    if (next) {
+                      setSettingsOpen(false);
+                      setGraphOpen(true);
+                    }
+                  }}
+                  className="h-6 w-6 flex-none accent-[#de73a5]"
+                />
+              </label>
+              {me.labWeight && (
+                <FineSetting data={fines} otherName={otherEntry?.name ?? ""} bothOn={otherLab.weight} onChange={setFines} />
+              )}
             </div>
 
             {/* 쉬어가기 요청 */}
@@ -1226,6 +1329,61 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* 친구가 실험실 벌금을 제안했으면 수락/거절을 묻는다 */}
+      {(() => {
+        if (!me || !otherEntry || !fines || roomPaused || incomingPause || weekResultPopup || mealConfirm || !historyReady || settingsOpen) return null;
+        const rule = fines.rules.find(
+          (r) => r.proposedAmount !== null && !r.proposedByMe && me.labWeight && otherLab.weight,
+        );
+        if (!rule) return null;
+        return <FineProposalPopup rule={rule} otherName={otherEntry.name} onChange={(d) => { setFines(d); loadWeek(); }} />;
+      })()}
+
+      {/* 친구가 실험실 기능을 켰는데 나는 아직 꺼져 있으면 "같이 할래요?" 팝업 (방마다 함께 쓰는 기능). 쉬어가는 방에서는 띄우지 않는다 */}
+      {(() => {
+        if (!me || !otherEntry || roomPaused || incomingPause || weekResultPopup || mealConfirm || !historyReady) return null;
+        const skipped = me.labDismissed ?? [];
+        const invite =
+          otherLab.meal && !me.labMeal && !skipped.includes("meal")
+            ? ({ key: "meal", field: "labMeal", title: "식단 인증", desc: "먹은 걸 올리면 AI가 칼로리를 알려줘요. 친구와 식단을 같이 볼 수 있어요." } as const)
+            : otherLab.weight && !me.labWeight && !skipped.includes("weight")
+              ? ({ key: "weight", field: "labWeight", title: "몸무게 인증", desc: "일주일에 한 번 체중계 사진을 올리면 AI가 늘었는지 줄었는지 알려줘요." } as const)
+              : null;
+        if (!invite) return null;
+        async function answer(join: boolean) {
+          if (!invite) return;
+          const body = join ? { [invite.field]: true } : { dismissLab: invite.key };
+          const res = await fetch("/api/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) { alert("저장에 실패했어요"); return; }
+          await loadMe();
+        }
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+              <CharacterSprite row={CharRow.A} pose={CharPose.WIN} height={76} className="mx-auto" />
+              <p className="font-bold text-[#4a2540]">
+                {otherEntry.name}님이 실험실 <span className="text-[#de73a5]">{invite.title}</span>을 켰어요 🧪
+              </p>
+              <p className="text-xs text-[#b4779b]">{invite.desc}</p>
+              <p className="text-sm font-semibold text-[#4a2540]">같이 해볼래요?</p>
+              <div className="flex gap-2">
+                <button onClick={() => answer(true)} className="flex-1 rounded-xl bg-[#f472b6] px-2 py-2.5 text-sm font-bold text-white">
+                  같이 하기
+                </button>
+                <button onClick={() => answer(false)} className="flex-1 rounded-xl bg-white border border-[#ffd6e8] px-2 py-2.5 text-sm font-semibold text-[#b4779b]">
+                  괜찮아요
+                </button>
+              </div>
+              <p className="text-[11px] text-[#d9a9c4]">나중에 설정 → 실험실에서 켤 수도 있어요</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 업데이트 소식: 다른 팝업이 떠 있을 땐 기다렸다가, 앱을 처음 여는 한 번만 보여준다.
           쉬어가는 방(흑백)에서는 띄우지 않고, 쉬는 게 풀린 뒤 처음 들어왔을 때 보여준다 */}

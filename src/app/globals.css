@@ -21,6 +21,15 @@ body {
   color: var(--foreground);
 }
 
+/* 스크롤바는 보이지 않게 한다 (스크롤은 그대로 된다) */
+html,
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* 주간 결과 축하 모션: 색종이가 위에서 떨어지고 캐릭터가 통통 뛴다 */
 @keyframes confetti-fall {
   0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1; }

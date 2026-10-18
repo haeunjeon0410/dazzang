@@ -6,6 +6,11 @@ import { analyzeMealPhoto } from "@/lib/meal-ai";
 import { draftFromAnalysis, parseMealInput } from "@/lib/meal-input";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { takeAiQuota } from "@/lib/ai-quota";
+import { checkThisWeek } from "@/lib/photo-date";
+import { signWeight } from "@/lib/weight-token";
+
+// AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // 하루는 오전 6시에 바뀐다 (lib/week.ts와 동일)
@@ -102,7 +107,7 @@ export async function GET(req: Request) {
 
 // 식단 사진 올리기는 두 단계다.
 // mode "analyze": 사진을 AI로 읽어서 저장하지 않고 초안만 돌려준다.
-//   음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 음식이 아니면 kind "other"(운동 인증으로 보내면 된다),
+//   체중계 사진이면 kind "weight"(kg: 읽은 몸무게, 몸무게 인증을 켠 사람만), 음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 음식이 아니면 kind "other"(운동 인증으로 보내면 된다),
 //   분석 자체가 안 되면(키 없음/실패) kind "unknown"(직접 적게 한다).
 // mode "save": 사용자가 확인하거나 고친 값(title, items, fraction)으로 사진과 함께 저장한다.
 export async function POST(req: Request) {
@@ -110,7 +115,8 @@ export async function POST(req: Request) {
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  if (!me.labMeal) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
+  // 식단이나 몸무게 인증 중 하나라도 켜져 있어야 사진을 AI로 가려낼 수 있다 (저장은 식단 인증이 켜진 사람만)
+  if (!me.labMeal && !me.labWeight) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
   // 사진 분석에는 크레딧이 들어서 사람당 분당 6장까지
   if (tooManyRequests(`meal:${userId}`, 6)) {
     return NextResponse.json({ error: "너무 빨라요. 잠시 뒤에 다시 올려 주세요" }, { status: 429 });
@@ -126,6 +132,7 @@ export async function POST(req: Request) {
   }
 
   if (mode === "save") {
+    if (!me.labMeal) return NextResponse.json({ error: "실험실에서 식단 인증을 먼저 켜 주세요" }, { status: 403 });
     const input = parseMealInput(body);
     if (!input) return NextResponse.json({ error: "음식 이름을 적어 주세요" }, { status: 400 });
     const meal = await prisma.meal.create({
@@ -149,6 +156,15 @@ export async function POST(req: Request) {
   if (quota !== "ok") return NextResponse.json({ kind: "limit", reason: quota });
   const analysis = await analyzeMealPhoto(photoDataUrl);
   if (!analysis) return NextResponse.json({ kind: "unknown" });
-  if (!analysis.isFood) return NextResponse.json({ kind: "other" });
+  // 체중계/체중 앱 사진은 몸무게 인증을 켠 사람만 몸무게로 보낸다 (사진은 저장하지 않고 숫자만 돌려준다)
+  if (analysis.scaleKg && me.labWeight) {
+    // 이번 주에 찍은 사진만 인정한다 (운동 인증과 같은 규칙)
+    const dateCheck = checkThisWeek(body.takenAt);
+    if (!dateCheck.ok) return NextResponse.json({ error: dateCheck.error }, { status: 400 });
+    // 바로 기록하지 않는다: 읽은 숫자에 서명한 토큰을 돌려주고, 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록한다
+    return NextResponse.json({ kind: "weight", kg: analysis.scaleKg, token: signWeight(userId, analysis.scaleKg) });
+  }
+  // 음식 사진이라도 식단 인증이 꺼져 있으면 식단으로 만들지 않는다
+  if (!analysis.isFood || !me.labMeal) return NextResponse.json({ kind: "other" });
   return NextResponse.json({ kind: "draft", draft: draftFromAnalysis(analysis) });
 }
