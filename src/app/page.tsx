@@ -939,7 +939,7 @@ export default function Home() {
                 <span className="space-y-0.5">
                   <span className="block text-sm font-semibold text-[#4a2540]">식단 인증</span>
                   <span className="block text-xs text-[#b4779b]">
-                    켜면 주간 표에 운동 | 식단 전환이 생겨요. 식단 보기에서 인증하기로 먹은 걸 올리면 AI가 칼로리를 어림잡고 친구와 같이 볼 수 있어요. 벌금과는 상관없어요.
+                    먹은 걸 올리면 AI가 칼로리를 알려줘요. 벌금과는 상관없어요.
                   </span>
                 </span>
                 <input
