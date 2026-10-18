@@ -10,6 +10,7 @@ import { ExcusePanel } from "./excuses";
 import { MealView } from "./meals";
 import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 import { ShortcutSetup } from "./shortcut-setup";
+import { MealReminderSetting } from "./meal-reminder-setting";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
@@ -56,7 +57,18 @@ type Summary = {
   checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
 };
 
-type Me = { id: string; name: string; caption?: string; restUntil?: string | null; labMeal?: boolean; mealToken?: string | null; pendingMeals?: number };
+type Me = {
+  id: string;
+  name: string;
+  caption?: string;
+  restUntil?: string | null;
+  labMeal?: boolean;
+  mealToken?: string | null;
+  pendingMeals?: number;
+  mealReminder?: boolean;
+  lunchTime?: string;
+  dinnerTime?: string;
+};
 type Room = {
   inviteToken: string;
   full: boolean;
@@ -999,6 +1011,14 @@ export default function Home() {
                 />
               </label>
               {me.labMeal && <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />}
+              {me.labMeal && (
+                <MealReminderSetting
+                  enabled={!!me.mealReminder}
+                  lunch={me.lunchTime ?? "12:30"}
+                  dinner={me.dinnerTime ?? "18:30"}
+                  onChanged={loadMe}
+                />
+              )}
             </div>
 
             {/* 쉬어가기 요청 */}

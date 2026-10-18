@@ -88,6 +88,10 @@ model User {
   meals   Meal[]
   // 아이폰 단축어(액션 버튼)로 식단 사진을 올릴 때 쓰는 개인 토큰. 쿠키가 없는 단축어가 "누구의 사진인지" 알려주는 용도
   mealToken String? @unique
+  // 식사 알림: 켜 두면 정한 점심/저녁 시간(KST, HH:mm)에 식단을 올리라는 푸시가 온다
+  mealReminder Boolean @default(false)
+  lunchTime    String  @default("12:30")
+  dinnerTime   String  @default("18:30")
 
   checkins      Checkin[]
   settlements   Settlement[]
@@ -122,6 +126,16 @@ model Meal {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// 식사 알림을 이미 보낸 기록 (같은 날 같은 알림이 두 번 가지 않게). day는 KST 날짜, kind는 lunch | dinner
+model MealReminderSent {
+  id     String @id @default(cuid())
+  userId String
+  day    String
+  kind   String
+
+  @@unique([userId, day, kind])
 }
 
 // 사람마다 하루에 AI를 몇 번 불렀는지 (크레딧을 한 사람이 너무 많이 쓰지 않게 하는 제한용). day는 오전 6시 기준 KST 날짜
