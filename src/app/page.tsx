@@ -43,7 +43,7 @@ type Summary = {
   ribbonIds?: string[];
   weightTrend?: "up" | "down" | "same" | null;
   recentEarnedRibbonIds?: string[];
-  checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean }[];
+  checkins: { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean; reaction?: string | null }[];
 };
 
 type Me = {

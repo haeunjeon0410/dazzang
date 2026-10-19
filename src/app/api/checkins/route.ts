@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { labFinesFor, labFineKey, noLabFine, weightTrendsFor } from "@/lib/lab-fine";
 import { settleLastWeekLazily } from "@/lib/week-settle";
+import { reactionOf } from "@/lib/reactions";
 import { createCheckin } from "@/lib/checkin-create";
 import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     prisma.checkin.findMany({
       where: { weekStart, userId: { in: userIds } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, userId: true, weekStart: true, liked: true, createdAt: true },
+      select: { id: true, userId: true, weekStart: true, liked: true, reaction: true, createdAt: true },
     }),
     prisma.excuse.findMany({ where: { weekStart, status: "APPROVED", userId: { in: userIds } } }),
     prisma.roomPause.findMany({ where: { roomId: me.roomId } }),
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
       // 몸무게가 지난 기록보다 늘었는지/줄었는지만 (수치는 없음). 친구에게도 보인다
       weightTrend: weightTrends.get(u.id) ?? null,
       fine: pardoned ? 0 : shortfall * FINE_PER_MISS + lab.total,
-      checkins: mine.map((c) => ({ id: c.id, photoUrl: `/api/checkins/${c.id}/photo`, createdAt: c.createdAt, userId: c.userId, liked: c.liked })),
+      checkins: mine.map((c) => ({ id: c.id, photoUrl: `/api/checkins/${c.id}/photo`, createdAt: c.createdAt, userId: c.userId, liked: c.liked, reaction: reactionOf(c) })),
     };
   });
 
