@@ -17,10 +17,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_RESET_MS = 6 * 60 * 60 * 1000;
 const MAX_PHOTO_CHARS = 6 * 1024 * 1024 * 1.4;
 
+// 사진은 base64를 목록에 넣지 않고 따로 받는 주소로 준다 (/api/meals/[id]/photo)
 const mealView = (m: {
   id: string;
   userId: string;
-  photoUrl: string;
   analyzed: boolean;
   title: string | null;
   kcal: number | null;
@@ -33,7 +33,7 @@ const mealView = (m: {
   id: m.id,
   userId: m.userId,
   name,
-  photoUrl: m.photoUrl,
+  photoUrl: `/api/meals/${m.id}/photo`,
   analyzed: m.analyzed,
   title: m.title,
   kcal: m.kcal,
@@ -60,6 +60,7 @@ export async function GET(req: Request) {
       where: { userId, confirmed: false },
       orderBy: { createdAt: "asc" },
       take: 10,
+      omit: { photoUrl: true },
     });
     return NextResponse.json({ drafts: drafts.map((m) => mealView(m, me.name)) });
   }
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
           where: { userId: { in: ids }, confirmed: true, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
           orderBy: { createdAt: "desc" },
           take: 30,
+          omit: { photoUrl: true },
         });
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
   return NextResponse.json({

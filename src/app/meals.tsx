@@ -304,7 +304,7 @@ export function MealView({
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
                         {m.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.photoUrl} alt="식단" draggable={false} className="aspect-square w-full object-cover" />
+                          <img src={m.photoUrl} alt="식단" loading="lazy" decoding="async" draggable={false} className="aspect-square w-full object-cover" />
                         ) : (
                           <div className="flex aspect-square w-full items-center justify-center bg-[#fff0f6] px-6 text-center text-xs text-[#b4779b]">
                             사진은 30일이 지나 지웠어요
