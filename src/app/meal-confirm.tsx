@@ -20,6 +20,21 @@ const FRACTIONS: [number, string][] = [
 // 사람은 음식 이름과 먹은 양만 고치고, 이름을 고치거나 새로 넣으면 그 음식의 칼로리를 AI가 다시 계산한다.
 type Row = ConfirmItem & { est: string; kcalKnown: boolean };
 
+// 마지막 글자에 받침이 있으면 "과", 없으면 "와" (한글이 아니면 "와")
+function withParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  const hasBatchim = code >= 0 && code <= 11171 && code % 28 !== 0;
+  return `${word}${hasBatchim ? "과" : "와"}`;
+}
+
+// 음식 이름들로 식단 제목을 만든다: 하나면 그 이름, 둘이면 "돈까스와 쌀국수", 셋 이상이면 "돈까스 외 2가지"
+export function mealTitleFrom(names: string[]): string {
+  const list = names.map((n) => n.trim()).filter(Boolean);
+  const title =
+    list.length === 0 ? "" : list.length === 1 ? list[0] : list.length === 2 ? `${withParticle(list[0])} ${list[1]}` : `${list[0]} 외 ${list.length - 1}가지`;
+  return title.slice(0, 40);
+}
+
 export function MealConfirm({
   photoUrl,
   initial,
@@ -37,6 +52,8 @@ export function MealConfirm({
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(initial.title);
+  // 제목을 직접 고쳤으면 그 뒤로는 음식을 바꿔도 제목을 덮어쓰지 않는다
+  const [titleTouched, setTitleTouched] = useState(false);
   const [rows, setRows] = useState<Row[]>(() =>
     initial.items.map((i) => ({ ...i, est: i.name.trim(), kcalKnown: i.name.trim() !== "" && i.kcal > 0 })),
   );
@@ -90,8 +107,18 @@ export function MealConfirm({
   const canSave = title.trim().length > 0 && !pending && !busy;
   const label = (f: number) => FRACTIONS.find(([v]) => v === f)?.[1] ?? `${Math.round(f * 100)}%`;
 
+  // 음식 목록(이름)이 바뀌면 제목도 따라 바뀐다. 예: 버섯국을 쌀국수로 고치면 "돈까스와 버섯국" -> "돈까스와 쌀국수"
+  function changeRows(next: Row[]) {
+    setRows(next);
+    if (titleTouched) return;
+    const auto = mealTitleFrom(next.map((r) => r.name));
+    if (auto) setTitle(auto);
+  }
+
   function setRow(idx: number, patch: Partial<Row>) {
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    if ("name" in patch) changeRows(next);
+    else setRows(next);
   }
 
   return (
@@ -108,7 +135,10 @@ export function MealConfirm({
             <p className="text-xs font-bold text-[#c2679c]">{aiRead ? "AI가 읽었어요. 틀리면 고쳐 주세요" : "직접 적어 주세요"}</p>
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleTouched(true);
+              }}
               placeholder="음식 이름"
               maxLength={40}
               className="w-full rounded-xl border border-[#ffd6e8] bg-[#fff0f6] px-3 py-2 text-base font-bold text-[#4a2540]"
@@ -122,7 +152,7 @@ export function MealConfirm({
             <p className="text-sm font-bold text-[#c2679c]">먹은 음식</p>
             {rows.length < 8 && (
               <button
-                onClick={() => setRows((prev) => [...prev, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
+                onClick={() => setRows([...rows, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
                 className="rounded-lg border border-dashed border-[#de73a5] bg-white px-3 py-1 text-xs font-bold text-[#de73a5]"
               >
                 + 추가
@@ -167,7 +197,7 @@ export function MealConfirm({
                   {r.fraction < 1 ? label(r.fraction) : "다 먹음"}
                 </button>
                 <button
-                  onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
+                  onClick={() => changeRows(rows.filter((_, i) => i !== idx))}
                   aria-label="이 음식 빼기"
                   className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-sm text-[#c2679c]"
                 >
