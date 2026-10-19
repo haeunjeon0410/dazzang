@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   if (!user) return reply(false, "연결 코드가 올바르지 않아요. 앱에서 주소를 다시 복사해 주세요", 401);
   // 사진이 못 올라간 이유는 단축어 화면 대신 푸시로 알려 준다 (단축어에 "콘텐츠 보기" 단계를 두지 않는다)
   const fail = async (message: string, status = 200) => {
-    await sendPushToUser(user, { title: "식단을 못 올렸어요", body: message }).catch(() => {});
+    await sendPushToUser(user, { title: "사진을 못 올렸어요", body: message }).catch(() => {});
     return reply(false, message, status);
   };
   if (tooManyRequests(`meal-ext:${user.id}`, 10)) return fail("너무 빨라요. 잠시 뒤에 다시 보내 주세요", 429);
@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
       create: { userId: user.id, weekStart, kg: analysis.scaleKg },
       update: { kg: analysis.scaleKg },
     });
-    const message = `몸무게 ${analysis.scaleKg}kg로 기록했어요`;
-    await sendPushToUser(user, { title: "몸무게 기록", body: message }).catch(() => {});
+    const message = `몸무게에 올라갔어요 · ${analysis.scaleKg}kg`;
+    await sendPushToUser(user, { title: "⚖️ 몸무게에 올라갔어요", body: `${analysis.scaleKg}kg로 기록했어요` }).catch(() => {});
     return reply(true, message);
   }
 
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
   if (analysis?.category === "workout") {
     const result = await createCheckin(user.id, photoUrl, await readTakenAt(image));
     if (!result.ok) return fail(result.error);
-    const message = "운동 인증으로 올렸어요";
-    await sendPushToUser(user, { title: "운동 인증", body: message }).catch(() => {});
+    const message = "운동에 올라갔어요";
+    await sendPushToUser(user, { title: "💪 운동에 올라갔어요", body: "운동 인증으로 올렸어요" }).catch(() => {});
     return reply(true, message);
   }
   // 어느 쪽으로도 못 읽은 사진은 저장하지 않고 다시 올리게 한다
@@ -121,10 +121,11 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const message = draft
-    ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 기록했어요`
-    : "분석은 못 했지만 사진은 기록했어요. 앱 식단 창의 수정에서 적어 주세요";
+  const detail = draft
+    ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal`
+    : "분석은 못 해서 칼로리는 비어 있어요. 앱 식단 창의 수정에서 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
-  await sendPushToUser(user, { title: "식단 기록", body: message }).catch(() => {});
+  await sendPushToUser(user, { title: "🍽️ 식단에 올라갔어요", body: detail }).catch(() => {});
+  const message = `식단에 올라갔어요 · ${detail}`;
   return reply(true, message);
 }
