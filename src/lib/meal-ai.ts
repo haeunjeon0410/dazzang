@@ -6,8 +6,12 @@ import { validKg } from "@/lib/weight-ai";
 
 const MODEL = process.env.GATEWAY_MODEL || "gpt-6-luna";
 
+export type PhotoCategory = "food" | "scale" | "workout" | "other";
+
 export type MealAnalysis = {
-  // 음식 사진인지. false면 운동 인증 등 다른 사진이라 식단으로 저장하지 않는다
+  // 사진이 무엇인지: 음식(식단) | 체중계/체중 앱(몸무게) | 운동 | 기타
+  category: PhotoCategory;
+  // 음식 사진인지 (category === "food"). false면 식단으로 저장하지 않는다
   isFood: boolean;
   // 체중계(또는 체중 기록 앱 화면) 사진이면 읽은 몸무게(kg). 몸무게 인증을 켠 사람은 이 사진을 식단/운동이 아니라 몸무게로 기록한다
   scaleKg?: number;
@@ -16,18 +20,22 @@ export type MealAnalysis = {
   items: { name: string; kcal: number }[];
 };
 
-const PROMPT = `너는 다이어트 인증방에 올라온 사진을 먼저 분류하고, 음식 사진이면 칼로리를 추정하는 코치야.
-올라오는 사진은 식단(음식), 운동(헬스장·운동하는 모습·러닝/운동 기록 앱 화면·운동복 인증샷), 몸무게(체중계·체중 앱 화면) 중 하나이고, 그 밖의 사진(셀카, 풍경, 물건)도 올 수 있어.
-먼저 사진의 '주인공'이 무엇인지 보고 JSON 객체 하나로만 답해 (키: isFood, scaleKg, title, kcal, items).
-- isFood: 사진의 주인공이 먹거나 마실 음식·음료일 때만 true (집밥, 도시락, 배달/편의점 음식, 과자·빵·과일, 커피·음료, 먹다 남긴 음식, 흐리거나 어두운 음식 사진 포함).
-  음식이 주인공이 아니면 false. 배경에 음식이나 물병이 살짝 보여도 주인공이 운동 장면, 운동 기록 화면, 사람(셀카·운동 인증샷), 풍경, 체중계라면 false.
-  운동 사진이나 기록 화면을 음식으로 억지로 읽지 마. 음식이 맞는지 정말 확실하지 않으면 false로 해
-- scaleKg: 체중계 화면이나 체중 기록 앱 화면처럼 몸무게(kg) 숫자가 보이는 사진이면 그 숫자(소수점 한 자리). 아니면 0. 몸무게 사진이면 isFood는 false
-- title: (음식일 때) 한 줄 요약 (20자 이내, 예: "닭가슴살 샐러드")
-- items: (음식일 때) 음식별 이름과 추정 kcal, 1인분 기준 (최대 8개)
-- kcal: (음식일 때) 전체 합계 (items 합과 같게)
-음식이 아니면 isFood를 false, title을 "", kcal을 0, items를 빈 배열로 해.
-JSON 키는 isFood, scaleKg, title, kcal, items 다섯 개야.`;
+const PROMPT = `너는 다이어트 인증방에 올라온 사진이 무엇인지 분류하고, 음식이면 칼로리까지 추정하는 코치야.
+올라오는 사진은 아래 넷 중 정확히 하나야. 사진의 '주인공'을 보고 category를 골라.
+- "food": 먹거나 마실 음식·음료가 주인공 (집밥, 도시락, 배달/편의점 음식, 과자·빵·과일, 커피·음료, 먹다 남긴 음식, 흐리거나 어두운 음식 사진)
+- "scale": 체중계 화면이나 체중 기록 앱 화면처럼 몸무게(kg) 숫자가 주인공
+- "workout": 운동 인증 (헬스장, 운동하는 모습, 운동 기구, 운동복 인증샷, 러닝·걷기·운동 기록 앱 화면)
+- "other": 위 셋 어디에도 안 맞는 사진 (풍경, 물건, 글자 등)
+배경에 음식이나 물병이 살짝 보여도 주인공이 운동 장면·사람·체중계면 food가 아니야.
+
+JSON 객체 하나로만 답해 (키: category, scaleKg, title, kcal, items).
+- category: 위 넷 중 하나
+- scaleKg: category가 "scale"이면 화면에 보이는 몸무게 숫자(소수점 한 자리). 아니면 0
+- title: category가 "food"일 때 한 줄 요약 (20자 이내, 예: "닭가슴살 샐러드")
+- items: category가 "food"일 때 음식별 이름과 추정 kcal, 1인분 기준 (최대 8개)
+- kcal: category가 "food"일 때 전체 합계 (items 합과 같게)
+food가 아니면 title을 "", kcal을 0, items를 빈 배열로 해.
+JSON 키는 category, scaleKg, title, kcal, items 다섯 개야.`;
 
 // 모델이 코드 블록으로 감싸거나 앞뒤에 말을 붙여도 JSON 부분만 꺼낸다 (mypt에서 쓰는 방식과 같다)
 function extractJson(text: string): unknown {
@@ -51,17 +59,24 @@ function clean(raw: unknown): MealAnalysis | null {
     .slice(0, 8)
     .map((i) => ({ name: String((i as { name?: unknown })?.name ?? "").slice(0, 30), kcal: num((i as { kcal?: unknown })?.kcal) }))
     .filter((i) => i.name);
-  // 모델이 "true"/"false" 글자로 답해도 받아들인다
-  const isFood = typeof r.isFood === "boolean" ? r.isFood : r.isFood === "true" ? true : r.isFood === "false" ? false : null;
-  if (isFood === null) return null;
+  const CATEGORIES: PhotoCategory[] = ["food", "scale", "workout", "other"];
+  const given = typeof r.category === "string" ? (r.category.trim().toLowerCase() as PhotoCategory) : null;
+  // 예전 형식(isFood만 온 답)도 받아들인다
+  const legacy = r.isFood === true || r.isFood === "true" ? "food" : r.isFood === false || r.isFood === "false" ? "other" : null;
+  const category = given && CATEGORIES.includes(given) ? given : legacy;
+  if (!category) return null;
   const title = typeof r.title === "string" ? r.title.trim().slice(0, 40) : "";
-  if (!isFood) {
+  if (category === "scale") {
     const kg = validKg(r.scaleKg);
-    return { isFood: false, ...(kg ? { scaleKg: kg } : {}), title: "", kcal: 0, items: [] };
+    // 체중계인데 숫자를 못 읽었으면 분류가 아니라 읽기 실패다
+    if (!kg) return null;
+    return { category, isFood: false, scaleKg: kg, title: "", kcal: 0, items: [] };
   }
+  if (category !== "food") return { category, isFood: false, title: "", kcal: 0, items: [] };
   // 이름을 안 줬어도 음식이 맞으면 첫 음식 이름으로 채운다 (분석 실패로 버리지 않는다)
   const name = title || items[0]?.name || "식사";
   return {
+    category: "food",
     isFood: true,
     title: name,
     kcal: num(r.kcal) || items.reduce((s, i) => s + i.kcal, 0),
@@ -118,6 +133,8 @@ export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | 
       if (!text) text = await callOnce(key, dataUrl, MAX_TOKENS * 2);
       const result = text ? clean(extractJson(text)) : null;
       if (result) return result;
+      // 왜 못 읽었는지 서버 로그에 남긴다 (사진은 남기지 않고 답 앞부분만)
+      console.error("[meal] unreadable answer", JSON.stringify(text.slice(0, 300)));
     } catch (e) {
       console.error("[meal] gateway", e instanceof Error ? e.message : e);
     }

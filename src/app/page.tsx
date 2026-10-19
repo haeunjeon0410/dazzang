@@ -512,9 +512,9 @@ export default function Home() {
           setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
-        if ((data?.kind === "unknown" || data?.kind === "limit" || data?.kind === "other") && viewMode === "diet") {
-          // 식단 보기에서 올렸는데 AI를 못 쓰거나 음식으로 못 읽었어도 운동으로 보내지 않고 확인 창도 띄우지 않는다.
-          // 사진은 분석 없이 "식사"로 바로 기록하고, 고치는 건 식단 창의 "수정"에서만 한다
+        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
+          // 식단 보기에서 올렸는데 AI를 못 쓰는 상태(실패, 한도 초과)면 확인 창을 띄우지 않고
+          // 사진을 분석 없이 "식사"로 바로 기록한다. 고치는 건 식단 창의 "수정"에서만 한다
           const saveRes = await fetch("/api/meals", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -533,7 +533,7 @@ export default function Home() {
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다
-        if (data?.kind === "other") setToast("음식 사진이 아닌 것 같아서 운동 인증으로 올렸어요");
+        if (data?.kind === "other") setToast("운동 사진으로 읽어서 운동 인증으로 올렸어요");
         setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
