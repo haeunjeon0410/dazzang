@@ -512,16 +512,24 @@ export default function Home() {
           setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
-        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
-          // AI를 못 쓰는 상태(키 없음, 실패, 오늘 한도 초과): 직접 적을 수 있게 빈 확인 창을 연다
-          if (data.kind === "limit") setToast(`${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 직접 적어 주세요`);
-          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
-          return;
-        }
-        // 식단 보기에서 올렸는데 AI가 음식으로 못 읽었으면 운동으로 보내지 말고 직접 적게 한다 (음식 사진을 잘못 읽어도 사진이 사라지지 않게)
-        if (data?.kind === "other" && viewMode === "diet") {
-          setToast("음식으로 읽지 못했어요. 직접 적어 주세요");
-          setMealConfirm({ photo: mealPhoto, initial: { title: "", items: [{ name: "", kcal: 0, fraction: 1 }] }, aiRead: false });
+        if ((data?.kind === "unknown" || data?.kind === "limit" || data?.kind === "other") && viewMode === "diet") {
+          // 식단 보기에서 올렸는데 AI를 못 쓰거나 음식으로 못 읽었어도 운동으로 보내지 않고 확인 창도 띄우지 않는다.
+          // 사진은 분석 없이 "식사"로 바로 기록하고, 고치는 건 식단 창의 "수정"에서만 한다
+          const saveRes = await fetch("/api/meals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photoDataUrl: mealPhoto, mode: "save", analyzed: false, title: "식사", items: [] }),
+          });
+          if (!saveRes.ok) {
+            alert((await saveRes.json().catch(() => null))?.error || "저장하지 못했어요");
+            return;
+          }
+          setMealRefresh((n) => n + 1);
+          setToast(
+            data.kind === "limit"
+              ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 써서 칼로리 없이 기록했어요. 식단 창의 수정에서 적어 주세요`
+              : "분석하지 못해 칼로리 없이 기록했어요. 식단 창의 수정에서 적어 주세요",
+          );
           return;
         }
         // 그 밖에는 운동 인증으로 이어진다

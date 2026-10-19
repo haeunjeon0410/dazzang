@@ -93,19 +93,18 @@ export async function POST(req: NextRequest) {
     return reply(true, message);
   }
 
-  // 음식으로 못 읽었어도(음식이 아니라고 했거나 분석 실패) 사진은 버리지 않는다: 확인 대기로 남겨 앱에서 직접 적거나 지운다
+  // 음식으로 못 읽었어도(음식이 아니라고 했거나 분석 실패) 사진은 버리지 않고 "식사"로 바로 기록한다. 고치는 건 앱 식단 창의 수정에서 한다
   const draft = analysis?.isFood ? draftFromAnalysis(analysis) : null;
   await prisma.meal.create({
     data: {
       userId: user.id,
       photoUrl,
       analyzed: !!draft,
-      title: draft?.title ?? null,
-      kcal: draft?.kcal ?? null,
+      title: draft?.title ?? "식사",
+      kcal: draft?.kcal ?? 0,
       items: draft?.items ?? undefined,
       fraction: 1,
-      // AI가 읽은 사진은 바로 기록하고, 못 읽은 사진만 확인 대기로 남긴다
-      confirmed: !!draft,
+      confirmed: true,
       source: "shortcut",
     },
   });
@@ -113,9 +112,9 @@ export async function POST(req: NextRequest) {
   const message = draft
     ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 기록했어요`
     : analysis
-      ? "음식으로 읽지 못했어요. 앱에서 확인하고 직접 적어 주세요"
-      : "사진은 올렸어요. 분석은 못 했으니 앱에서 직접 적어 주세요";
+      ? "음식으로 읽지 못해 칼로리 없이 기록했어요. 앱 식단 창의 수정에서 적어 주세요"
+      : "분석은 못 했지만 사진은 기록했어요. 앱 식단 창의 수정에서 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
-  await sendPushToUser(user, { title: draft ? "식단 기록" : "식단 확인", body: message }).catch(() => {});
+  await sendPushToUser(user, { title: "식단 기록", body: message }).catch(() => {});
   return reply(true, message);
 }
