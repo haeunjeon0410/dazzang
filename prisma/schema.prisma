@@ -133,7 +133,8 @@ model Checkin {
   user      User     @relation(fields: [userId], references: [id])
   photoUrl  String
   weekStart DateTime // 해당 인증이 속한 주의 월요일 00:00 (KST)
-  liked     Boolean  @default(false) // 상대방이 칭찬(좋아요) 눌렀는지
+  liked     Boolean  @default(false) // 상대방이 칭찬(좋아요) 눌렀는지 (예전 하트. 이모티콘 반응이 있으면 reaction도 같이 채운다)
+  reaction  String? // 상대방이 고른 이모티콘 (lib/reactions.ts의 목록). 한 번 고르면 바꿀 수 없다
   createdAt DateTime @default(now()) // 사진 촬영 시각(EXIF). 촬영 정보가 없으면 업로드 시각
 
   @@index([userId, weekStart])
@@ -154,6 +155,7 @@ model Meal {
   fraction  Float    @default(1) // 먹은 비율 (1=다 먹음, 0.5=절반). kcal은 items 합 × fraction
   confirmed Boolean  @default(true) // false면 단축어로 올라와 아직 본인이 확인하지 않은 초안. 확인 전에는 친구에게 안 보인다
   source    String   @default("app") // app | shortcut
+  reaction  String? // 상대방이 고른 이모티콘 (lib/reactions.ts). 한 번 고르면 바꿀 수 없다
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])

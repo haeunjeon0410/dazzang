@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { todayDayIndex } from "./calendar";
 import { MealConfirm, type ConfirmValues } from "./meal-confirm";
+import { ReactionOverlay } from "./reaction-overlay";
 
 type Meal = {
   id: string;
@@ -14,6 +15,7 @@ type Meal = {
   kcal: number | null;
   items: { name: string; kcal: number; fraction?: number }[] | null;
   fraction?: number;
+  reaction?: string | null;
   createdAt: string;
 };
 
@@ -27,11 +29,12 @@ type MealsData = {
 
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
-// 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 2500kcal 이상이면 가장 진하다
-// 하루 칼로리를 세 단계 색으로만 나눈다 (적게 / 보통 / 많이). 글자색은 늘 같다
+// 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 400kcal마다 한 단계씩 진해지고 1600kcal 이상이 가장 진하다. 글자색은 늘 같다
 function heatClass(kcal: number): string {
-  if (kcal >= 2000) return "bg-[#eba0c0]";
-  if (kcal >= 1200) return "bg-[#f6c3d8]";
+  if (kcal >= 1600) return "bg-[#e48fb5]";
+  if (kcal >= 1200) return "bg-[#efafc9]";
+  if (kcal >= 800) return "bg-[#f6c3d8]";
+  if (kcal >= 400) return "bg-[#f9d3e3]";
   return "bg-[#fde3ee]";
 }
 
@@ -61,6 +64,8 @@ export function MealView({
   const [popup, setPopup] = useState<{ userId: string; day: number } | null>(null);
   const [dayMeals, setDayMeals] = useState<Meal[] | null>(null);
   const [slide, setSlide] = useState(0);
+  // 방금 내가 남긴 반응 (목록을 다시 읽기 전에도 바로 보이게)
+  const [reactions, setReactions] = useState<Record<string, string>>({});
   const [reload, setReload] = useState(0);
   // 단축어로 올라와 아직 확인하지 않은 내 식단 (확인 창에 하나씩 띄운다)
   const [draft, setDraft] = useState<Meal | null>(null);
@@ -180,6 +185,19 @@ export function MealView({
     window.addEventListener("mouseup", onUp);
   }
 
+  // 친구 식단 사진에 이모티콘 반응을 남기고, 남겨진 이모티콘을 돌려준다 (실패하면 null)
+  async function reactTo(m: Meal, emoji: string): Promise<string | null> {
+    const res = await fetch(`/api/meals/${m.id}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    if (!res.ok) return null;
+    const chosen: string = (await res.json()).reaction ?? emoji;
+    setReactions((prev) => ({ ...prev, [m.id]: chosen }));
+    return chosen;
+  }
+
   async function remove(id: string) {
     if (!confirm("이 식단을 지울까요?")) return;
     const res = await fetch(`/api/meals/${id}`, { method: "DELETE" });
@@ -261,7 +279,7 @@ export function MealView({
         // 앱의 다른 창(내 정보, 통산전적)과 같은 흰 카드. 바깥을 누르면 닫힌다
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setPopup(null)}>
           <div
-            className="w-full max-w-[19rem] rounded-3xl bg-white p-4 shadow-xl"
+            className="w-full max-w-[22rem] rounded-3xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {dayMeals === null && <p className="py-10 text-center text-sm text-[#b4779b]">불러오는 중...</p>}
@@ -304,7 +322,7 @@ export function MealView({
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
                         {m.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.photoUrl} alt="식단" loading="lazy" decoding="async" draggable={false} className="aspect-square w-full object-cover" />
+                          <img src={`${m.photoUrl}?w=480`} alt="식단" loading="lazy" decoding="async" draggable={false} className="aspect-square w-full object-cover" />
                         ) : (
                           <div className="flex aspect-square w-full items-center justify-center bg-[#fff0f6] px-6 text-center text-xs text-[#b4779b]">
                             사진은 30일이 지나 지웠어요
@@ -333,12 +351,20 @@ export function MealView({
                             ›
                           </button>
                         )}
+                        {/* 오른쪽 위: 친구 식단에는 이모티콘 반응 버튼, 반응이 있으면 그 이모티콘. 틀이 사진을 자르니 조각은 안쪽으로 터진다 */}
+                        <ReactionOverlay
+                          key={m.id}
+                          mine={m.userId === meId}
+                          reaction={reactions[m.id] ?? m.reaction ?? null}
+                          onPick={(emoji) => reactTo(m, emoji)}
+                          inward
+                        />
                         {m.userId === meId && (
-                          // 눈에 띄지 않게 사진 구석에 둔 지우기 버튼
+                          // 눈에 띄지 않게 사진 구석에 둔 지우기 버튼 (오른쪽 위는 친구의 반응 자리라 왼쪽 위에 둔다)
                           <button
                             onClick={() => remove(m.id)}
                             aria-label="식단 지우기"
-                            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-xs text-white/80"
+                            className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/20 text-xs text-white/80"
                           >
                             ✕
                           </button>

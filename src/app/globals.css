@@ -13,12 +13,18 @@
 
 body {
   background-color: var(--background);
-  background-image: url("/assets/bg-room.webp");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   color: var(--foreground);
+}
+
+/* 배경 그림은 화면에 고정된 별도 층으로 둔다. body에 background-attachment: fixed를 쓰면 스크롤할 때마다 배경을 다시 그려서
+   (특히 안드로이드) 버벅거린다. 고정된 층은 그대로 두고 그 위에서 내용만 움직인다 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url("/assets/bg-room.webp") top center / cover no-repeat;
+  pointer-events: none;
 }
 
 /* 스크롤바는 보이지 않게 한다 (스크롤은 그대로 된다) */
@@ -224,4 +230,23 @@ html.paused-app { filter: grayscale(1) contrast(0.95); }
   .ribbon-attach { animation: none; }
   .ribbon-sparkle { display: none; }
   .ribbon-toast { animation: none; }
+}
+
+/* 인증샷 이모티콘 반응: 고른 이모티콘이 튀어오르고(reaction-pop), 같은 이모티콘 조각들이 사방으로 터진다(reaction-particle).
+   조각마다 날아갈 방향(--bx, --by)과 회전(--br)은 JS가 정한다 */
+@keyframes reaction-pop {
+  0% { transform: scale(0.2); opacity: 0; }
+  45% { transform: scale(1.7); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes reaction-burst {
+  0% { transform: translate(0, 0) scale(0.3) rotate(0deg); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--bx), var(--by)) scale(1.1) rotate(var(--br)); opacity: 0; }
+}
+.reaction-pop { animation: reaction-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.reaction-particle { animation: reaction-burst 0.85s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .reaction-pop { animation: none; }
+  .reaction-particle { animation: none; opacity: 0; }
 }

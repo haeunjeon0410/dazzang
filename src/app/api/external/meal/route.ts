@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { analyzeMealPhoto } from "@/lib/meal-ai";
+import { analyzeMealPhotoDetailed } from "@/lib/meal-ai";
+import { aiFailureText } from "@/lib/ai-failure";
 import { draftFromAnalysis } from "@/lib/meal-input";
 import { sendPushToUser } from "@/lib/push";
 import { tooManyRequests } from "@/lib/rate-limit";
@@ -81,9 +82,9 @@ export async function POST(req: NextRequest) {
   const quota = await takeAiQuota(user.id, "photo");
   if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
   // 분석이 예기치 않게 터져도 아무 반응이 없게 두지 않고 알림으로 알린다
-  const analysis = await analyzeMealPhoto(photoUrl).catch((e) => {
+  const { analysis, failure } = await analyzeMealPhotoDetailed(photoUrl).catch((e) => {
     console.error("[meal] analyze", e instanceof Error ? e.message : e);
-    return null;
+    return { analysis: null, failure: "network" } as { analysis: null; failure: string };
   });
 
   // 체중계 사진은 식단이 아니라 몸무게로 기록한다 (몸무게 인증을 켠 사람만). 숫자가 틀렸으면 앱의 몸무게 창에서 다시 기록한다
@@ -113,7 +114,10 @@ export async function POST(req: NextRequest) {
   if (analysis?.category === "other") return fail("사진을 인식하지 못했어요. 다시 올려 주세요");
 
   // 분석 자체가 안 된 사진(키 없음, 호출 실패)은 칼로리를 못 구하니 저장하지 않고 다시 올리게 한다
-  if (!analysis) return fail("분석하지 못했어요. 잠시 뒤에 다시 올려 주세요");
+  if (!analysis) {
+    const why = aiFailureText(failure);
+    return fail(`분석하지 못했어요${why ? ` (${why})` : ""}. 잠시 뒤에 다시 올려 주세요`);
+  }
 
   // 여기까지 오는 건 음식 사진뿐이다 (체중계, 운동, 기타, 분석 실패는 위에서 걸러진다)
   const draft = draftFromAnalysis(analysis);

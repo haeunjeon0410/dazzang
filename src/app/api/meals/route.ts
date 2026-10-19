@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getWeekStart } from "@/lib/week";
-import { analyzeMealPhoto } from "@/lib/meal-ai";
+import { analyzeMealPhotoDetailed } from "@/lib/meal-ai";
 import { draftFromAnalysis, parseMealInput } from "@/lib/meal-input";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { takeAiQuota } from "@/lib/ai-quota";
@@ -28,12 +28,14 @@ const mealView = (m: {
   fraction: number;
   confirmed: boolean;
   source: string;
+  reaction: string | null;
   createdAt: Date;
-}, name: string) => ({
+}, name: string, photoGone = false) => ({
   id: m.id,
   userId: m.userId,
   name,
-  photoUrl: `/api/meals/${m.id}/photo`,
+  // 30일이 지나 사진을 지운 식단은 빈 값 (화면에 "사진은 지웠어요"가 뜬다)
+  photoUrl: photoGone ? "" : `/api/meals/${m.id}/photo`,
   analyzed: m.analyzed,
   title: m.title,
   kcal: m.kcal,
@@ -41,6 +43,7 @@ const mealView = (m: {
   fraction: m.fraction,
   confirmed: m.confirmed,
   source: m.source,
+  reaction: m.reaction,
   createdAt: m.createdAt,
 });
 
@@ -95,6 +98,11 @@ export async function GET(req: Request) {
           take: 30,
           omit: { photoUrl: true },
         });
+  const gone = new Set(
+    meals.length
+      ? (await prisma.meal.findMany({ where: { id: { in: meals.map((m) => m.id) }, photoUrl: "" }, select: { id: true } })).map((m) => m.id)
+      : [],
+  );
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
   return NextResponse.json({
     // 나를 먼저
@@ -102,7 +110,7 @@ export async function GET(req: Request) {
     week,
     day,
     pendingCount,
-    meals: meals.map((m) => mealView(m, nameOf.get(m.userId) ?? "")),
+    meals: meals.map((m) => mealView(m, nameOf.get(m.userId) ?? "", gone.has(m.id))),
   });
 }
 
@@ -152,8 +160,8 @@ export async function POST(req: Request) {
   // 오늘 내 한도나 이번 달 앱 전체 한도를 넘으면 AI를 부르지 않고 직접 적게 한다
   const quota = await takeAiQuota(userId, "photo");
   if (quota !== "ok") return NextResponse.json({ kind: "limit", reason: quota });
-  const analysis = await analyzeMealPhoto(photoDataUrl);
-  if (!analysis) return NextResponse.json({ kind: "unknown" });
+  const { analysis, failure } = await analyzeMealPhotoDetailed(photoDataUrl);
+  if (!analysis) return NextResponse.json({ kind: "unknown", reason: failure });
   // 체중계/체중 앱 사진은 몸무게로 보낸다 (사진은 저장하지 않고 숫자만 돌려준다)
   if (analysis.scaleKg) {
     // 이번 주에 찍은 사진만 인정한다 (운동 인증과 같은 규칙)
