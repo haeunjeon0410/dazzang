@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { REACTION_CHOICES, lastEmojiIn, reactionOf } from "@/lib/reactions";
+import { useEffect, useState, type ReactNode } from "react";
+import { reactionOf } from "@/lib/reactions";
+import { ReactionOverlay } from "./reaction-overlay";
 
 type CheckinItem = { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean; reaction?: string | null };
 type PersonSummary = { userId: string; name: string; checkins: CheckinItem[] };
@@ -68,33 +69,6 @@ function FloatingReaction({ emoji, delay, onDone }: { emoji: string; delay: numb
   );
 }
 
-// 이모티콘을 고른 순간 사진 오른쪽 위에서 같은 이모티콘이 사방으로 팡 터진다 (항상 같은 모양이라 매번 똑같이 터진다)
-function ReactionBurst({ emoji }: { emoji: string }) {
-  const parts = Array.from({ length: 10 }, (_, i) => {
-    const angle = (i / 10) * Math.PI * 2 + (i % 2) * 0.3;
-    const dist = 54 + (i % 3) * 16;
-    return {
-      bx: Math.round(Math.cos(angle) * dist),
-      by: Math.round(Math.sin(angle) * dist),
-      br: (i % 2 ? 1 : -1) * (30 + i * 12),
-      size: i % 3 === 0 ? 20 : 15,
-    };
-  });
-  return (
-    <span className="pointer-events-none absolute right-2 top-2 h-9 w-9" aria-hidden>
-      {parts.map((p, i) => (
-        <span
-          key={i}
-          className="reaction-particle absolute left-1/2 top-1/2"
-          style={{ "--bx": `${p.bx}px`, "--by": `${p.by}px`, "--br": `${p.br}deg`, fontSize: p.size, marginLeft: -p.size / 2, marginTop: -p.size / 2 } as CSSProperties}
-        >
-          {emoji}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 export function WeekCalendar({
   people,
   meId,
@@ -108,11 +82,8 @@ export function WeekCalendar({
   onDeleted?: () => void;
 }) {
   const [selected, setSelected] = useState<CheckinItem | null>(null);
-  const [reactBusy, setReactBusy] = useState(false);
   // 방금 내가 남긴 반응 (서버 응답을 기다렸다가 주간 기록을 다시 읽기 전에도 바로 보이게)
   const [reactionOverrides, setReactionOverrides] = useState<Record<string, string>>({});
-  const [trayOpen, setTrayOpen] = useState(false);
-  const [burst, setBurst] = useState<{ id: string; emoji: string } | null>(null);
   const [animating, setAnimating] = useState<Set<string>>(new Set());
 
   function reactionFor(c: CheckinItem): string | null {
@@ -131,26 +102,19 @@ export function WeekCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people]);
 
-  async function react(checkin: CheckinItem, emoji: string) {
-    if (reactionFor(checkin)) return;
-    setReactBusy(true);
-    try {
-      const res = await fetch(`/api/checkins/${checkin.id}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const chosen: string = data.reaction ?? emoji;
-      setReactionOverrides((prev) => ({ ...prev, [checkin.id]: chosen }));
-      setTrayOpen(false);
-      // 내가 고른 이모티콘이 팡 터진다
-      setBurst({ id: checkin.id, emoji: chosen });
-      setTimeout(() => setBurst((b) => (b && b.id === checkin.id ? null : b)), 1000);
-    } finally {
-      setReactBusy(false);
-    }
+  // 서버에 반응을 남기고, 남겨진 이모티콘을 돌려준다 (실패하면 null). 사진 위 연출은 ReactionOverlay가 한다
+  async function react(checkin: CheckinItem, emoji: string): Promise<string | null> {
+    if (reactionFor(checkin)) return null;
+    const res = await fetch(`/api/checkins/${checkin.id}/like`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const chosen: string = data.reaction ?? emoji;
+    setReactionOverrides((prev) => ({ ...prev, [checkin.id]: chosen }));
+    return chosen;
   }
 
   async function deleteCheckin(checkin: CheckinItem) {
@@ -166,7 +130,6 @@ export function WeekCalendar({
 
   function closePopup() {
     setSelected(null);
-    setTrayOpen(false);
   }
 
   const todayIdx = todayDayIndex();
@@ -233,7 +196,7 @@ export function WeekCalendar({
 
       {selected && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={closePopup}>
-          <div className="w-full max-w-[19rem] rounded-3xl bg-white p-4 shadow-xl space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-[22rem] rounded-3xl bg-white p-5 shadow-xl space-y-3" onClick={(e) => e.stopPropagation()}>
             {/* 터지는 이모티콘이 사진 밖으로도 날아가도록 사진 바깥 틀은 자르지 않는다 */}
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -250,58 +213,12 @@ export function WeekCalendar({
               )}
 
               {/* 오른쪽 위: 반응이 있으면 그 이모티콘, 없으면 친구 사진에서만 이모티콘을 고르는 버튼 */}
-              {selectedReaction ? (
-                <span
-                  key={selectedReaction}
-                  className="reaction-pop absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-xl shadow"
-                  aria-label={`${selectedReaction} 반응`}
-                >
-                  {selectedReaction}
-                </span>
-              ) : selected.userId !== meId ? (
-                trayOpen ? (
-                  <div className="absolute right-2 top-2 w-60 rounded-2xl bg-white/95 p-2 shadow-lg" role="menu">
-                    {/* 이모티콘을 눌러 고르거나, 아래 칸에서 폰의 이모티콘 키보드로 아무거나 고른다. 고르는 순간 팡 터진다 */}
-                    <div className="grid max-h-40 grid-cols-6 gap-0.5 overflow-y-auto overscroll-contain">
-                      {REACTION_CHOICES.map((e) => (
-                        <button
-                          key={e}
-                          disabled={reactBusy}
-                          onClick={() => react(selected, e)}
-                          aria-label={`${e} 반응 남기기`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-transform hover:scale-110 active:scale-125 disabled:opacity-60"
-                        >
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                    <input
-                      value=""
-                      onChange={(e) => {
-                        const picked = lastEmojiIn(e.target.value);
-                        if (picked) react(selected, picked);
-                      }}
-                      placeholder="다른 이모티콘 직접 입력"
-                      aria-label="이모티콘 직접 입력"
-                      className="mt-1.5 w-full rounded-full border border-[#ffd6e8] bg-[#fff0f6] px-3 py-1.5 text-center text-sm text-[#4a2540] placeholder:text-[#c2679c]"
-                    />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setTrayOpen(true)}
-                    aria-label="이모티콘 반응 남기기"
-                    className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-[#de73a5] shadow"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <circle cx="11" cy="12" r="8" />
-                      <path d="M8 14a4 4 0 0 0 6 0" />
-                      <path d="M9 10h.01M13 10h.01" />
-                      <path d="M19 3v4M17 5h4" />
-                    </svg>
-                  </button>
-                )
-              ) : null}
-              {burst && burst.id === selected.id && <ReactionBurst emoji={burst.emoji} />}
+              <ReactionOverlay
+                key={selected.id}
+                mine={selected.userId === meId}
+                reaction={selectedReaction}
+                onPick={(emoji) => react(selected, emoji)}
+              />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#c2679c]">

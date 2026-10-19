@@ -28,6 +28,7 @@ const mealView = (m: {
   fraction: number;
   confirmed: boolean;
   source: string;
+  reaction: string | null;
   createdAt: Date;
 }, name: string) => ({
   id: m.id,
@@ -41,6 +42,7 @@ const mealView = (m: {
   fraction: m.fraction,
   confirmed: m.confirmed,
   source: m.source,
+  reaction: m.reaction,
   createdAt: m.createdAt,
 });
 
