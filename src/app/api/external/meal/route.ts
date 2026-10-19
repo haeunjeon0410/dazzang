@@ -77,7 +77,11 @@ export async function POST(req: NextRequest) {
 
   const quota = await takeAiQuota(user.id, "photo");
   if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
-  const analysis = await analyzeMealPhoto(photoUrl);
+  // 분석이 예기치 않게 터져도 아무 반응이 없게 두지 않고 알림으로 알린다
+  const analysis = await analyzeMealPhoto(photoUrl).catch((e) => {
+    console.error("[meal] analyze", e instanceof Error ? e.message : e);
+    return null;
+  });
 
   // 체중계 사진은 식단이 아니라 몸무게로 기록한다 (몸무게 인증을 켠 사람만). 숫자가 틀렸으면 앱의 몸무게 창에서 다시 기록한다
   if (analysis?.scaleKg) {

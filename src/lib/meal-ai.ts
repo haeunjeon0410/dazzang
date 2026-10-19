@@ -88,7 +88,11 @@ function clean(raw: unknown): MealAnalysis | null {
 // 한도가 작으면 추론만 하다 끝나서 답이 비어 오므로, 추론을 낮추고 한도를 넉넉하게 둔 뒤 빈 답이면 두 배로 한 번 더 시도한다.
 const MAX_TOKENS = 1500;
 
-async function callOnce(key: string, dataUrl: string, maxTokens: number): Promise<string> {
+// 서버 함수가 60초에 강제로 끊기므로(응답도 알림도 없이), 사진 분석 전체를 이 시간 안에 끝낸다
+const TOTAL_BUDGET_MS = 50_000;
+const MIN_CALL_MS = 8_000;
+
+async function callOnce(key: string, dataUrl: string, maxTokens: number, timeoutMs: number): Promise<string> {
   const res = await fetch(`${BASE_URL}/chat/completions/`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -108,7 +112,7 @@ async function callOnce(key: string, dataUrl: string, maxTokens: number): Promis
       temperature: 0.2,
       reasoning_effort: "low",
     }),
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`gateway ${res.status}`);
   const data = await res.json();
@@ -126,11 +130,13 @@ export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | 
   if (!key) return null;
   if (!/^data:image\/(?:jpeg|png|webp);base64,/.test(dataUrl)) return null;
 
-  // 사진은 무조건 분석한다: 호출 실패, 빈 답, 읽을 수 없는 답이면 한 번 더 시도한다
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // 사진은 무조건 분석한다: 호출 실패, 빈 답, 읽을 수 없는 답이면 남은 시간 안에서 한 번 더 시도한다
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const remaining = () => deadline - Date.now();
+  for (let attempt = 0; attempt < 2 && remaining() > MIN_CALL_MS; attempt++) {
     try {
-      let text = await callOnce(key, dataUrl, MAX_TOKENS);
-      if (!text) text = await callOnce(key, dataUrl, MAX_TOKENS * 2);
+      let text = await callOnce(key, dataUrl, MAX_TOKENS, Math.min(30_000, remaining()));
+      if (!text && remaining() > MIN_CALL_MS) text = await callOnce(key, dataUrl, MAX_TOKENS * 2, Math.min(30_000, remaining()));
       const result = text ? clean(extractJson(text)) : null;
       if (result) return result;
       // 왜 못 읽었는지 서버 로그에 남긴다 (사진은 남기지 않고 답 앞부분만)
