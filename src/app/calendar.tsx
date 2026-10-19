@@ -158,7 +158,7 @@ export function WeekCalendar({
                 {c ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={c.photoUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={`${c.photoUrl}?w=240`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     {isLiked(c) && (
                       <span className="absolute top-0 right-0 text-[10px] leading-none bg-white/90 rounded-bl px-0.5 text-[#de73a5]">
                         ♥

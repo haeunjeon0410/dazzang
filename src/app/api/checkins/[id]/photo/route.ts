@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
+import sharp from "sharp";
 
 // 운동 인증샷 한 장. 목록 응답에 사진 데이터(base64)를 통째로 넣으면 앱을 열 때마다 몇 MB가 오가서 느려지므로,
 // 목록에는 이 주소만 주고 사진은 화면에 보일 때 따로 받는다. 같은 방 사람의 사진만 볼 수 있고, 사진은 바뀌지 않아서 오래 캐시한다
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userId = await getSessionUserId();
   if (!userId) return new NextResponse(null, { status: 401 });
 
@@ -21,7 +22,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const head = checkin.photoUrl.slice(0, comma);
   const mime = head.match(/^data:(image\/[a-zA-Z+.-]+);base64$/)?.[1];
   if (comma < 0 || !mime) return new NextResponse(null, { status: 404 });
-  return new NextResponse(Buffer.from(checkin.photoUrl.slice(comma + 1), "base64"), {
-    headers: { "Content-Type": mime, "Cache-Control": "private, max-age=31536000, immutable" },
-  });
+  const original = Buffer.from(checkin.photoUrl.slice(comma + 1), "base64");
+  const cache = "private, max-age=31536000, immutable";
+
+  // ?w=240 처럼 너비를 주면 작은 그림으로 줄여서 준다. 주간 표의 작은 칸에 원본(수백 KB)을 그대로 보내면 느려서다.
+  const w = Math.round(Number(req.nextUrl.searchParams.get("w")));
+  if (w >= 64 && w <= 800) {
+    try {
+      const small = await sharp(original).rotate().resize({ width: w, withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
+      return new NextResponse(small, { headers: { "Content-Type": "image/jpeg", "Cache-Control": cache } });
+    } catch (e) {
+      console.error("[photo] resize", e instanceof Error ? e.message : e);
+    }
+  }
+  return new NextResponse(original, { headers: { "Content-Type": mime, "Cache-Control": cache } });
 }

@@ -13,12 +13,18 @@
 
 body {
   background-color: var(--background);
-  background-image: url("/assets/bg-room.webp");
-  background-size: cover;
-  background-position: top center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   color: var(--foreground);
+}
+
+/* 배경 그림은 화면에 고정된 별도 층으로 둔다. body에 background-attachment: fixed를 쓰면 스크롤할 때마다 배경을 다시 그려서
+   (특히 안드로이드) 버벅거린다. 고정된 층은 그대로 두고 그 위에서 내용만 움직인다 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url("/assets/bg-room.webp") top center / cover no-repeat;
+  pointer-events: none;
 }
 
 /* 스크롤바는 보이지 않게 한다 (스크롤은 그대로 된다) */

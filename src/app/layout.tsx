@@ -4,7 +4,8 @@ import "./globals.css";
 import { PushSetup } from "./push-setup";
 
 const ongeulip = localFont({
-  src: "./fonts/ongeulip-dahyun.ttf",
+  // 원본 TTF는 2MB라 첫 접속이 느렸다. 같은 글자를 가진 woff2(약 1MB)로 바꿨다 (원본은 assets-src/fonts에 보관)
+  src: "./fonts/ongeulip-dahyun.woff2",
   variable: "--font-ongeulip",
   display: "swap",
 });
