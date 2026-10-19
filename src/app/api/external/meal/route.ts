@@ -8,6 +8,7 @@ import { quotaMessage, takeAiQuota } from "@/lib/ai-quota";
 import { getWeekStart } from "@/lib/week";
 import { checkThisWeek, readTakenAt } from "@/lib/photo-date";
 import { createCheckin } from "@/lib/checkin-create";
+import { shrinkPhoto } from "@/lib/photo-resize";
 
 // AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
 export const maxDuration = 60;
@@ -73,7 +74,9 @@ export async function POST(req: NextRequest) {
   const mimeType = sniff(image);
   if (mimeType === "heic") return fail("사진이 HEIC 형식이에요. 이미지 변환(JPEG) 단계를 확인해 주세요", 415);
   if (!mimeType) return fail("사진 파일이 아닌 것 같아요", 415);
-  const photoUrl = `data:${mimeType};base64,${image.toString("base64")}`;
+  // 원본은 수 MB라 AI가 거절하거나 느려질 수 있어서, 앱과 같게 줄인 사진으로 분석하고 저장한다 (촬영 시각은 원본에서 읽는다)
+  const small = await shrinkPhoto(image);
+  const photoUrl = `data:${small?.mimeType ?? mimeType};base64,${(small?.data ?? image).toString("base64")}`;
 
   const quota = await takeAiQuota(user.id, "photo");
   if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
