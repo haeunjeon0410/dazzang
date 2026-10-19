@@ -1,10 +1,13 @@
-// 실험실 식단 인증: 음식 사진을 숙명여대 API 게이트웨이(OpenAI 호환)의 GPT-6 Luna로 분석해 칼로리를 추정한다.
-// GATEWAY_API_KEY가 없거나 호출이 실패하면 null을 돌려주고, 호출한 쪽은 분석 없이 사진만 저장한다.
-const BASE_URL = (process.env.GATEWAY_BASE_URL || "https://factchat-cloud.mindlogic.ai/v1/gateway").replace(/\/+$/, "");
+// 실험실 식단 인증: 음식 사진을 숙명여대 API 게이트웨이(BAZE, OpenAI 호환)의 GPT-6 Luna로 분석해 칼로리를 추정한다.
+// 키가 없거나 호출이 실패하면 null을 돌려주고, 호출한 쪽이 다시 올리게 안내한다.
+// 환경변수는 mypt와 같은 BAZE_* 이름을 쓴다 (예전 GATEWAY_* 이름도 그대로 받는다):
+//   BAZE_API_KEY (필수), BAZE_BASE_URL (선택), BAZE_IMAGE_MODEL (선택, 기본 gpt-6-luna)
 import { addCredits } from "@/lib/ai-quota";
 import { validKg } from "@/lib/weight-ai";
 
-const MODEL = process.env.GATEWAY_MODEL || "gpt-6-luna";
+const BASE_URL = (process.env.BAZE_BASE_URL || process.env.GATEWAY_BASE_URL || "https://factchat-cloud.mindlogic.ai/v1/gateway").replace(/\/+$/, "");
+const MODEL = process.env.BAZE_IMAGE_MODEL || process.env.BAZE_CHAT_MODEL || process.env.GATEWAY_MODEL || "gpt-6-luna";
+const aiKey = () => process.env.BAZE_API_KEY || process.env.GATEWAY_API_KEY;
 
 export type PhotoCategory = "food" | "scale" | "workout" | "other";
 
@@ -131,9 +134,9 @@ export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | 
 
 // 분석이 안 됐을 때 왜 안 됐는지(failure)도 같이 돌려준다: no-key | gateway-<HTTP 코드> | timeout | network | unreadable
 export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analysis: MealAnalysis | null; failure?: string }> {
-  const key = process.env.GATEWAY_API_KEY;
+  const key = aiKey();
   if (!key) {
-    console.error("[meal] GATEWAY_API_KEY가 설정되지 않았어요");
+    console.error("[meal] BAZE_API_KEY가 설정되지 않았어요");
     return { analysis: null, failure: "no-key" };
   }
   if (!/^data:image\/(?:jpeg|png|webp);base64,/.test(dataUrl)) return { analysis: null, failure: "unreadable" };
@@ -166,7 +169,7 @@ const ESTIMATE_PROMPT = `너는 다이어트 코치야. 음식 이름 목록을 
 형식: {"kcals":[숫자, ...]} (목록과 같은 순서, 같은 개수)`;
 
 export async function estimateKcals(names: string[]): Promise<number[] | null> {
-  const key = process.env.GATEWAY_API_KEY;
+  const key = aiKey();
   if (!key || names.length === 0) return null;
   try {
     const res = await fetch(`${BASE_URL}/chat/completions/`, {
