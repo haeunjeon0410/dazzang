@@ -513,22 +513,11 @@ export default function Home() {
           return;
         }
         if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
-          // 식단 보기에서 올렸는데 AI를 못 쓰는 상태(실패, 한도 초과)면 확인 창을 띄우지 않고
-          // 사진을 분석 없이 "식사"로 바로 기록한다. 고치는 건 식단 창의 "수정"에서만 한다
-          const saveRes = await fetch("/api/meals", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ photoDataUrl: mealPhoto, mode: "save", analyzed: false, title: "식사", items: [] }),
-          });
-          if (!saveRes.ok) {
-            alert((await saveRes.json().catch(() => null))?.error || "저장하지 못했어요");
-            return;
-          }
-          setMealRefresh((n) => n + 1);
+          // 식단 보기에서 올렸는데 AI를 못 쓰는 상태(실패, 한도 초과)면 칼로리를 못 구하니 저장하지 않고 다시 올리게 한다
           setToast(
             data.kind === "limit"
-              ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 써서 칼로리 없이 기록했어요. 식단 창의 수정에서 적어 주세요`
-              : "분석하지 못해 칼로리 없이 기록했어요. 식단 창의 수정에서 적어 주세요",
+              ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 나중에 다시 올려 주세요`
+              : "분석하지 못했어요. 잠시 뒤에 다시 올려 주세요",
           );
           return;
         }
