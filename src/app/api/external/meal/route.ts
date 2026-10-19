@@ -7,6 +7,7 @@ import { tooManyRequests } from "@/lib/rate-limit";
 import { quotaMessage, takeAiQuota } from "@/lib/ai-quota";
 import { getWeekStart } from "@/lib/week";
 import { checkThisWeek, readTakenAt } from "@/lib/photo-date";
+import { createCheckin } from "@/lib/checkin-create";
 
 // AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
 export const maxDuration = 60;
@@ -23,7 +24,7 @@ function sniff(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | "heic" 
   return null;
 }
 
-// 아이폰 단축어(동작 버튼)가 식단 사진을 바로 올리는 주소.
+// 아이폰 단축어(동작 버튼)가 사진을 바로 올리는 주소. AI가 음식이면 식단, 체중계면 몸무게, 운동이면 운동 인증으로 알아서 나눈다.
 // 쿠키가 없어서, 설정에서 만든 개인 코드로 누구의 사진인지 알아낸다. 코드는 주소 끝(?t=코드)이나 Authorization 헤더로 받는다.
 // 사진은 파일 그대로(본문 전체, 또는 양식의 첫 파일)나 예전 방식(JSON의 imageBase64)으로 받는다.
 // 파일로 보내면 응답도 단축어가 바로 "결과 보기"에 띄울 수 있게 글자로 돌려준다.
@@ -93,9 +94,16 @@ export async function POST(req: NextRequest) {
     return reply(true, message);
   }
 
-  // AI가 사진을 분류했는데 음식이 아니면 저장하지 않고 다시 올리게 한다 (동작 버튼은 식단 전용)
-  if (analysis?.category === "workout") return fail("식단 사진이 아니라 운동 사진으로 읽었어요. 음식 사진을 다시 올려 주세요");
-  if (analysis?.category === "other") return fail("사진을 인식하지 못했어요. 음식 사진을 다시 올려 주세요");
+  // 운동 사진은 운동 인증으로 올린다 (이번 주에 찍은 사진만)
+  if (analysis?.category === "workout") {
+    const result = await createCheckin(user.id, photoUrl, await readTakenAt(image));
+    if (!result.ok) return fail(result.error);
+    const message = "운동 인증으로 올렸어요";
+    await sendPushToUser(user, { title: "운동 인증", body: message }).catch(() => {});
+    return reply(true, message);
+  }
+  // 어느 쪽으로도 못 읽은 사진은 저장하지 않고 다시 올리게 한다
+  if (analysis?.category === "other") return fail("사진을 인식하지 못했어요. 다시 올려 주세요");
 
   // 분석 자체가 안 된 사진(키 없음, 호출 실패)은 버리지 않고 "식사"로 바로 기록한다. 고치는 건 앱 식단 창의 수정에서 한다
   const draft = analysis?.isFood ? draftFromAnalysis(analysis) : null;

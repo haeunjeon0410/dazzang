@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { labFinesFor, labFineKey, noLabFine, weightTrendsFor } from "@/lib/lab-fine";
 import { settleLastWeekLazily } from "@/lib/week-settle";
-import { getWeekStart, getWeekDeadline, getDayRange, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
+import { createCheckin } from "@/lib/checkin-create";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
 
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
 
@@ -113,41 +114,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "사진 용량이 너무 큽니다" }, { status: 400 });
   }
 
-  // 사진 조작 방지: 사진에 찍힌 촬영 시각(EXIF)으로 인증한다. 촬영 정보가 없는 사진(캡처 등)은 업로드한 지금으로 인정
-  const now = new Date();
-  const shotAt = typeof takenAt === "string" ? new Date(takenAt) : now;
-  if (Number.isNaN(shotAt.getTime()) || shotAt.getTime() > now.getTime() + 5 * 60 * 1000) {
-    return NextResponse.json({ error: "사진의 촬영 날짜가 올바르지 않아요" }, { status: 400 });
-  }
-
-  // 항상 서버 현재 시각 기준 "이번 주"에 찍은 사진만 받는다 (지난주 사진으로 소급 불가)
-  const weekStart = getWeekStart(now);
-  if (getWeekStart(shotAt).getTime() < weekStart.getTime()) {
-    const kst = new Date(shotAt.getTime() + 9 * 60 * 60 * 1000);
-    return NextResponse.json(
-      { error: `이번 주에 찍은 사진만 인증할 수 있어요 (이 사진은 ${kst.getUTCMonth() + 1}/${kst.getUTCDate()}에 찍은 사진이에요)` },
-      { status: 400 },
-    );
-  }
-
-  // 같은 사람의 다른 방 계정(linkGroup이 같은 계정)에도 똑같이 인증한다
-  const me = await prisma.user.findUnique({ where: { id: userId } });
-  if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  const linked = me.linkGroup
-    ? await prisma.user.findMany({ where: { linkGroup: me.linkGroup, id: { not: userId } }, select: { id: true } })
-    : [];
-  const targetIds = [userId, ...linked.map((u) => u.id)];
-
-  // 하루 1장만 인정(오전 6시 기준): 찍은 날에 이미 올린 게 있으면 지우고 새로 올린 걸로 교체
-  // createdAt = 촬영 시각 → 캘린더 요일 칸, 하루 1장 규칙이 모두 찍은 날 기준으로 동작
-  const { start, end } = getDayRange(shotAt);
-  const [, ...created] = await prisma.$transaction([
-    prisma.checkin.deleteMany({ where: { userId: { in: targetIds }, createdAt: { gte: start, lte: end } } }),
-    ...targetIds.map((id) =>
-      prisma.checkin.create({ data: { userId: id, photoUrl: photoDataUrl, weekStart, createdAt: shotAt } }),
-    ),
-  ]);
-  const checkin = created[0];
+  const result = await createCheckin(userId, photoDataUrl, takenAt);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  const checkin = result.checkin;
 
   return NextResponse.json({ checkin: { id: checkin.id, createdAt: checkin.createdAt } });
 }
