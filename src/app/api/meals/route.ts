@@ -106,7 +106,7 @@ export async function GET(req: Request) {
 
 // 식단 사진 올리기는 두 단계다.
 // mode "analyze": 사진을 AI로 읽어서 저장하지 않고 초안만 돌려준다.
-//   체중계 사진이면 kind "weight"(kg: 읽은 몸무게, token: 서버가 서명한 값. 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록), 음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 음식이 아니면 kind "other"(운동 인증으로 보내면 된다),
+//   체중계 사진이면 kind "weight"(kg: 읽은 몸무게, token: 서버가 서명한 값. 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록), 음식이면 kind "draft"(analysis: 이름, 음식별 칼로리), 운동 사진이면 kind "workout"(운동 인증으로 보내면 된다), 어느 쪽도 아니면 kind "unrecognized"(다시 올리게 한다),
 //   분석 자체가 안 되면(키 없음/실패) kind "unknown"(직접 적게 한다).
 // mode "save": 사용자가 확인하거나 고친 값(title, items, fraction)으로 사진과 함께 저장한다.
 export async function POST(req: Request) {
@@ -160,6 +160,7 @@ export async function POST(req: Request) {
     // 바로 기록하지 않는다: 읽은 숫자에 서명한 토큰을 돌려주고, 사용자가 맞다고 확인하면 /api/weight/confirm 이 기록한다
     return NextResponse.json({ kind: "weight", kg: analysis.scaleKg, token: signWeight(userId, analysis.scaleKg) });
   }
-  if (!analysis.isFood) return NextResponse.json({ kind: "other" });
+  if (analysis.category === "workout") return NextResponse.json({ kind: "workout" });
+  if (!analysis.isFood) return NextResponse.json({ kind: "unrecognized" });
   return NextResponse.json({ kind: "draft", draft: draftFromAnalysis(analysis) });
 }

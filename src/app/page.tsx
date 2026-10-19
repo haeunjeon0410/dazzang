@@ -532,8 +532,13 @@ export default function Home() {
           );
           return;
         }
+        // 체중계/음식/운동 어느 쪽으로도 못 읽었으면 아무것도 올리지 않고 다시 올리게 한다
+        if (data?.kind === "unrecognized") {
+          setToast("사진을 인식하지 못했어요. 다시 올려 주세요");
+          return;
+        }
         // 그 밖에는 운동 인증으로 이어진다
-        if (data?.kind === "other") setToast("운동 사진으로 읽어서 운동 인증으로 올렸어요");
+        if (data?.kind === "workout") setToast("운동 사진으로 읽어서 운동 인증으로 올렸어요");
         setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);

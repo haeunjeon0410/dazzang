@@ -27,7 +27,7 @@ function sniff(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" | "heic" 
 // 쿠키가 없어서, 설정에서 만든 개인 코드로 누구의 사진인지 알아낸다. 코드는 주소 끝(?t=코드)이나 Authorization 헤더로 받는다.
 // 사진은 파일 그대로(본문 전체, 또는 양식의 첫 파일)나 예전 방식(JSON의 imageBase64)으로 받는다.
 // 파일로 보내면 응답도 단축어가 바로 "결과 보기"에 띄울 수 있게 글자로 돌려준다.
-// 사진은 AI가 읽으면 바로 기록되어 친구와 공유된다(앱에서 나중에 고칠 수 있다). AI가 못 읽었을 때만 "확인 대기" 초안으로 남는다.
+// 사진은 AI가 읽으면 바로 기록되어 친구와 공유된다(앱에서 나중에 고칠 수 있다). 분석 자체가 안 되면 칼로리 없이 "식사"로 기록된다.
 export async function POST(req: NextRequest) {
   const type = (req.headers.get("content-type") ?? "").toLowerCase();
   const asJson = type.includes("application/json");
@@ -93,7 +93,11 @@ export async function POST(req: NextRequest) {
     return reply(true, message);
   }
 
-  // 음식으로 못 읽었어도(음식이 아니라고 했거나 분석 실패) 사진은 버리지 않고 "식사"로 바로 기록한다. 고치는 건 앱 식단 창의 수정에서 한다
+  // AI가 사진을 분류했는데 음식이 아니면 저장하지 않고 다시 올리게 한다 (동작 버튼은 식단 전용)
+  if (analysis?.category === "workout") return fail("식단 사진이 아니라 운동 사진으로 읽었어요. 음식 사진을 다시 올려 주세요");
+  if (analysis?.category === "other") return fail("사진을 인식하지 못했어요. 음식 사진을 다시 올려 주세요");
+
+  // 분석 자체가 안 된 사진(키 없음, 호출 실패)은 버리지 않고 "식사"로 바로 기록한다. 고치는 건 앱 식단 창의 수정에서 한다
   const draft = analysis?.isFood ? draftFromAnalysis(analysis) : null;
   await prisma.meal.create({
     data: {
@@ -111,9 +115,7 @@ export async function POST(req: NextRequest) {
 
   const message = draft
     ? `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal로 기록했어요`
-    : analysis
-      ? "음식으로 읽지 못해 칼로리 없이 기록했어요. 앱 식단 창의 수정에서 적어 주세요"
-      : "분석은 못 했지만 사진은 기록했어요. 앱 식단 창의 수정에서 적어 주세요";
+    : "분석은 못 했지만 사진은 기록했어요. 앱 식단 창의 수정에서 적어 주세요";
   // 푸시가 안 가도 식단 올리기는 성공이다
   await sendPushToUser(user, { title: "식단 기록", body: message }).catch(() => {});
   return reply(true, message);
