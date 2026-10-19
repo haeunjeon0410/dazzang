@@ -471,8 +471,8 @@ export default function Home() {
     setUploading(true);
     try {
       if (me) {
-        // 실험실 식단/몸무게 인증이 켜져 있으면 AI가 사진을 보고 체중계면 몸무게에, 음식이면 식단에, 아니면 운동 인증으로 보낸다.
-        // AI가 판단하지 못하면(키 없음/실패) 지금 보고 있는 보기(운동 | 식단)를 따른다
+        // AI가 사진을 보고 체중계면 몸무게에, 음식이면 식단에, 운동이면 운동 인증으로 보낸다.
+        // AI가 판단하지 못하면(키 없음/실패/한도 초과) 어디에도 올리지 않고 다시 올리게 한다. 보고 있는 보기(운동 | 식단)는 사진이 갈 곳과 상관없다
         const [mealPhoto, shotAt] = await Promise.all([compressImage(file, 1024, 0.7), readTakenAt(file)]);
         const res = await fetch("/api/meals", {
           method: "POST",
@@ -512,8 +512,8 @@ export default function Home() {
           setToast(`${data.draft.title} · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal로 기록했어요`);
           return;
         }
-        if ((data?.kind === "unknown" || data?.kind === "limit") && viewMode === "diet") {
-          // 식단 보기에서 올렸는데 AI를 못 쓰는 상태(실패, 한도 초과)면 칼로리를 못 구하니 저장하지 않고 다시 올리게 한다
+        if (data?.kind === "unknown" || data?.kind === "limit") {
+          // AI를 못 쓰는 상태(실패, 한도 초과)면 무슨 사진인지 몰라서 저장하지 않고 다시 올리게 한다
           setToast(
             data.kind === "limit"
               ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 나중에 다시 올려 주세요`
@@ -526,7 +526,7 @@ export default function Home() {
           setToast("사진을 인식하지 못했어요. 다시 올려 주세요");
           return;
         }
-        // 그 밖에는 운동 인증으로 이어진다
+        // 여기까지 오는 건 운동 사진뿐이다: 운동 인증으로 이어진다
         if (data?.kind === "workout") setToast("운동 사진으로 읽어서 운동 인증으로 올렸어요");
         setViewMode("workout");
       }
