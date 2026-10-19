@@ -34,7 +34,7 @@ const mealView = (m: {
   id: m.id,
   userId: m.userId,
   name,
-  // 30일이 지나 사진을 지운 식단은 빈 값 (화면에 "사진은 지웠어요"가 뜬다)
+  // 지난 주가 되어 사진을 지운 식단은 빈 값 (화면에 "사진은 지웠어요"가 뜬다)
   photoUrl: photoGone ? "" : `/api/meals/${m.id}/photo`,
   analyzed: m.analyzed,
   title: m.title,

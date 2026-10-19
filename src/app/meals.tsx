@@ -325,7 +325,7 @@ export function MealView({
                           <img src={`${m.photoUrl}?w=480`} alt="식단" loading="lazy" decoding="async" draggable={false} className="aspect-square w-full object-cover" />
                         ) : (
                           <div className="flex aspect-square w-full items-center justify-center bg-[#fff0f6] px-6 text-center text-xs text-[#b4779b]">
-                            사진은 30일이 지나 지웠어요
+                            지난 주 사진은 지웠어요
                           </div>
                         )}
                         {m.kcal != null && (
