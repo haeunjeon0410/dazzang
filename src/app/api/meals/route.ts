@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { getWeekStart } from "@/lib/week";
-import { analyzeMealPhoto } from "@/lib/meal-ai";
+import { analyzeMealPhotoDetailed } from "@/lib/meal-ai";
 import { draftFromAnalysis, parseMealInput } from "@/lib/meal-input";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { takeAiQuota } from "@/lib/ai-quota";
@@ -150,8 +150,8 @@ export async function POST(req: Request) {
   // 오늘 내 한도나 이번 달 앱 전체 한도를 넘으면 AI를 부르지 않고 직접 적게 한다
   const quota = await takeAiQuota(userId, "photo");
   if (quota !== "ok") return NextResponse.json({ kind: "limit", reason: quota });
-  const analysis = await analyzeMealPhoto(photoDataUrl);
-  if (!analysis) return NextResponse.json({ kind: "unknown" });
+  const { analysis, failure } = await analyzeMealPhotoDetailed(photoDataUrl);
+  if (!analysis) return NextResponse.json({ kind: "unknown", reason: failure });
   // 체중계/체중 앱 사진은 몸무게로 보낸다 (사진은 저장하지 않고 숫자만 돌려준다)
   if (analysis.scaleKg) {
     // 이번 주에 찍은 사진만 인정한다 (운동 인증과 같은 규칙)

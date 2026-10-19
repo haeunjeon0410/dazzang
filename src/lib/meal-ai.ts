@@ -126,26 +126,39 @@ async function callOnce(key: string, dataUrl: string, maxTokens: number, timeout
 }
 
 export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | null> {
+  return (await analyzeMealPhotoDetailed(dataUrl)).analysis;
+}
+
+// 분석이 안 됐을 때 왜 안 됐는지(failure)도 같이 돌려준다: no-key | gateway-<HTTP 코드> | timeout | network | unreadable
+export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analysis: MealAnalysis | null; failure?: string }> {
   const key = process.env.GATEWAY_API_KEY;
-  if (!key) return null;
-  if (!/^data:image\/(?:jpeg|png|webp);base64,/.test(dataUrl)) return null;
+  if (!key) {
+    console.error("[meal] GATEWAY_API_KEY가 설정되지 않았어요");
+    return { analysis: null, failure: "no-key" };
+  }
+  if (!/^data:image\/(?:jpeg|png|webp);base64,/.test(dataUrl)) return { analysis: null, failure: "unreadable" };
 
   // 사진은 무조건 분석한다: 호출 실패, 빈 답, 읽을 수 없는 답이면 남은 시간 안에서 한 번 더 시도한다
   const deadline = Date.now() + TOTAL_BUDGET_MS;
   const remaining = () => deadline - Date.now();
+  let failure = "timeout";
   for (let attempt = 0; attempt < 2 && remaining() > MIN_CALL_MS; attempt++) {
     try {
       let text = await callOnce(key, dataUrl, MAX_TOKENS, Math.min(30_000, remaining()));
       if (!text && remaining() > MIN_CALL_MS) text = await callOnce(key, dataUrl, MAX_TOKENS * 2, Math.min(30_000, remaining()));
       const result = text ? clean(extractJson(text)) : null;
-      if (result) return result;
+      if (result) return { analysis: result };
+      failure = "unreadable";
       // 왜 못 읽었는지 서버 로그에 남긴다 (사진은 남기지 않고 답 앞부분만)
       console.error("[meal] unreadable answer", JSON.stringify(text.slice(0, 300)));
     } catch (e) {
-      console.error("[meal] gateway", e instanceof Error ? e.message : e);
+      const msg = e instanceof Error ? e.message : String(e);
+      const name = e instanceof Error ? e.name : "";
+      failure = name === "TimeoutError" || name === "AbortError" ? "timeout" : msg.startsWith("gateway ") ? msg.replace(" ", "-") : "network";
+      console.error("[meal] gateway", msg);
     }
   }
-  return null;
+  return { analysis: null, failure };
 }
 
 // 사용자가 음식을 고치거나 새로 넣었을 때, 이름만 보고 1인분 칼로리를 다시 추정한다 (글자만 보내서 사진보다 훨씬 싸다)

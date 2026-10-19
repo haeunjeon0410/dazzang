@@ -12,6 +12,7 @@ import { MealConfirm, type ConfirmValues } from "./meal-confirm";
 import { ShortcutSetup } from "./shortcut-setup";
 import { WeightGraph } from "./weight";
 import { readTakenAt } from "@/lib/photo-date";
+import { aiFailureText } from "@/lib/ai-failure";
 import { FineSetting, FineProposalPopup, type FineSnapshot } from "./lab-fine";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 import { WhatsNew } from "./whats-new";
@@ -517,7 +518,7 @@ export default function Home() {
           setToast(
             data.kind === "limit"
               ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 나중에 다시 올려 주세요`
-              : "분석하지 못했어요. 잠시 뒤에 다시 올려 주세요",
+              : `분석하지 못했어요${aiFailureText(data.reason) ? ` (${aiFailureText(data.reason)})` : ""}. 잠시 뒤에 다시 올려 주세요`,
           );
           return;
         }
