@@ -27,11 +27,12 @@ type MealsData = {
 
 const DAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
-// 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 하루 칼로리를 세 단계 색으로만 나눈다 (적게 / 보통 / 많이). 글자색은 늘 같다
-// 기록은 끼니를 다 올리지 않는 날이 많아서 기준을 낮게 잡았다 (600 미만 / 600~1199 / 1200 이상)
+// 하루에 먹은 칼로리가 많을수록 진해지는 칸 색 (히트맵). 400kcal마다 한 단계씩 진해지고 1600kcal 이상이 가장 진하다. 글자색은 늘 같다
 function heatClass(kcal: number): string {
-  if (kcal >= 1200) return "bg-[#eba0c0]";
-  if (kcal >= 600) return "bg-[#f6c3d8]";
+  if (kcal >= 1600) return "bg-[#e48fb5]";
+  if (kcal >= 1200) return "bg-[#efafc9]";
+  if (kcal >= 800) return "bg-[#f6c3d8]";
+  if (kcal >= 400) return "bg-[#f9d3e3]";
   return "bg-[#fde3ee]";
 }
 
