@@ -13,7 +13,7 @@ type Meal = {
   analyzed: boolean;
   title: string | null;
   kcal: number | null;
-  items: { name: string; kcal: number; fraction?: number }[] | null;
+  items: { name: string; kcal: number; fraction?: number; qty?: number; unit?: string }[] | null;
   fraction?: number;
   reaction?: string | null;
   createdAt: string;
@@ -264,7 +264,7 @@ export function MealView({
             title: target.title ?? "",
             items:
               target.items && target.items.length
-                ? target.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? target.fraction ?? 1 }))
+                ? target.items.map((i) => ({ name: i.name, kcal: i.kcal, fraction: i.fraction ?? target.fraction ?? 1, qty: i.qty, unit: i.unit }))
                 : // 음식별 기록이 없는 식단은 제목을 음식 한 줄로 두어, 고쳐도 칼로리가 0으로 날아가지 않게 한다
                   [{ name: target.title ?? "", kcal: target.kcal ?? 0, fraction: 1 }],
           }}
@@ -379,7 +379,7 @@ export function MealView({
                             const word = f === 0.75 ? "3/4" : f === 0.5 ? "절반" : f === 0.25 ? "1/4" : `${Math.round(f * 100)}%`;
                             return (
                               <span key={k} className="rounded-full bg-[#ffe1ee] px-2.5 py-1 text-xs font-semibold text-[#b4356f]">
-                                {i.name} {Math.round(i.kcal * f)}
+                                {i.name}{i.qty && i.qty !== 1 ? ` ${i.qty}${i.unit ?? ""}` : ""} {Math.round(i.kcal * f)}
                                 {f < 1 ? ` (${word})` : ""}
                               </span>
                             );

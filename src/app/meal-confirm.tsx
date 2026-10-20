@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type ConfirmItem = { name: string; kcal: number; fraction: number };
+export type ConfirmItem = { name: string; kcal: number; fraction: number; qty?: number; unit?: string };
 
 export type ConfirmValues = {
   title: string;
@@ -18,7 +18,17 @@ const FRACTIONS: [number, string][] = [
 
 // 칼로리는 AI가 계산하는 영역이라 사람이 숫자를 적지 않는다.
 // 사람은 음식 이름과 먹은 양만 고치고, 이름을 고치거나 새로 넣으면 그 음식의 칼로리를 AI가 다시 계산한다.
-type Row = ConfirmItem & { est: string; kcalKnown: boolean };
+// qty/unit: 양과 단위 (kcal은 그 양 전체의 칼로리). 양을 바꾸면 칼로리가 비례해서 바뀌고, 이름을 고치면 1인분 칼로리를 AI가 구해서 양만큼 곱한다
+type Row = ConfirmItem & { qty: number; unit: string; est: string; kcalKnown: boolean };
+
+const qtyText = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(1));
+
+// 양은 인분으로만 센다. 눌러서 고르는 선택지
+const QTYS = [0.5, 1, 1.5, 2, 3, 4, 5, 6];
+
+// 칼로리를 구한 이름+양+단위 (이게 바뀌면 칼로리를 다시 구해야 한다). AI에게는 "막창 3인분"처럼 양까지 붙여서 묻는다
+const keyOf = (r: { name: string; qty: number; unit: string }) => `${r.name.trim()}\u0001${r.qty}\u0001${r.unit}`;
+const queryOf = (r: { name: string; qty: number; unit: string }) => `${r.name.trim()} ${qtyText(r.qty)}${r.unit}`;
 
 // 마지막 글자에 받침이 있으면 "과", 없으면 "와" (한글이 아니면 "와")
 function withParticle(word: string): string {
@@ -55,19 +65,26 @@ export function MealConfirm({
   // 제목을 직접 고쳤으면 그 뒤로는 음식을 바꿔도 제목을 덮어쓰지 않는다
   const [titleTouched, setTitleTouched] = useState(false);
   const [rows, setRows] = useState<Row[]>(() =>
-    initial.items.map((i) => ({ ...i, est: i.name.trim(), kcalKnown: i.name.trim() !== "" && i.kcal > 0 })),
+    initial.items.map((i) => {
+      const asServing = !i.unit || i.unit === "인분";
+      const row = { ...i, qty: asServing ? i.qty ?? 1 : 1, unit: "인분", est: "", kcalKnown: i.name.trim() !== "" && i.kcal > 0 };
+      return { ...row, est: keyOf(row) };
+    }),
   );
+  // 양/단위를 직접 고치는 중인 음식 (그 음식 밑에 입력칸이 펼쳐진다)
   // 먹은 양을 고르는 중인 음식 (그 음식 위에 토글이 펼쳐진다)
   const [pickIdx, setPickIdx] = useState<number | null>(null);
+  // 양(인분)을 고르는 중인 음식
+  const [qtyPick, setQtyPick] = useState<number | null>(null);
   // 사진을 눌러 크게 볼 때 (음식이 뭐뭐 들어 있는지 보면서 고치기 편하게)
   const [zoom, setZoom] = useState(false);
   const alive = useRef(true);
 
-  // 이름이 바뀌었는데 아직 칼로리를 계산하지 않은 음식
-  const stale = (r: Row) => r.name.trim() !== "" && r.name.trim() !== r.est;
+  // 이름이나 양, 단위가 바뀌었는데 아직 칼로리를 계산하지 않은 음식
+  const stale = (r: Row) => r.name.trim() !== "" && keyOf(r) !== r.est;
   const pending = rows.some(stale);
   // 이름에 어떤 글자가 들어 있어도 구분이 깨지지 않게 JSON 글자로 만든다
-  const staleKey = JSON.stringify(rows.map((r) => (stale(r) ? r.name.trim() : "")));
+  const staleKey = JSON.stringify(rows.map((r) => (stale(r) ? queryOf(r) : "")));
 
   useEffect(() => {
     alive.current = true;
@@ -96,13 +113,17 @@ export function MealConfirm({
       if (!alive.current) return;
       setRows((prev) =>
         prev.map((r, idx) => {
-          const k = asked.findIndex((x) => x.i === idx && x.n === r.name.trim());
-          return k < 0 ? r : { ...r, kcal: kcals ? kcals[k] : 0, est: r.name.trim(), kcalKnown: !!kcals };
+          const k = asked.findIndex((x) => x.i === idx && x.n === queryOf(r));
+          // 양까지 붙여서 물었으니 돌아온 칼로리가 그 양 전체의 칼로리다
+          return k < 0 ? r : { ...r, kcal: kcals ? Math.round(kcals[k]) : 0, est: keyOf(r), kcalKnown: !!kcals };
         }),
       );
     }, 700);
     return () => clearTimeout(t);
   }, [staleKey]);
+
+  // 먹은 칼로리 합계 (음식별 칼로리 x 먹은 비율). 계산이 끝난 음식만 더한다
+  const total = rows.reduce((sum, r) => sum + (r.name.trim() && r.kcalKnown && !stale(r) ? Math.round(r.kcal * r.fraction) : 0), 0);
 
   const canSave = title.trim().length > 0 && !pending && !busy;
   const label = (f: number) => FRACTIONS.find(([v]) => v === f)?.[1] ?? `${Math.round(f * 100)}%`;
@@ -115,6 +136,17 @@ export function MealConfirm({
     if (auto) setTitle(auto);
   }
 
+  // 양을 고르면 칼로리가 비례해서 바로 바뀐다 (AI를 다시 부르지 않는다)
+  function setQty(idx: number, next: number) {
+    const r = rows[idx];
+    setQtyPick(null);
+    if (next === r.qty) return;
+    const wasStale = stale(r);
+    const moved = { ...r, qty: next, kcal: r.kcalKnown ? Math.round((r.kcal * next) / r.qty) : r.kcal };
+    // 이미 계산이 끝난 음식만 "계산 끝"으로 유지한다 (계산을 기다리는 중이면 계속 기다린다)
+    setRows(rows.map((x, i) => (i === idx ? (wasStale ? moved : { ...moved, est: keyOf(moved) }) : x)));
+  }
+
   function setRow(idx: number, patch: Partial<Row>) {
     const next = rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
     if ("name" in patch) changeRows(next);
@@ -124,7 +156,7 @@ export function MealConfirm({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
-        className="flex max-h-[90vh] w-full max-w-sm flex-col gap-4 rounded-3xl bg-white p-5 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-[22rem] flex-col gap-4 rounded-3xl bg-white p-4 shadow-xl"
       >
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setZoom(true)} aria-label="사진 크게 보기" className="flex-none">
@@ -149,10 +181,13 @@ export function MealConfirm({
         {/* 사진·이름과 취소/저장은 고정하고, 음식 목록만 스크롤한다 (스크롤바는 숨김) */}
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="flex flex-none items-center justify-between">
-            <p className="text-sm font-bold text-[#c2679c]">먹은 음식</p>
+            <p className="text-sm font-bold text-[#c2679c]">
+              먹은 음식
+              {total > 0 && <span className="ml-1.5 text-xs font-semibold text-[#b4779b]">총 {total.toLocaleString()}kcal</span>}
+            </p>
             {rows.length < 8 && (
               <button
-                onClick={() => setRows([...rows, { name: "", kcal: 0, fraction: 1, est: "", kcalKnown: false }])}
+                onClick={() => setRows([...rows, { name: "", kcal: 0, fraction: 1, qty: 1, unit: "인분", est: "", kcalKnown: false }])}
                 className="rounded-lg border border-dashed border-[#de73a5] bg-white px-3 py-1 text-xs font-bold text-[#de73a5]"
               >
                 + 추가
@@ -180,18 +215,33 @@ export function MealConfirm({
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-xl bg-[#fff5fa] py-1 pl-3 pr-1.5">
                 <input
                   value={r.name}
                   onChange={(e) => setRow(idx, { name: e.target.value })}
                   placeholder="음식"
                   maxLength={30}
-                  className="min-w-0 flex-1 rounded-lg border border-[#ffd6e8] px-3 py-2 text-base text-[#4a2540]"
+                  className="min-w-0 flex-1 bg-transparent py-1.5 text-base font-semibold text-[#4a2540] placeholder:font-normal placeholder:text-[#d9a7c2] focus:outline-none"
                 />
+                {/* 양: 사진에서 가늠한 양이 틀렸으면 눌러서 다시 고른다 */}
                 <button
-                  onClick={() => setPickIdx(pickIdx === idx ? null : idx)}
-                  className={`w-[4.2rem] flex-none rounded-full py-2 text-xs font-bold ${
-                    r.fraction < 1 ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#b4356f]"
+                  onClick={() => {
+                    setPickIdx(null);
+                    setQtyPick(qtyPick === idx ? null : idx);
+                  }}
+                  aria-label="양 고르기"
+                  className={`flex-none rounded-full px-2 py-1.5 text-[11px] font-bold ${r.qty !== 1 ? "bg-[#de73a5] text-white" : "text-[#c2679c]"}`}
+                >
+                  {qtyText(r.qty)}인분
+                </button>
+                <button
+                  onClick={() => {
+                    setQtyPick(null);
+                    setPickIdx(pickIdx === idx ? null : idx);
+                  }}
+                  aria-label="먹은 양 고르기"
+                  className={`flex-none rounded-full px-2 py-1.5 text-[11px] font-bold ${
+                    r.fraction < 1 ? "bg-[#de73a5] text-white" : "text-[#c2679c]"
                   }`}
                 >
                   {r.fraction < 1 ? label(r.fraction) : "다 먹음"}
@@ -199,22 +249,25 @@ export function MealConfirm({
                 <button
                   onClick={() => changeRows(rows.filter((_, i) => i !== idx))}
                   aria-label="이 음식 빼기"
-                  className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#ffeef5] text-sm text-[#c2679c]"
+                  className="flex h-6 w-6 flex-none items-center justify-center text-sm text-[#d9a7c2]"
                 >
                   ✕
                 </button>
               </div>
-              {/* 이름이 틀리면 칼로리가 이상하게 나오니, 계산된 칼로리를 보여줘서 오타를 알아채게 한다 */}
-              {r.name.trim() &&
-                (stale(r) ? (
-                  <p className="px-1 text-[11px] text-[#b4779b]">칼로리 계산 중...</p>
-                ) : r.kcalKnown ? (
-                  <p className="px-1 text-[11px] text-[#b4779b]">약 {Math.round(r.kcal * r.fraction).toLocaleString()} kcal</p>
-                ) : (
-                  <p className="px-1 text-[11px] font-semibold text-[#d1465f]">
-                    칼로리를 못 구했어요. 이름을 확인해 주세요 (0 kcal로 저장돼요)
-                  </p>
-                ))}
+              {qtyPick === idx && (
+                <div className="grid grid-cols-4 gap-1">
+                  {QTYS.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => setQty(idx, q)}
+                      className={`rounded-full py-1.5 text-xs font-bold ${r.qty === q ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#b4356f]"}`}
+                    >
+                      {qtyText(q)}인분
+                    </button>
+                  ))}
+                </div>
+              )}
+              {r.name.trim() && !stale(r) && !r.kcalKnown && <p className="pl-3 text-[10px] font-semibold text-[#d1465f]">칼로리를 못 구했어요</p>}
             </div>
           ))}
           </div>
@@ -231,7 +284,7 @@ export function MealConfirm({
                 title: title.trim(),
                 items: rows
                   .filter((r) => r.name.trim())
-                  .map((r) => ({ name: r.name.trim(), kcal: r.kcalKnown ? r.kcal : 0, fraction: r.fraction })),
+                  .map((r) => ({ name: r.name.trim(), kcal: r.kcalKnown ? r.kcal : 0, fraction: r.fraction, qty: r.qty, unit: "인분" })),
               })
             }
             disabled={!canSave}

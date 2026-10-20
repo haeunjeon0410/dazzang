@@ -4,6 +4,7 @@
 //   BAZE_API_KEY (필수), BAZE_BASE_URL (선택), BAZE_IMAGE_MODEL (선택, 기본 gpt-6-luna)
 import { addCredits } from "@/lib/ai-quota";
 import { validKg } from "@/lib/weight-ai";
+import { qtyOf, unitOf } from "@/lib/meal-input";
 
 const BASE_URL = (process.env.BAZE_BASE_URL || process.env.GATEWAY_BASE_URL || "https://factchat-cloud.mindlogic.ai/v1/gateway").replace(/\/+$/, "");
 const MODEL = process.env.BAZE_IMAGE_MODEL || process.env.BAZE_CHAT_MODEL || process.env.GATEWAY_MODEL || "gpt-6-luna";
@@ -20,7 +21,7 @@ export type MealAnalysis = {
   scaleKg?: number;
   title: string;
   kcal: number;
-  items: { name: string; kcal: number }[];
+  items: { name: string; kcal: number; qty?: number; unit?: string }[];
 };
 
 const PROMPT = `너는 다이어트 인증방에 올라온 사진이 무엇인지 분류하고, 음식이면 칼로리까지 추정하는 코치야.
@@ -35,15 +36,15 @@ JSON 객체 하나로만 답해 (키: category, scaleKg, title, kcal, items).
 - category: 위 넷 중 하나
 - scaleKg: category가 "scale"이면 화면에 보이는 몸무게 숫자(소수점 한 자리). 아니면 0
 - title: category가 "food"일 때 한 줄 요약 (20자 이내, 예: "닭가슴살 샐러드")
-- items: category가 "food"일 때 사진에 보이는 음식별 {name, kcal} (최대 8개).
-  name에는 사진에서 가늠한 양을 꼭 붙여: "막창 3인분", "쌀국수 1그릇", "삼겹살 300g", "공기밥 2공기", "치킨 반 마리", "맥주 500ml"
-  kcal은 그 양 전체의 칼로리야. 1인분으로 줄여서 말하지 마.
+- items: category가 "food"일 때 사진에 보이는 음식별 {name, qty, unit, kcal} (최대 8개).
+  name은 양을 뺀 음식 이름만 ("막창", "쌀국수"). qty는 사진에서 가늠한 양을 인분 단위 숫자로 (0.5 단위, 예: 반 접시 0.5, 막창 3인분 3). unit은 항상 "인분".
+  kcal은 그 양(qty) 전체의 칼로리야. 1인분으로 줄여서 말하지 마. 예: {"name":"막창","qty":3,"unit":"인분","kcal":1500}
 - kcal: category가 "food"일 때 사진에 보이는 음식 전체의 합계 (items 합과 같게)
 양 가늠하는 법: 접시·그릇·불판·냄비의 크기, 젓가락·숟가락·손과 비교한 크기, 같은 음식이 몇 접시·몇 점·몇 개인지를 세어 봐.
 여럿이 나눠 먹을 양이어도 사진에 보이는 건 전부 더해. 기름진 고기·곱창·막창·튀김은 양이 많으면 칼로리가 크게 늘어.
-감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700, 라면 1봉지 500.
+감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700, 라면 1봉지 500, 방울토마토 1알 4, 사과 1개 120, 계란 1개 75, 닭가슴살 100g 110. 작은 과일·채소는 개수나 g으로 현실적으로 계산해.
 food가 아니면 title을 "", kcal을 0, items를 빈 배열로 해.
-JSON 키는 category, scaleKg, title, kcal, items 다섯 개야.`;
+JSON 키는 category, scaleKg, title, kcal, items 다섯 개야 (items 안의 키는 name, qty, unit, kcal).`;
 
 // 모델이 코드 블록으로 감싸거나 앞뒤에 말을 붙여도 JSON 부분만 꺼낸다 (mypt에서 쓰는 방식과 같다)
 function extractJson(text: string): unknown {
@@ -65,7 +66,14 @@ function clean(raw: unknown): MealAnalysis | null {
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(Math.max(Math.round(v), 0), 5000) : 0);
   const items = (Array.isArray(r.items) ? r.items : [])
     .slice(0, 8)
-    .map((i) => ({ name: String((i as { name?: unknown })?.name ?? "").slice(0, 30), kcal: num((i as { kcal?: unknown })?.kcal) }))
+    .map((i) => {
+      const qty = qtyOf((i as { qty?: unknown })?.qty);
+      return {
+        name: String((i as { name?: unknown })?.name ?? "").slice(0, 30),
+        kcal: num((i as { kcal?: unknown })?.kcal),
+        ...(qty !== undefined ? { qty, unit: unitOf((i as { unit?: unknown })?.unit) ?? "인분" } : {}),
+      };
+    })
     .filter((i) => i.name);
   const CATEGORIES: PhotoCategory[] = ["food", "scale", "workout", "other"];
   const given = typeof r.category === "string" ? (r.category.trim().toLowerCase() as PhotoCategory) : null;
@@ -172,8 +180,10 @@ export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analy
 // 사용자가 음식을 고치거나 새로 넣었을 때, 이름만 보고 칼로리를 다시 추정한다 (글자만 보내서 사진보다 훨씬 싸다).
 // 이름에 양이 적혀 있으면("막창 3인분", "삼겹살 300g") 그 양 전체로, 없으면 1인분으로 계산한다
 const ESTIMATE_PROMPT = `너는 다이어트 코치야. 음식 이름 목록을 받으면 각각의 칼로리를 추정해서 JSON 객체 하나로만 답해.
-이름에 양이 적혀 있으면(예: "막창 3인분", "공기밥 2공기", "삼겹살 300g", "치킨 반 마리") 그 양 전체의 칼로리를, 양이 없으면 1인분(1그릇, 1접시) 기준으로 계산해. 1인분으로 줄이지 마.
-감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700.
+이름에 양이 적혀 있으면(예: "막창 3인분", "공기밥 2공기", "삼겹살 300g", "방울토마토 10알", "치킨 반 마리") 그 양 전체의 칼로리를, 양이 없으면 1인분(1그릇, 1접시) 기준으로 계산해. 1인분으로 줄이지 마.
+계산 방법: g나 ml면 그 음식 100g(100ml)당 칼로리 x 양/100. 개·알·조각·마리면 1개당 칼로리 x 개수. 인분·그릇·접시·공기면 1인분 칼로리 x 양.
+작은 음식도 현실적으로 계산해: 방울토마토는 100g에 20kcal, 1알에 3~4kcal야.
+감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700, 닭가슴살 100g 110, 계란 1개 75, 사과 1개 120, 바나나 1개 100, 고구마 100g 130, 아몬드 10알 70.
 형식: {"kcals":[숫자, ...]} (목록과 같은 순서, 같은 개수)`;
 
 export async function estimateKcals(names: string[]): Promise<number[] | null> {
@@ -189,9 +199,9 @@ export async function estimateKcals(names: string[]): Promise<number[] | null> {
           { role: "system", content: ESTIMATE_PROMPT },
           { role: "user", content: JSON.stringify(names) },
         ],
-        max_tokens: 1000,
+        max_tokens: 2000,
         temperature: 0.2,
-        reasoning_effort: "low",
+        reasoning_effort: "medium",
       }),
       signal: AbortSignal.timeout(30_000),
     });

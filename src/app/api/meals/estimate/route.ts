@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const names = (Array.isArray(body?.names) ? body.names : [])
     .slice(0, 8)
-    .map((n: unknown) => String(n ?? "").trim().slice(0, 30))
+    .map((n: unknown) => String(n ?? "").trim().slice(0, 40))
     .filter(Boolean);
   if (names.length === 0) return NextResponse.json({ error: "음식 이름이 없어요" }, { status: 400 });
 
