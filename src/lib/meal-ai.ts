@@ -35,8 +35,13 @@ JSON 객체 하나로만 답해 (키: category, scaleKg, title, kcal, items).
 - category: 위 넷 중 하나
 - scaleKg: category가 "scale"이면 화면에 보이는 몸무게 숫자(소수점 한 자리). 아니면 0
 - title: category가 "food"일 때 한 줄 요약 (20자 이내, 예: "닭가슴살 샐러드")
-- items: category가 "food"일 때 음식별 이름과 추정 kcal, 1인분 기준 (최대 8개)
-- kcal: category가 "food"일 때 전체 합계 (items 합과 같게)
+- items: category가 "food"일 때 사진에 보이는 음식별 {name, kcal} (최대 8개).
+  name에는 사진에서 가늠한 양을 꼭 붙여: "막창 3인분", "쌀국수 1그릇", "삼겹살 300g", "공기밥 2공기", "치킨 반 마리", "맥주 500ml"
+  kcal은 그 양 전체의 칼로리야. 1인분으로 줄여서 말하지 마.
+- kcal: category가 "food"일 때 사진에 보이는 음식 전체의 합계 (items 합과 같게)
+양 가늠하는 법: 접시·그릇·불판·냄비의 크기, 젓가락·숟가락·손과 비교한 크기, 같은 음식이 몇 접시·몇 점·몇 개인지를 세어 봐.
+여럿이 나눠 먹을 양이어도 사진에 보이는 건 전부 더해. 기름진 고기·곱창·막창·튀김은 양이 많으면 칼로리가 크게 늘어.
+감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700, 라면 1봉지 500.
 food가 아니면 title을 "", kcal을 0, items를 빈 배열로 해.
 JSON 키는 category, scaleKg, title, kcal, items 다섯 개야.`;
 
@@ -164,8 +169,11 @@ export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analy
   return { analysis: null, failure };
 }
 
-// 사용자가 음식을 고치거나 새로 넣었을 때, 이름만 보고 1인분 칼로리를 다시 추정한다 (글자만 보내서 사진보다 훨씬 싸다)
-const ESTIMATE_PROMPT = `너는 다이어트 코치야. 음식 이름 목록을 받으면 각각의 1인분 기준 칼로리를 추정해서 JSON 객체 하나로만 답해.
+// 사용자가 음식을 고치거나 새로 넣었을 때, 이름만 보고 칼로리를 다시 추정한다 (글자만 보내서 사진보다 훨씬 싸다).
+// 이름에 양이 적혀 있으면("막창 3인분", "삼겹살 300g") 그 양 전체로, 없으면 1인분으로 계산한다
+const ESTIMATE_PROMPT = `너는 다이어트 코치야. 음식 이름 목록을 받으면 각각의 칼로리를 추정해서 JSON 객체 하나로만 답해.
+이름에 양이 적혀 있으면(예: "막창 3인분", "공기밥 2공기", "삼겹살 300g", "치킨 반 마리") 그 양 전체의 칼로리를, 양이 없으면 1인분(1그릇, 1접시) 기준으로 계산해. 1인분으로 줄이지 마.
+감각을 맞추는 예 (대략): 공기밥 1공기 300kcal, 쌀국수 1그릇 500, 돈까스 1접시 800, 삼겹살 100g 330, 막창·곱창 1인분(150~200g) 450~600, 치킨 1마리 1,700.
 형식: {"kcals":[숫자, ...]} (목록과 같은 순서, 같은 개수)`;
 
 export async function estimateKcals(names: string[]): Promise<number[] | null> {
