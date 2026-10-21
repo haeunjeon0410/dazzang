@@ -131,6 +131,32 @@ const WEEK_SEEN_KEY = "dajjang_seen_week_results";
 // 쉬어가기 시작 연출(카드 떨어지고 흑백)을 이 기기에서 이미 봤는지 (방+종료일 단위)
 const PAUSE_SEEN_KEY = "dajjang_seen_pause_effect";
 
+// 마지막으로 받은 화면 데이터를 기기에 잠깐 저장해 둔다. 다음에 앱을 열면 서버 응답을 기다리지 않고 바로 그려 주고, 새 값이 오면 갈아 끼운다
+const SCREEN_CACHE_KEY = "dajjang_screen_cache_v1";
+type ScreenCache = Record<string, unknown>;
+function readScreenCache(): ScreenCache | null {
+  try {
+    const raw = localStorage.getItem(SCREEN_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as ScreenCache) : null;
+  } catch {
+    return null;
+  }
+}
+function saveScreenCache(patch: ScreenCache) {
+  try {
+    localStorage.setItem(SCREEN_CACHE_KEY, JSON.stringify({ ...readScreenCache(), ...patch }));
+  } catch {
+    // 저장 공간이 없거나 막혀 있으면 그냥 넘어간다 (다음에 조금 느릴 뿐)
+  }
+}
+function clearScreenCache() {
+  try {
+    localStorage.removeItem(SCREEN_CACHE_KEY);
+  } catch {
+    // 무시
+  }
+}
+
 function hasSeenPauseEffect(id: string): boolean {
   try {
     return (JSON.parse(localStorage.getItem(PAUSE_SEEN_KEY) || "[]") as string[]).includes(id);
@@ -264,6 +290,9 @@ export default function Home() {
     loadFines();
     const res = await fetch("/api/me");
     const data = await res.json();
+    // 로그아웃 상태면 남아 있던 저장본을 지운다 (다른 사람 화면이 보이면 안 된다)
+    if (data.user) saveScreenCache({ me: data.user, room: data.room ?? null, other: data.other ?? null });
+    else clearScreenCache();
     setMe(data.user);
     setRoom(data.room ?? null);
     setOtherCaption(data.other?.caption);
@@ -279,13 +308,19 @@ export default function Home() {
 
   async function loadFines() {
     const res = await fetch("/api/room/fines").catch(() => null);
-    if (res?.ok) setFines(await res.json());
+    if (res?.ok) {
+      const data = await res.json();
+      saveScreenCache({ fines: data });
+      setFines(data);
+    }
   }
 
   async function loadWeek() {
     const res = await fetch("/api/checkins");
     if (!res.ok) return;
-    setWeekData(await res.json());
+    const data = await res.json();
+    saveScreenCache({ week: data });
+    setWeekData(data);
   }
 
   async function loadHistory() {
@@ -295,6 +330,7 @@ export default function Home() {
       return;
     }
     const data = await res.json();
+    saveScreenCache({ weeks: data.weeks });
     setPastWeeks(data.weeks);
 
     const lastWeek = data.weeks[0];
@@ -325,6 +361,28 @@ export default function Home() {
   useEffect(() => {
     // 내 정보, 이번 주 기록, 지난 기록, 벌금 약속을 한꺼번에 요청한다 (내 정보를 기다렸다가 이어서 요청하면 한 번 더 왕복해서 느리다).
     // 로그인하지 않았으면 나머지는 조용히 실패하고 로그인 화면이 뜬다
+    // 저장해 둔 화면이 있으면 먼저 바로 보여 주고, 아래 요청이 끝나면 최신 값으로 바꾼다
+    const cached = readScreenCache() as {
+      me?: Me;
+      room?: Room | null;
+      other?: { caption?: string; resting?: boolean } | null;
+      fines?: FineSnapshot;
+      week?: { weekStart: string; deadline: string; summary: Summary[] };
+      weeks?: PastWeek[];
+    } | null;
+    if (cached?.me && cached.week) {
+      setMe(cached.me);
+      setRoom(cached.room ?? null);
+      setOtherCaption(cached.other?.caption);
+      setOtherResting(!!cached.other?.resting);
+      setNameForm(cached.me.name ?? "");
+      if (cached.fines) setFines(cached.fines);
+      setWeekData(cached.week);
+      if (cached.weeks) {
+        setPastWeeks(cached.weeks);
+        setHistoryReady(true);
+      }
+    }
     loadMe();
     loadWeek();
     loadHistory();
@@ -793,6 +851,7 @@ export default function Home() {
               className="paused-card paused-center"
               onClick={async () => {
                 await fetch("/api/logout", { method: "POST" });
+                clearScreenCache();
                 location.href = "/";
               }}
             >
@@ -1147,6 +1206,7 @@ export default function Home() {
               <button
                 onClick={async () => {
                   await fetch("/api/logout", { method: "POST" });
+                clearScreenCache();
                   location.href = "/";
                 }}
                 className="w-full rounded-xl bg-[#ffeef5] py-3 text-sm font-semibold text-[#c2679c]"
