@@ -4,7 +4,7 @@ import { estimateKcals } from "@/lib/meal-ai";
 import { tooManyRequests } from "@/lib/rate-limit";
 import { takeAiQuota } from "@/lib/ai-quota";
 
-// 식단 확인 창에서 음식을 고치거나 새로 넣었을 때, 이름만으로 1인분 칼로리를 다시 계산해 준다
+// 식단 확인 창에서 음식을 고치거나 새로 넣었을 때, 이름(양을 적었으면 그 양 전체)으로 칼로리를 다시 계산해 준다
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });

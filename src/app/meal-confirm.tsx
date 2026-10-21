@@ -110,7 +110,7 @@ export function MealConfirm({
         prev.map((r, idx) => {
           const k = asked.findIndex((x) => x.i === idx && x.n === queryOf(r));
           // 양까지 붙여서 물었으니 돌아온 칼로리가 그 양 전체의 칼로리다
-          return k < 0 ? r : { ...r, kcal: kcals ? Math.round(kcals[k]) : 0, est: keyOf(r), kcalKnown: !!kcals };
+          return k < 0 ? r : { ...r, kcal: kcals ? Math.round(kcals[k]) : 0, est: keyOf(r), kcalKnown: !!kcals && kcals[k] > 0 };
         }),
       );
     }, 700);

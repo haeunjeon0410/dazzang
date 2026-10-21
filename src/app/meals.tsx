@@ -65,6 +65,8 @@ export function MealView({
   const [dayMeals, setDayMeals] = useState<Meal[] | null>(null);
   const [slide, setSlide] = useState(0);
   // 방금 내가 남긴 반응 (목록을 다시 읽기 전에도 바로 보이게)
+  // 사진을 누른 횟수 (반응 이모티콘을 다시 터뜨리는 데 쓴다)
+  const [taps, setTaps] = useState<Record<string, number>>({});
   const [reactions, setReactions] = useState<Record<string, string>>({});
   const [reload, setReload] = useState(0);
   // 단축어로 올라와 아직 확인하지 않은 내 식단 (확인 창에 하나씩 띄운다)
@@ -322,7 +324,7 @@ export function MealView({
                       <div className="relative overflow-hidden rounded-2xl border border-[#ffd6e8]">
                         {m.photoUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={`${m.photoUrl}?w=480`} alt="식단" loading="lazy" decoding="async" draggable={false} className="aspect-square w-full object-cover" />
+                          <img src={`${m.photoUrl}?w=480`} alt="식단" loading="lazy" decoding="async" draggable={false} onClick={() => setTaps((t) => ({ ...t, [m.id]: (t[m.id] ?? 0) + 1 }))} className="aspect-square w-full object-cover" />
                         ) : (
                           <div className="flex aspect-square w-full items-center justify-center bg-[#fff0f6] px-6 text-center text-xs text-[#b4779b]">
                             지난 주 사진은 지웠어요
@@ -358,6 +360,7 @@ export function MealView({
                           reaction={reactions[m.id] ?? m.reaction ?? null}
                           onPick={(emoji) => reactTo(m, emoji)}
                           inward
+                          tap={taps[m.id] ?? 0}
                         />
                         {m.userId === meId && (
                           // 눈에 띄지 않게 사진 구석에 둔 지우기 버튼 (오른쪽 위는 친구의 반응 자리라 왼쪽 위에 둔다)

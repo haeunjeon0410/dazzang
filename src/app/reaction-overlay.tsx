@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { REACTIONS } from "@/lib/reactions";
 
 // 사진 상세 창의 오른쪽 위에 얹는 이모티콘 반응 (운동 사진과 식단 사진이 같이 쓴다).
@@ -8,21 +8,40 @@ import { REACTIONS } from "@/lib/reactions";
 // - 반응이 없고 친구 사진이면 버튼 -> 이모티콘 다섯 개 -> 고르는 순간 같은 이모티콘이 팡 터진다
 // - 내 사진이고 반응이 없으면 아무것도 보이지 않는다
 // onPick은 서버에 반응을 남기고, 남겨진 이모티콘(실패하면 null)을 돌려준다. 고르면 위쪽(부모)이 reaction을 채워 준다.
+// tap: 부모가 사진을 누를 때마다 올리는 숫자. 반응이 있으면 사진을 누를 때마다 그 이모티콘이 다시 터진다
 // inward: 사진을 자르는 틀 안에서 쓸 때 조각들이 틀 안쪽(왼쪽 아래)으로만 터지게 한다
 export function ReactionOverlay({
   mine,
   reaction,
   onPick,
   inward = false,
+  tap = 0,
 }: {
   mine: boolean;
   reaction: string | null;
   onPick: (emoji: string) => Promise<string | null>;
   inward?: boolean;
+  tap?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [burst, setBurst] = useState<string | null>(null);
+  // 터짐 연출을 처음부터 다시 시작시키는 번호
+  const [burstId, setBurstId] = useState(0);
+  const [lastTap, setLastTap] = useState(tap);
+  if (tap !== lastTap) {
+    setLastTap(tap);
+    if (reaction) {
+      setBurst(reaction);
+      setBurstId((n) => n + 1);
+    }
+  }
+
+  useEffect(() => {
+    if (!burst) return;
+    const t = setTimeout(() => setBurst(null), 1000);
+    return () => clearTimeout(t);
+  }, [burst, burstId]);
 
   async function pick(emoji: string) {
     setBusy(true);
@@ -31,7 +50,7 @@ export function ReactionOverlay({
       if (chosen) {
         setOpen(false);
         setBurst(chosen);
-        setTimeout(() => setBurst(null), 1000);
+        setBurstId((n) => n + 1);
       }
     } finally {
       setBusy(false);
@@ -78,7 +97,7 @@ export function ReactionOverlay({
           </button>
         )
       ) : null}
-      {burst && <ReactionBurst emoji={burst} inward={inward} />}
+      {burst && <ReactionBurst key={burstId} emoji={burst} inward={inward} />}
     </>
   );
 }

@@ -84,6 +84,8 @@ export function WeekCalendar({
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   // 방금 내가 남긴 반응 (서버 응답을 기다렸다가 주간 기록을 다시 읽기 전에도 바로 보이게)
   const [reactionOverrides, setReactionOverrides] = useState<Record<string, string>>({});
+  // 사진을 누른 횟수 (반응 이모티콘을 다시 터뜨리는 데 쓴다)
+  const [taps, setTaps] = useState(0);
   const [animating, setAnimating] = useState<Set<string>>(new Set());
 
   function reactionFor(c: CheckinItem): string | null {
@@ -159,7 +161,11 @@ export function WeekCalendar({
             {byDay.map((c, i) => (
               <button
                 key={i}
-                onClick={() => c && setSelected(c)}
+                onClick={() => {
+                  if (!c) return;
+                  setTaps(0);
+                  setSelected(c);
+                }}
                 className={`relative aspect-square rounded-md flex items-center justify-center text-[10px] overflow-hidden ${
                   c ? "bg-[#ff8fc0]" : "bg-[#ffe1ee] text-[#c2679c]"
                 }`}
@@ -169,7 +175,7 @@ export function WeekCalendar({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`${c.photoUrl}?w=240`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     {reactionFor(c) && (
-                      <span className="absolute top-0 right-0 text-[10px] leading-none bg-white/90 rounded-bl px-0.5">{reactionFor(c)}</span>
+                      <span className="absolute right-0.5 top-0 text-[11px] leading-none [text-shadow:0_0_3px_rgba(0,0,0,0.45)]">{reactionFor(c)}</span>
                     )}
                     {animating.has(c.id) && (
                       <FloatingReaction
@@ -200,7 +206,7 @@ export function WeekCalendar({
             {/* 터지는 이모티콘이 사진 밖으로도 날아가도록 사진 바깥 틀은 자르지 않는다 */}
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selected.photoUrl} alt="인증샷" className="aspect-square w-full rounded-2xl border border-[#ffd6e8] object-cover" />
+              <img src={selected.photoUrl} alt="인증샷" onClick={() => setTaps((n) => n + 1)} className="aspect-square w-full rounded-2xl border border-[#ffd6e8] object-cover" />
               {selected.userId === meId && (
                 // 식단 사진과 같은, 눈에 띄지 않게 구석에 둔 반투명 지우기 버튼 (오른쪽 위는 친구가 남긴 반응 자리라 왼쪽 위에 둔다)
                 <button
@@ -218,6 +224,7 @@ export function WeekCalendar({
                 mine={selected.userId === meId}
                 reaction={selectedReaction}
                 onPick={(emoji) => react(selected, emoji)}
+                tap={taps}
               />
             </div>
             <div className="flex items-center justify-between">
