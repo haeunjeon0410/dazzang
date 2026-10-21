@@ -23,12 +23,9 @@ type Row = ConfirmItem & { qty: number; unit: string; est: string; kcalKnown: bo
 
 const qtyText = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(1));
 
-// 양은 인분으로만 센다. 눌러서 고르는 선택지
-const QTYS = [0.5, 1, 1.5, 2, 3, 4, 5, 6];
-
 // 칼로리를 구한 이름+양+단위 (이게 바뀌면 칼로리를 다시 구해야 한다). AI에게는 "막창 3인분"처럼 양까지 붙여서 묻는다
 const keyOf = (r: { name: string; qty: number; unit: string }) => `${r.name.trim()}\u0001${r.qty}\u0001${r.unit}`;
-const queryOf = (r: { name: string; qty: number; unit: string }) => `${r.name.trim()} ${qtyText(r.qty)}${r.unit}`;
+const queryOf = (r: { name: string }) => r.name.trim();
 
 // 마지막 글자에 받침이 있으면 "과", 없으면 "와" (한글이 아니면 "와")
 function withParticle(word: string): string {
@@ -66,16 +63,14 @@ export function MealConfirm({
   const [titleTouched, setTitleTouched] = useState(false);
   const [rows, setRows] = useState<Row[]>(() =>
     initial.items.map((i) => {
-      const asServing = !i.unit || i.unit === "인분";
-      const row = { ...i, qty: asServing ? i.qty ?? 1 : 1, unit: "인분", est: "", kcalKnown: i.name.trim() !== "" && i.kcal > 0 };
+      // 사진에서 가늠한 양은 이름에 붙여 보여준다 ("막창 3인분"). 칼로리는 이미 그 양 전체의 값이다. 양을 바꾸고 싶으면 이름을 고치면 AI가 다시 계산한다
+      const amount = i.qty && i.qty !== 1 ? ` ${qtyText(i.qty)}${i.unit ?? "인분"}` : "";
+      const row = { ...i, name: `${i.name}${amount}`.slice(0, 30), qty: 1, unit: "인분", est: "", kcalKnown: i.name.trim() !== "" && i.kcal > 0 };
       return { ...row, est: keyOf(row) };
     }),
   );
-  // 양/단위를 직접 고치는 중인 음식 (그 음식 밑에 입력칸이 펼쳐진다)
   // 먹은 양을 고르는 중인 음식 (그 음식 위에 토글이 펼쳐진다)
   const [pickIdx, setPickIdx] = useState<number | null>(null);
-  // 양(인분)을 고르는 중인 음식
-  const [qtyPick, setQtyPick] = useState<number | null>(null);
   // 사진을 눌러 크게 볼 때 (음식이 뭐뭐 들어 있는지 보면서 고치기 편하게)
   const [zoom, setZoom] = useState(false);
   const alive = useRef(true);
@@ -132,19 +127,9 @@ export function MealConfirm({
   function changeRows(next: Row[]) {
     setRows(next);
     if (titleTouched) return;
-    const auto = mealTitleFrom(next.map((r) => r.name));
+    // 제목에는 양을 빼고 음식 이름만 쓴다 ("막창 3인분" -> "막창")
+    const auto = mealTitleFrom(next.map((r) => r.name.replace(/\s*[0-9.]+\s*(인분|그릇|접시|공기|개|알|조각|잔|마리|캔|g|ml|kg)$/, "")));
     if (auto) setTitle(auto);
-  }
-
-  // 양을 고르면 칼로리가 비례해서 바로 바뀐다 (AI를 다시 부르지 않는다)
-  function setQty(idx: number, next: number) {
-    const r = rows[idx];
-    setQtyPick(null);
-    if (next === r.qty) return;
-    const wasStale = stale(r);
-    const moved = { ...r, qty: next, kcal: r.kcalKnown ? Math.round((r.kcal * next) / r.qty) : r.kcal };
-    // 이미 계산이 끝난 음식만 "계산 끝"으로 유지한다 (계산을 기다리는 중이면 계속 기다린다)
-    setRows(rows.map((x, i) => (i === idx ? (wasStale ? moved : { ...moved, est: keyOf(moved) }) : x)));
   }
 
   function setRow(idx: number, patch: Partial<Row>) {
@@ -223,20 +208,8 @@ export function MealConfirm({
                   maxLength={30}
                   className="min-w-0 flex-1 bg-transparent py-1.5 text-base font-semibold text-[#4a2540] placeholder:font-normal placeholder:text-[#d9a7c2] focus:outline-none"
                 />
-                {/* 양: 사진에서 가늠한 양이 틀렸으면 눌러서 다시 고른다 */}
                 <button
                   onClick={() => {
-                    setPickIdx(null);
-                    setQtyPick(qtyPick === idx ? null : idx);
-                  }}
-                  aria-label="양 고르기"
-                  className={`flex-none rounded-full px-2 py-1.5 text-[11px] font-bold ${r.qty !== 1 ? "bg-[#de73a5] text-white" : "text-[#c2679c]"}`}
-                >
-                  {qtyText(r.qty)}인분
-                </button>
-                <button
-                  onClick={() => {
-                    setQtyPick(null);
                     setPickIdx(pickIdx === idx ? null : idx);
                   }}
                   aria-label="먹은 양 고르기"
@@ -254,19 +227,6 @@ export function MealConfirm({
                   ✕
                 </button>
               </div>
-              {qtyPick === idx && (
-                <div className="grid grid-cols-4 gap-1">
-                  {QTYS.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setQty(idx, q)}
-                      className={`rounded-full py-1.5 text-xs font-bold ${r.qty === q ? "bg-[#de73a5] text-white" : "bg-[#ffe1ee] text-[#b4356f]"}`}
-                    >
-                      {qtyText(q)}인분
-                    </button>
-                  ))}
-                </div>
-              )}
               {r.name.trim() && !stale(r) && !r.kcalKnown && <p className="pl-3 text-[10px] font-semibold text-[#d1465f]">칼로리를 못 구했어요</p>}
             </div>
           ))}
