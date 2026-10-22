@@ -233,6 +233,8 @@ export default function Home() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [otherCaption, setOtherCaption] = useState<string | undefined>(undefined);
   const [otherResting, setOtherResting] = useState(false);
+  // 친구가 혼자 쉬다가 다시 도전하기로 했을 때 앱을 열면 한 번 띄우는 팝업
+  const [friendBackName, setFriendBackName] = useState<string | null>(null);
   const [fines, setFines] = useState<FineSnapshot | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   // 쉬어가기를 수락하는 순간: 카드들이 우수수 떨어지고 앱 전체가 흑백으로 변한다
@@ -297,6 +299,16 @@ export default function Home() {
     setRoom(data.room ?? null);
     setOtherCaption(data.other?.caption);
     setOtherResting(!!data.other?.resting);
+    // 지난번에 본 친구 상태가 "쉬는 중"이었는데 지금은 아니면 다시 도전한다는 팝업을 띄운다 (푸시 알림 대신)
+    if (data.other) {
+      try {
+        const key = "dajjang_other_resting";
+        if (localStorage.getItem(key) === "1" && !data.other.resting) setFriendBackName(data.other.name);
+        localStorage.setItem(key, data.other.resting ? "1" : "0");
+      } catch {
+        // 저장소를 못 쓰면 팝업만 건너뛴다
+      }
+    }
     if (data.user) setNameForm(data.user.name ?? "");
     if (data.room) {
       setGroupForm({
@@ -1362,6 +1374,19 @@ export default function Home() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 친구가 쉬기를 그만두고 다시 도전하기로 했을 때 */}
+      {friendBackName && !weekResultPopup && !mealConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
+            <p className="font-bold text-[#4a2540]">{friendBackName}님이 다시 도전해요</p>
+            <p className="text-xs leading-relaxed text-[#b4779b]">쉬기를 그만뒀어요. 이번 주부터 벌금이 다시 생겨요.</p>
+            <button onClick={() => setFriendBackName(null)} className="w-full rounded-xl bg-[#f472b6] px-2 py-2.5 text-sm font-bold text-white">
+              확인
+            </button>
           </div>
         </div>
       )}

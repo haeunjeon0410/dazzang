@@ -48,13 +48,7 @@ export async function PATCH(req: NextRequest) {
       if (r.fromWeek.getTime() >= thisWeek.getTime()) await prisma.userRest.delete({ where: { id: r.id } });
       else await prisma.userRest.update({ where: { id: r.id }, data: { untilWeek: thisWeek } });
     }
-    const other = await findOther();
-    if (other) {
-      await sendPushToUser(other, {
-        title: "친구가 다시 도전해요",
-        body: `${me.name}님이 쉬기를 그만두고 다시 도전해요`,
-      }).catch(() => {});
-    }
+    // 알림은 보내지 않는다. 친구가 앱을 열었을 때 쉬는 상태가 풀린 걸 보고 팝업으로 알려준다
     return NextResponse.json({ ok: true });
   }
 
