@@ -1150,7 +1150,8 @@ export default function Home() {
                 실험실 <span className="ml-1 rounded-full bg-[#ffc72c] px-2 py-0.5 text-[10px] font-bold text-[#6b4a00]">BETA</span>
               </p>
               <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />
-              <FineSetting data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
+              <FineSetting feature="weight" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
+              <FineSetting feature="meal" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
             </div>
 
             {/* 쉬어가기 요청 */}

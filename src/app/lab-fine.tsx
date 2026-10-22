@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { CharacterSprite, CharPose, CharRow } from "./sprite";
 
-// 몸무게 인증의 벌금 약속. 한쪽이 금액을 제안하고 상대가 수락해야 정해진다 (합의한 다음 주부터 적용)
+// 몸무게 인증과 식단 인증의 벌금 약속. 한쪽이 금액을 제안하고 상대가 수락해야 정해진다 (합의한 다음 주부터 적용)
 
 export type FineRule = {
-  feature: "weight";
+  feature: Feature;
+  // 이 기능에서 고를 수 있는 금액 (예전 응답에는 없을 수 있다)
+  choices?: number[];
   amount: number;
   activeAmount: number;
   sinceWeek: string | null;
@@ -15,14 +17,18 @@ export type FineRule = {
 };
 export type FineSnapshot = { choices: number[]; rules: FineRule[] };
 
-const RULE = "이번 주 몸무게가 지난 기록보다 늘거나 인증을 안 하면";
+export type Feature = "weight" | "meal";
+const TEXT: Record<Feature, { name: string; short: string; rule: string; unit: string }> = {
+  weight: { name: "몸무게 벌금", short: "늘거나 인증을 안 하면 벌금이에요", rule: "이번 주 몸무게가 지난 기록보다 늘거나 인증을 안 하면", unit: "" },
+  meal: { name: "식단 벌금", short: "식단 인증을 안 한 날마다 벌금이에요", rule: "식단 인증을 안 한 날마다", unit: "하루 " },
+};
 const won = (n: number) => `${n.toLocaleString()}원`;
 
-async function post(body: Record<string, unknown>): Promise<FineSnapshot | null> {
+async function post(feature: Feature, body: Record<string, unknown>): Promise<FineSnapshot | null> {
   const res = await fetch("/api/room/fines", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ feature: "weight", ...body }),
+    body: JSON.stringify({ feature, ...body }),
   });
   const d = await res.json().catch(() => null);
   if (!res.ok) {
@@ -36,17 +42,20 @@ async function post(body: Record<string, unknown>): Promise<FineSnapshot | null>
 // 금액을 골라 친구에게 제안하고, 친구가 수락하면 다음 주부터 적용된다.
 // 한 번 정해진 금액은 혼자 못 바꾸고, 바꾸려면 다시 제안해서 친구가 수락해야 한다
 export function FineSetting({
+  feature,
   data,
   otherName,
   bothOn,
   onChange,
 }: {
+  feature: Feature;
   data: FineSnapshot | null;
   otherName: string;
   bothOn: boolean;
   onChange: (d: FineSnapshot) => void;
 }) {
-  const rule = data?.rules.find((r) => r.feature === "weight");
+  const rule = data?.rules.find((r) => r.feature === feature);
+  const t = TEXT[feature];
   const [pick, setPick] = useState(0);
   // 정해진 뒤에 "변경 제안"을 눌러 고르는 중인지
   const [changing, setChanging] = useState(false);
@@ -56,7 +65,7 @@ export function FineSetting({
   async function run(body: Record<string, unknown>) {
     setBusy(true);
     try {
-      const d = await post(body);
+      const d = await post(feature, body);
       if (d) {
         onChange(d);
         setChanging(false);
@@ -70,9 +79,9 @@ export function FineSetting({
   const fixed = rule.amount > 0;
   const incoming = rule.proposedAmount !== null && !rule.proposedByMe;
   const outgoing = rule.proposedAmount !== null && rule.proposedByMe;
-  const proposalText = (n: number) => (n > 0 ? won(n) : "없음");
+  const proposalText = (n: number) => (n > 0 ? `${t.unit}${won(n)}` : "없음");
   // 정해진 금액은 고를 수 없고, 정해진 뒤에는 "없음"도 고를 수 있다
-  const options = data.choices.filter((c) => c !== rule.amount && c > 0);
+  const options = (rule.choices ?? data.choices).filter((c) => c !== rule.amount && c > 0);
   const btn = "flex-none rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40";
 
   let right;
@@ -96,7 +105,7 @@ export function FineSetting({
   } else if (fixed && !changing) {
     right = (
       <>
-        <span className="text-sm font-bold text-[#de73a5]">{won(rule.amount)}</span>
+        <span className="text-sm font-bold text-[#de73a5]">{t.unit}{won(rule.amount)}</span>
         <button onClick={() => setChanging(true)} className="flex-none text-xs text-[#b4779b] underline">변경</button>
       </>
     );
@@ -125,8 +134,8 @@ export function FineSetting({
   return (
     <div className="flex items-center gap-2 border-t border-[#ffd6e8] pt-2">
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-[#4a2540]">몸무게 벌금</span>
-        <span className="block text-xs text-[#b4779b]">늘거나 인증을 안 하면 벌금이에요</span>
+        <span className="block text-sm font-semibold text-[#4a2540]">{t.name}</span>
+        <span className="block text-xs text-[#b4779b]">{t.short}</span>
       </span>
       <span className="flex min-w-0 items-center gap-1.5">{right}</span>
       {/* 확정된 벌금이 있으면 체크. 켜고 끄는 건 위의 제안/동의로만 바뀐다 */}
@@ -149,7 +158,7 @@ export function FineProposalPopup({
   async function answer(accept: boolean) {
     setBusy(true);
     try {
-      const d = await post({ action: "respond", accept });
+      const d = await post(rule.feature, { action: "respond", accept });
       if (d) onChange(d);
     } finally {
       setBusy(false);
@@ -160,10 +169,10 @@ export function FineProposalPopup({
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
         <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
-        <p className="font-bold text-[#4a2540]">{otherName}님이 몸무게 벌금을 제안했어요</p>
-        <p className="text-3xl font-black text-[#de73a5]">{amount > 0 ? won(amount) : "없음"}</p>
+        <p className="font-bold text-[#4a2540]">{otherName}님이 {TEXT[rule.feature].name}을 제안했어요</p>
+        <p className="text-3xl font-black text-[#de73a5]">{amount > 0 ? `${TEXT[rule.feature].unit}${won(amount)}` : "없음"}</p>
         <p className="text-xs leading-relaxed text-[#b4779b]">
-          {RULE} 내는 돈이에요.
+          {TEXT[rule.feature].rule} 내는 돈이에요.
           <br />
           수락하면 다음 주부터 적용돼요.
         </p>
