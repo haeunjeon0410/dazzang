@@ -37,6 +37,27 @@ export async function PATCH(req: NextRequest) {
       include: { subscriptions: true },
     });
 
+  // ── 혼자 쉬기 취소 ────────────────────────────────────────────
+  // 친구가 쉬어가기를 거절해서 혼자 쉬는 중일 때, 쉬기를 그만두고 다시 도전한다.
+  // 이미 지나간 주의 쉬는 기록은 그대로 두고, 이번 주부터는 다시 벌금이 생긴다
+  if (action === "end-rest") {
+    const thisWeek = getWeekStart();
+    const rests = await prisma.userRest.findMany({ where: { userId, untilWeek: { gt: thisWeek } } });
+    if (rests.length === 0) return NextResponse.json({ error: "쉬는 중이 아니에요" }, { status: 400 });
+    for (const r of rests) {
+      if (r.fromWeek.getTime() >= thisWeek.getTime()) await prisma.userRest.delete({ where: { id: r.id } });
+      else await prisma.userRest.update({ where: { id: r.id }, data: { untilWeek: thisWeek } });
+    }
+    const other = await findOther();
+    if (other) {
+      await sendPushToUser(other, {
+        title: "친구가 다시 도전해요",
+        body: `${me.name}님이 쉬기를 그만두고 다시 도전해요`,
+      }).catch(() => {});
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   // ── 일시정지 요청 ─────────────────────────────────────────────
   if (action === "request-pause") {
     const weeks = Number(body.weeks);

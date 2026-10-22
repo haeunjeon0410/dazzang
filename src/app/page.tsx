@@ -876,6 +876,14 @@ export default function Home() {
             <p className="text-xs text-[#b4779b]">
               ~ {formatPauseEnd(new Date(me.restUntil))}까지 벌금이 없어요. 친구는 계속 도전 중이에요!
             </p>
+            <button
+              onClick={() => {
+                if (confirm("쉬기를 그만두고 다시 도전할까요? 이번 주부터 다시 벌금이 생겨요.")) roomAction("end-rest");
+              }}
+              className="w-full rounded-xl bg-white border border-[#ffd6e8] py-2 text-sm font-semibold text-[#c2679c]"
+            >
+              쉬기 취소
+            </button>
           </div>
         )}
 
