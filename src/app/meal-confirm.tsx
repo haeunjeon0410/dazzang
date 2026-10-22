@@ -34,6 +34,9 @@ function withParticle(word: string): string {
   return `${word}${hasBatchim ? "과" : "와"}`;
 }
 
+// 이름 끝에 붙은 양("막창 3인분", "붕어빵 3개")은 제목에서 뺀다
+const stripAmount = (name: string) => name.replace(/\s*[0-9.]+\s*(인분|그릇|접시|공기|개|알|조각|잔|마리|캔|g|ml|kg)$/, "");
+
 // 음식 이름들로 식단 제목을 만든다: 하나면 그 이름, 둘이면 "돈까스와 쌀국수", 셋 이상이면 "돈까스 외 2가지"
 export function mealTitleFrom(names: string[]): string {
   const list = names.map((n) => n.trim()).filter(Boolean);
@@ -60,7 +63,6 @@ export function MealConfirm({
 }) {
   const [title, setTitle] = useState(initial.title);
   // 제목을 직접 고쳤으면 그 뒤로는 음식을 바꿔도 제목을 덮어쓰지 않는다
-  const [titleTouched, setTitleTouched] = useState(false);
   const [rows, setRows] = useState<Row[]>(() =>
     initial.items.map((i) => {
       // 사진에서 가늠한 양은 이름에 붙여 보여준다 ("막창 3인분"). 칼로리는 이미 그 양 전체의 값이다. 양을 바꾸고 싶으면 이름을 고치면 AI가 다시 계산한다
@@ -126,10 +128,8 @@ export function MealConfirm({
   // 음식 목록(이름)이 바뀌면 제목도 따라 바뀐다. 예: 버섯국을 쌀국수로 고치면 "돈까스와 버섯국" -> "돈까스와 쌀국수"
   function changeRows(next: Row[]) {
     setRows(next);
-    if (titleTouched) return;
-    // 제목에는 양을 빼고 음식 이름만 쓴다 ("막창 3인분" -> "막창")
-    const auto = mealTitleFrom(next.map((r) => r.name.replace(/\s*[0-9.]+\s*(인분|그릇|접시|공기|개|알|조각|잔|마리|캔|g|ml|kg)$/, "")));
-    if (auto) setTitle(auto);
+    // 제목은 사람이 적지 않고 음식 이름에서 만든다 (양은 뺀다)
+    setTitle(mealTitleFrom(next.map((r) => stripAmount(r.name))));
   }
 
   function setRow(idx: number, patch: Partial<Row>) {
@@ -150,16 +150,10 @@ export function MealConfirm({
           </button>
           <div className="min-w-0 flex-1 space-y-1">
             <p className="text-xs font-bold text-[#c2679c]">{aiRead ? "AI가 읽었어요. 틀리면 고쳐 주세요" : "직접 적어 주세요"}</p>
-            <input
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setTitleTouched(true);
-              }}
-              placeholder="음식 이름"
-              maxLength={40}
-              className="w-full rounded-xl border border-[#ffd6e8] bg-[#fff0f6] px-3 py-2 text-base font-bold text-[#4a2540]"
-            />
+            {/* 제목은 아래 음식 이름에서 자동으로 만들어진다 (직접 고치지 않는다) */}
+            <p className="w-full truncate rounded-xl bg-[#fff0f6] px-3 py-2 text-base font-bold text-[#4a2540]">
+              {title || <span className="font-normal text-[#d9a7c2]">아래에 음식을 적어 주세요</span>}
+            </p>
           </div>
         </div>
 
