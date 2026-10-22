@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     });
     await sendPushToUser(other, {
       title: `${NAMES[feature]} 벌금 제안`,
-      body: amount > 0 ? `${me.name}님이 ${NAMES[feature]} 벌금 ${UNIT[feature]}${amount.toLocaleString()}원을 제안했어요` : `${me.name}님이 ${NAMES[feature]} 벌금을 없애자고 제안했어요`,
+      body: amount > 0 ? `${me.name}님이 ${NAMES[feature]} 벌금 ${UNIT[feature]}${amount.toLocaleString()}원을 제안했어요` : `${me.name}님이 ${NAMES[feature]} 벌금 내기를 중단하고 싶대요. 앱에서 수락하거나 거절해 주세요`,
     }).catch(() => {});
     return NextResponse.json(await snapshot(me.roomId, userId));
   }

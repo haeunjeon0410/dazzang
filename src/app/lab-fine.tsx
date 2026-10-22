@@ -77,9 +77,11 @@ export function FineSetting({
   }
 
   const fixed = rule.amount > 0;
+  // 정해진 벌금을 풀고 싶을 때 누를 수 있다 (친구가 들어와 있고, 오가는 제안이 없을 때)
+  const canStop = fixed && bothOn && rule.proposedAmount === null;
   const incoming = rule.proposedAmount !== null && !rule.proposedByMe;
   const outgoing = rule.proposedAmount !== null && rule.proposedByMe;
-  const proposalText = (n: number) => (n > 0 ? `${t.unit}${won(n)}` : "없음");
+  const proposalText = (n: number) => (n > 0 ? `${t.unit}${won(n)}` : "중단");
   // 정해진 금액은 고를 수 없고, 정해진 뒤에는 "없음"도 고를 수 있다
   const options = (rule.choices ?? data.choices).filter((c) => c !== rule.amount && c > 0);
   const btn = "flex-none rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40";
@@ -98,7 +100,7 @@ export function FineSetting({
   } else if (outgoing) {
     right = (
       <>
-        <span className="text-xs text-[#b4779b]">{proposalText(rule.proposedAmount!)} 제안 중</span>
+        <span className="text-xs text-[#b4779b]">{rule.proposedAmount === 0 ? "중단 제안 중" : `${proposalText(rule.proposedAmount!)} 제안 중`}</span>
         <button disabled={busy} onClick={() => run({ action: "cancel" })} className="flex-none text-xs text-[#b4779b] underline">취소</button>
       </>
     );
@@ -119,7 +121,7 @@ export function FineSetting({
           onChange={(e) => setPick(Number(e.target.value))}
           className="rounded-lg border border-[#ffd6e8] bg-white px-2 py-1.5 text-sm text-[#4a2540]"
         >
-          <option value={0} disabled={!fixed}>{fixed ? "없음" : "금액"}</option>
+          <option value={0} disabled={!fixed}>{fixed ? "중단" : "금액"}</option>
           {options.map((c) => (
             <option key={c} value={c}>{won(c)}</option>
           ))}
@@ -138,8 +140,22 @@ export function FineSetting({
         <span className="block text-xs text-[#b4779b]">{t.short}</span>
       </span>
       <span className="flex min-w-0 items-center gap-1.5">{right}</span>
-      {/* 확정된 벌금이 있으면 체크. 켜고 끄는 건 위의 제안/동의로만 바뀐다 */}
-      <input type="checkbox" checked={fixed} readOnly tabIndex={-1} aria-label="벌금 확정" className="pointer-events-none h-6 w-6 flex-none accent-[#de73a5]" />
+      {/* 확정된 벌금이 있으면 체크. 체크를 풀려면 친구에게 "벌금 내기를 그만하자"고 제안해서 친구가 수락해야 한다 */}
+      <input
+        type="checkbox"
+        checked={fixed}
+        disabled={busy}
+        readOnly={!canStop}
+        tabIndex={canStop ? 0 : -1}
+        aria-label={canStop ? "벌금 중단 제안" : "벌금 확정"}
+        onChange={() => {
+          if (!canStop) return;
+          if (confirm(`${t.name}을 중단할까요?\n${otherName || "친구"}님에게 "벌금 내기를 중단하고 싶다"고 제안이 가고, 수락하면 다음 주부터 벌금이 없어져요.`)) {
+            run({ action: "propose", amount: 0 });
+          }
+        }}
+        className={`h-6 w-6 flex-none accent-[#de73a5] ${canStop ? "cursor-pointer" : "pointer-events-none"}`}
+      />
     </div>
   );
 }
@@ -169,12 +185,16 @@ export function FineProposalPopup({
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
         <CharacterSprite row={CharRow.A} pose={CharPose.PLEAD} height={76} className="mx-auto" />
-        <p className="font-bold text-[#4a2540]">{otherName}님이 {TEXT[rule.feature].name}을 제안했어요</p>
-        <p className="text-3xl font-black text-[#de73a5]">{amount > 0 ? `${TEXT[rule.feature].unit}${won(amount)}` : "없음"}</p>
+        <p className="font-bold text-[#4a2540]">{amount === 0 ? `${otherName}님이 ${TEXT[rule.feature].name}을 그만하자고 해요` : `${otherName}님이 ${TEXT[rule.feature].name}을 제안했어요`}</p>
+        <p className="text-3xl font-black text-[#de73a5]">{amount > 0 ? `${TEXT[rule.feature].unit}${won(amount)}` : "중단"}</p>
         <p className="text-xs leading-relaxed text-[#b4779b]">
-          {TEXT[rule.feature].rule} 내는 돈이에요.
-          <br />
-          수락하면 다음 주부터 적용돼요.
+          {amount === 0 ? "수락하면 다음 주부터 벌금 내기를 하지 않아요." : `${TEXT[rule.feature].rule} 내는 돈이에요.`}
+          {amount > 0 && (
+            <>
+              <br />
+              수락하면 다음 주부터 적용돼요.
+            </>
+          )}
         </p>
         <div className="flex gap-2">
           <button disabled={busy} onClick={() => answer(true)} className="flex-1 rounded-xl bg-[#2f9e44] px-2 py-2.5 text-sm font-bold text-white disabled:opacity-50">
