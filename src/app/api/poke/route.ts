@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { sendPushToUser } from "@/lib/push";
+import { tooManyRequests } from "@/lib/rate-limit";
 
 const POKE_LINES = [
   "나는 했는데, 너는?",
@@ -37,6 +38,11 @@ const POKE_LINES = [
 export async function POST() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+
+  // 친구에게 알림이 쏟아지지 않게 10분에 5번까지
+  if (tooManyRequests(`poke:${userId}`, 5, 10 * 60_000)) {
+    return NextResponse.json({ error: "너무 자주 찔렀어요. 잠시 뒤에 다시 해 주세요" }, { status: 429 });
+  }
 
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });

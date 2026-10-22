@@ -75,29 +75,31 @@ export async function GET(req: Request) {
   const dayParam = dayRaw === null || dayRaw === "" ? NaN : Number(dayRaw);
   const day = Number.isInteger(dayParam) && dayParam >= 0 && dayParam <= 6 ? dayParam : todayIdx;
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, select: { id: true, name: true } });
-  const ids = users.map((u) => u.id);
-  const weekMeals = await prisma.meal.findMany({
-    where: { userId: { in: ids }, confirmed: true, createdAt: { gte: dayStart(0), lt: dayStart(7) } },
-    select: { userId: true, kcal: true, createdAt: true },
-  });
+  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다). 방 사람들은 관계(user.roomId)로 바로 걸러서 사람 목록을 기다리지 않는다
+  const inRoom = { user: { roomId: me.roomId } };
+  const [users, weekMeals, pendingCount, meals] = await Promise.all([
+    prisma.user.findMany({ where: { roomId: me.roomId }, select: { id: true, name: true } }),
+    prisma.meal.findMany({
+      where: { ...inRoom, confirmed: true, createdAt: { gte: dayStart(0), lt: dayStart(7) } },
+      select: { userId: true, kcal: true, createdAt: true },
+    }),
+    prisma.meal.count({ where: { userId, confirmed: false } }),
+    // day=none: 표만 필요할 때라 사진이 든 목록은 건너뛴다
+    dayRaw === "none"
+      ? Promise.resolve([])
+      : prisma.meal.findMany({
+          where: { ...inRoom, confirmed: true, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+          omit: { photoUrl: true },
+        }),
+  ]);
   const week = weekMeals.map((m) => ({
     userId: m.userId,
     day: Math.floor((m.createdAt.getTime() - dayStart(0).getTime()) / DAY_MS),
     kcal: m.kcal ?? 0,
   }));
-  const pendingCount = await prisma.meal.count({ where: { userId, confirmed: false } });
 
-  // day=none: 표만 필요할 때라 사진이 든 목록은 건너뛴다
-  const meals =
-    dayRaw === "none"
-      ? []
-      : await prisma.meal.findMany({
-          where: { userId: { in: ids }, confirmed: true, createdAt: { gte: dayStart(day), lt: dayStart(day + 1) } },
-          orderBy: { createdAt: "desc" },
-          take: 30,
-          omit: { photoUrl: true },
-        });
   const gone = new Set(
     meals.length
       ? (await prisma.meal.findMany({ where: { id: { in: meals.map((m) => m.id) }, photoUrl: "" }, select: { id: true } })).map((m) => m.id)

@@ -3,19 +3,23 @@
 import { formatPauseEnd } from "@/lib/week";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { PushToggle } from "./push-setup";
 import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
-import { MealView } from "./meals";
-import { MealConfirm, type ConfirmValues } from "./meal-confirm";
-import { ShortcutSetup } from "./shortcut-setup";
-import { WeightGraph } from "./weight";
+import type { ConfirmValues } from "./meal-confirm";
 import { readTakenAt } from "@/lib/photo-date";
 import { aiFailureText } from "@/lib/ai-failure";
 import { FineSetting, FineProposalPopup, type FineSnapshot } from "./lab-fine";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
-import { WhatsNew } from "./whats-new";
+
+// 처음 화면에 바로 필요 없는 큰 화면들은 열 때 내려받는다 (첫 로딩에 받는 코드가 줄어든다)
+const MealView = dynamic(() => import("./meals").then((m) => m.MealView));
+const MealConfirm = dynamic(() => import("./meal-confirm").then((m) => m.MealConfirm));
+const ShortcutSetup = dynamic(() => import("./shortcut-setup").then((m) => m.ShortcutSetup));
+const WeightGraph = dynamic(() => import("./weight").then((m) => m.WeightGraph));
+const WhatsNew = dynamic(() => import("./whats-new").then((m) => m.WhatsNew));
 
 // 업로드 전 브라우저에서 리사이즈+압축해서 DB 용량/트래픽을 아낀다 (긴 변 1280px, JPEG 75%)
 async function compressImage(file: File, maxDim = 1280, quality = 0.75): Promise<string> {

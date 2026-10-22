@@ -8,8 +8,8 @@ export async function POST(req: NextRequest) {
   if (tooManyRequests(`login:${clientIp(req)}`, 20)) {
     return NextResponse.json({ error: "너무 많이 시도했어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
   }
-  const { userId } = await req.json();
-  if (!userId) {
+  const { userId } = await req.json().catch(() => ({}));
+  if (!userId || typeof userId !== "string") {
     return NextResponse.json({ error: "누구인지 선택해주세요" }, { status: 400 });
   }
 

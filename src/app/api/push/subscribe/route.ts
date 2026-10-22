@@ -6,8 +6,9 @@ export async function POST(req: NextRequest) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { endpoint, keys } = await req.json();
-  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+  const { endpoint, keys } = await req.json().catch(() => ({}));
+  const str = (v: unknown) => typeof v === "string" && v.length > 0 && v.length < 1000;
+  if (!str(endpoint) || !str(keys?.p256dh) || !str(keys?.auth)) {
     return NextResponse.json({ error: "구독 정보가 올바르지 않습니다" }, { status: 400 });
   }
 
