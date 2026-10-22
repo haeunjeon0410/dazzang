@@ -14,7 +14,7 @@ export const FINE_CHOICES = [0, 5000, 10000, 15000, 20000, 25000, 30000];
 // 기능마다 제안할 수 있는 금액이 다르다. 식단은 하루 단위라 금액이 작다 (하루에 안 올릴 때마다 한 번)
 export const FINE_CHOICES_BY: Record<LabFeature, number[]> = {
   weight: FINE_CHOICES,
-  meal: [0, 1000, 2000, 4000, 6000, 8000, 10000],
+  meal: [0, 1000, 2000, 3000, 4000, 5000],
 };
 
 export type LabUser = { id: string };
