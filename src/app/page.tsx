@@ -1077,7 +1077,13 @@ export default function Home() {
       )}
 
       {graphOpen && (
-        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0} onClose={() => setGraphOpen(false)} />
+        <WeightGraph fineAmount={fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0} onClose={() => setGraphOpen(false)}
+          // 체중계 사진을 올리는 창(인증하기와 같은 업로드)을 연다. 기록하고 나면 그래프가 다시 열린다
+          onRegister={() => {
+            setGraphOpen(false);
+            uploadInputRef.current?.click();
+          }}
+        />
       )}
 
       {toast && (

@@ -63,7 +63,7 @@ function Chart({ logs }: { logs: WeightData["logs"] }) {
 }
 
 // 헤더의 그래프 버튼으로 여는 몸무게 창: 최근 5주 기록과 지난주 대비 변화를 보여준다
-export function WeightGraph({ fineAmount, onClose }: { fineAmount: number; onClose: () => void }) {
+export function WeightGraph({ fineAmount, onClose, onRegister }: { fineAmount: number; onClose: () => void; onRegister: () => void }) {
   const [data, setData] = useState<WeightData | null>(null);
 
   useEffect(() => {
@@ -107,8 +107,15 @@ export function WeightGraph({ fineAmount, onClose }: { fineAmount: number; onClo
             <Chart logs={data.logs} />
           </>
         ) : (
-          <p className="py-8 text-center text-sm text-[#b4779b]">인증하기로 체중계 사진을 올려 기록해요</p>
+          <p className="py-8 text-center text-sm text-[#b4779b]">체중계 사진을 올려 기록해요</p>
         )}
+
+        <button
+          onClick={onRegister}
+          className="w-full rounded-xl bg-[#f472b6] px-2 py-2.5 text-sm font-bold text-white"
+        >
+          {data.thisWeekDone ? "몸무게 다시 등록" : "몸무게 등록"}
+        </button>
       </div>
     </div>
   );
