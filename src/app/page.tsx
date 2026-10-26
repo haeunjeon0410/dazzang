@@ -922,6 +922,8 @@ export default function Home() {
                 마감 하루 전부터는 빨간색으로 바뀌고 자동 벌금을 알려준다 */}
             {me.weightPending && !roomPaused && !(me.restUntil && new Date(me.restUntil) > new Date()) && (() => {
               const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0;
+              // 벌금이 꺼져 있으면(약속이 없거나 0원) 안 해도 잃는 게 없으니 배너를 띄우지 않는다
+              if (fineAmount <= 0) return null;
               const lastDay = !!weekData && new Date(weekData.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000;
               return (
                 <div
@@ -935,7 +937,7 @@ export default function Home() {
                 >
                   <p className="min-w-0 text-sm font-black leading-snug text-[#4a2540]">
                     {lastDay
-                      ? `오늘까지 몸무게 인증 안 하면 ${fineAmount > 0 ? `벌금 ${fineAmount.toLocaleString()}원 ` : "벌금이 "}자동 청구!`
+                      ? `오늘까지 몸무게 인증 안 하면 벌금 ${fineAmount.toLocaleString()}원 자동 청구!`
                       : "이번 주 몸무게 인증 아직이에요"}
                   </p>
                   <button
