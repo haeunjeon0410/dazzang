@@ -63,12 +63,12 @@ export async function GET(req: NextRequest) {
       if (weightLogs.some((l) => l.userId === user.id)) continue;
       const rule = weightRules.find((r) => r.roomId === user.roomId);
       const fineAmount = rule ? fineAmountForWeek(rule, weekStart) : 0;
+      // 벌금이 꺼져 있으면(약속이 없거나 0원) 안 해도 잃는 게 없으니 알리지 않는다
+      if (fineAmount <= 0) continue;
       pushes.push(
         sendPushToUser(user, {
           title: "몸무게 인증 마감 임박!",
-          body: fineAmount > 0
-            ? `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 안 하면 벌금 ${fineAmount.toLocaleString()}원이 자동으로 청구돼요`
-            : `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 인증해 주세요`,
+          body: `${user.name}님 이번 주 몸무게 인증을 아직 안 했어요. 오늘 안에 안 하면 벌금 ${fineAmount.toLocaleString()}원이 자동으로 청구돼요`,
         }),
       );
     }
