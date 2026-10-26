@@ -21,7 +21,7 @@ type Meal = {
 
 type MealsData = {
   people: { id: string; name: string }[];
-  week: { userId: string; day: number; kcal: number }[];
+  week: { id: string; userId: string; day: number; kcal: number; reaction: string | null }[];
   day: number;
   pendingCount?: number;
   meals: Meal[];
@@ -243,15 +243,20 @@ export function MealView({
           {DAY_LABELS.map((_, i) => {
             const mine = data!.week.filter((w) => w.userId === p.id && w.day === i);
             const kcal = mine.reduce((s, w) => s + w.kcal, 0);
+            // 친구가 남긴 이모티콘은 눌러 보지 않아도 칸에서 보이게 한다 (그날 여러 끼면 가장 늦게 먹은 것의 반응)
+            const reaction = [...mine].reverse().map((w) => reactions[w.id] ?? w.reaction).find(Boolean);
             return (
               <button
                 key={i}
                 onClick={() => mine.length && openCell(p.id, i)}
-                className={`aspect-square rounded-md flex items-center justify-center text-xs leading-tight ${
+                className={`relative aspect-square rounded-md flex items-center justify-center text-xs leading-tight ${
                   mine.length ? `font-semibold text-[#7a2a50] ${kcal > 0 ? heatClass(kcal) : "bg-[#fde3ee]"}` : "bg-[#fff0f6] text-[#d9a9c4]"
                 }`}
               >
                 {mine.length ? (kcal > 0 ? kcal.toLocaleString() : `${mine.length}끼`) : "-"}
+                {reaction && (
+                  <span className="absolute right-0.5 top-0 text-[11px] leading-none [text-shadow:0_0_3px_rgba(0,0,0,0.45)]">{reaction}</span>
+                )}
               </button>
             );
           })}

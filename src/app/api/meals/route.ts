@@ -82,7 +82,7 @@ export async function GET(req: Request) {
     prisma.user.findMany({ where: { roomId: me.roomId }, select: { id: true, name: true } }),
     prisma.meal.findMany({
       where: { ...inRoom, confirmed: true, createdAt: { gte: dayStart(0), lt: dayStart(7) } },
-      select: { userId: true, kcal: true, createdAt: true },
+      select: { id: true, userId: true, kcal: true, reaction: true, createdAt: true },
     }),
     prisma.meal.count({ where: { userId, confirmed: false } }),
     // day=none: 표만 필요할 때라 사진이 든 목록은 건너뛴다
@@ -96,7 +96,9 @@ export async function GET(req: Request) {
         }),
   ]);
   const week = weekMeals.map((m) => ({
+    id: m.id,
     userId: m.userId,
+    reaction: m.reaction,
     day: Math.floor((m.createdAt.getTime() - dayStart(0).getTime()) / DAY_MS),
     kcal: m.kcal ?? 0,
   }));
