@@ -30,15 +30,14 @@ export async function GET(req: NextRequest) {
     if (excuses.some((e) => e.userId === user.id)) continue;
     if (meals.some((m) => m.userId === user.id)) continue;
 
+    // 벌금이 꺼져 있으면(약속이 없거나 0원) 안 해도 잃는 게 없으니 알리지 않는다
     const rule = rules.find((r) => r.roomId === user.roomId);
     const fine = rule ? fineAmountForWeek(rule, weekStart) : 0;
+    if (fine <= 0) continue;
     pushes.push(
       sendPushToUser(user, {
         title: "오늘 식단 인증 아직이에요",
-        body:
-          fine > 0
-            ? `${user.name}님 오늘 식단 인증을 아직 안 했어요. 오늘을 넘기면 벌금 ${fine.toLocaleString()}원이 쌓여요`
-            : `${user.name}님 오늘 식단 인증을 아직 안 했어요. 먹은 걸 사진으로 남겨 주세요`,
+        body: `${user.name}님 오늘 식단 인증을 아직 안 했어요. 오늘을 넘기면 벌금 ${fine.toLocaleString()}원이 쌓여요`,
       }),
     );
   }
