@@ -8,6 +8,7 @@ import { tooManyRequests } from "@/lib/rate-limit";
 import { takeAiQuota } from "@/lib/ai-quota";
 import { checkThisWeek } from "@/lib/photo-date";
 import { signWeight } from "@/lib/weight-token";
+import { linkedUserIds } from "@/lib/meal-link";
 
 // AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
 export const maxDuration = 60;
@@ -143,19 +144,25 @@ export async function POST(req: Request) {
   if (mode === "save") {
     const input = parseMealInput(body);
     if (!input) return NextResponse.json({ error: "음식 이름을 적어 주세요" }, { status: 400 });
-    const meal = await prisma.meal.create({
-      data: {
-        userId,
-        photoUrl: photoDataUrl,
-        analyzed: !!body.analyzed,
-        title: input.title,
-        kcal: input.kcal,
-        items: input.items,
-        fraction: input.fraction,
-        confirmed: true,
-        source: "app",
-      },
-    });
+    const createdAt = new Date();
+    const [meal] = await prisma.$transaction(
+      [userId, ...(await linkedUserIds(userId))].map((id) =>
+        prisma.meal.create({
+          data: {
+            userId: id,
+            photoUrl: photoDataUrl,
+            analyzed: !!body.analyzed,
+            title: input.title,
+            kcal: input.kcal,
+            items: input.items,
+            fraction: input.fraction,
+            confirmed: true,
+            source: "app",
+            createdAt,
+          },
+        }),
+      ),
+    );
     return NextResponse.json({ kind: "meal", meal: { id: meal.id, title: meal.title, kcal: meal.kcal } });
   }
 

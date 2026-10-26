@@ -10,6 +10,7 @@ import { getWeekStart } from "@/lib/week";
 import { checkThisWeek, readTakenAt } from "@/lib/photo-date";
 import { createCheckin } from "@/lib/checkin-create";
 import { shrinkPhoto } from "@/lib/photo-resize";
+import { linkedUserIds } from "@/lib/meal-link";
 
 // AI 분석은 몇 초 걸리고 재시도도 하므로 서버 함수가 중간에 끊기지 않게 넉넉히 둔다
 export const maxDuration = 60;
@@ -121,19 +122,25 @@ export async function POST(req: NextRequest) {
 
   // 여기까지 오는 건 음식 사진뿐이다 (체중계, 운동, 기타, 분석 실패는 위에서 걸러진다)
   const draft = draftFromAnalysis(analysis);
-  await prisma.meal.create({
-    data: {
-      userId: user.id,
-      photoUrl,
-      analyzed: true,
-      title: draft.title,
-      kcal: draft.kcal,
-      items: draft.items,
-      fraction: 1,
-      confirmed: true,
-      source: "shortcut",
-    },
-  });
+  const createdAt = new Date();
+  await prisma.$transaction(
+    [user.id, ...(await linkedUserIds(user.id))].map((id) =>
+      prisma.meal.create({
+        data: {
+          userId: id,
+          photoUrl,
+          analyzed: true,
+          title: draft.title,
+          kcal: draft.kcal,
+          items: draft.items,
+          fraction: 1,
+          confirmed: true,
+          source: "shortcut",
+          createdAt,
+        },
+      }),
+    ),
+  );
 
   const detail = `${draft.title} 약 ${draft.kcal.toLocaleString()} kcal`;
   // 푸시가 안 가도 식단 올리기는 성공이다
