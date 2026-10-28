@@ -217,7 +217,7 @@ export function MealView({
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   return (
-    <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-5">
+    <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
       {header}
       {(data?.pendingCount ?? 0) > 0 && (
         <button
