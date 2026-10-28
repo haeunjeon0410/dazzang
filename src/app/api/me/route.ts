@@ -8,18 +8,18 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ user: null });
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, include: { room: true, rests: true } });
-  if (!user) return NextResponse.json({ user: null });
-
-  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다)
-  const [other, weekWeights, pendingMeals] = await Promise.all([
+  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다).
+  // 친구도 내 방 기준으로 같이 찾아서 내 정보를 기다리지 않는다
+  const [user, other, weekWeights, pendingMeals] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, include: { room: true, rests: true } }),
     prisma.user.findFirst({
-      where: { roomId: user.roomId, id: { not: userId } },
+      where: { room: { users: { some: { id: userId } } }, id: { not: userId } },
       include: { rests: true },
     }),
-    prisma.weightLog.count({ where: { userId: user.id, weekStart: getWeekStart() } }),
-    prisma.meal.count({ where: { userId: user.id, confirmed: false } }),
+    prisma.weightLog.count({ where: { userId, weekStart: getWeekStart() } }),
+    prisma.meal.count({ where: { userId, confirmed: false } }),
   ]);
+  if (!user) return NextResponse.json({ user: null });
 
   // 지금 진행 중인(끝나지 않은) 혼자 쉬는 기간 중 가장 늦게 끝나는 것
   const now = new Date();

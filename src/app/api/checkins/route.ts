@@ -13,7 +13,11 @@ export async function GET(req: NextRequest) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const me = await prisma.user.findUnique({ where: { id: userId } });
+  // 내 정보, 방 사람들, 쉬어가기 이력을 한 번에 가져온다 (DB 왕복 한 번)
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { room: { include: { users: { include: { rests: true } }, pauses: true } } },
+  });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const weekParam = req.nextUrl.searchParams.get("weekStart");
@@ -26,24 +30,25 @@ export async function GET(req: NextRequest) {
   // 다른 조회와 같이 돌려서, 리본을 읽기 전까지만 기다린다
   const settling = weekParam ? Promise.resolve() : settleLastWeekLazily(me.roomId);
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
+  const users = me.room.users;
+  const pauses = me.room.pauses;
   const userIds = users.map((u) => u.id);
   // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다).
+  // 리본만 지난 주 반영이 끝난 뒤에 읽고, 실험실 벌금과 몸무게 변화는 그동안 같이 읽는다.
   // 인증 사진 데이터(base64)는 크니까 목록에는 넣지 않고, 사진은 따로 받는다 (/api/checkins/[id]/photo)
-  const [checkins, approvedExcuses, pauses] = await Promise.all([
+  const [checkins, approvedExcuses, ribbons, labFines, weightTrends] = await Promise.all([
     prisma.checkin.findMany({
       where: { weekStart, userId: { in: userIds } },
       orderBy: { createdAt: "asc" },
       select: { id: true, userId: true, weekStart: true, liked: true, reaction: true, createdAt: true },
     }),
     prisma.excuse.findMany({ where: { weekStart, status: "APPROVED", userId: { in: userIds } } }),
-    prisma.roomPause.findMany({ where: { roomId: me.roomId } }),
+    settling.then(() => prisma.ribbon.findMany({ where: { userId: { in: userIds } } })),
+    // 실험실(식단/몸무게 인증) 벌금: 방 두 사람이 합의한 금액. 친구에게는 몸무게 숫자 없이 벌금만 보인다
+    labFinesFor(me.roomId, users, [weekStart]),
+    weightTrendsFor(users, weekStart),
   ]);
-  await settling;
-  const ribbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds } } });
   const roomPaused = isWeekPaused(pauses, weekStart);
-  // 실험실(식단/몸무게 인증) 벌금: 방 두 사람이 합의한 금액. 친구에게는 몸무게 숫자 없이 벌금만 보인다
-  const [labFines, weightTrends] = await Promise.all([labFinesFor(me.roomId, users, [weekStart]), weightTrendsFor(users, weekStart)]);
 
   // 최근 2주 안에 쓴 리본이 면제한 주의 인증 횟수 (면제된 벌금 금액 계산용)
   const recentCutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;

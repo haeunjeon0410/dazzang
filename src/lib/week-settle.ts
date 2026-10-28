@@ -129,8 +129,10 @@ export async function settleLastWeekLazily(roomId: string): Promise<void> {
       isWeekPaused(room.pauses, lastWeekStart);
     if (!skip) {
       const ids = room.users.map((u) => u.id);
-      const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart, userId: { in: ids } }, select: { userId: true } });
-      const excuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED", userId: { in: ids } }, select: { userId: true } });
+      const [checkins, excuses] = await Promise.all([
+        prisma.checkin.findMany({ where: { weekStart: lastWeekStart, userId: { in: ids } }, select: { userId: true } }),
+        prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED", userId: { in: ids } }, select: { userId: true } }),
+      ]);
       await settleRoomWeek(room.id, room.users, checkins, excuses, lastWeekStart, false);
     }
     settled.add(key);

@@ -10,13 +10,16 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const me = await prisma.user.findUnique({ where: { id: userId }, include: { room: true } });
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { room: { include: { users: { include: { rests: true } }, pauses: true } } },
+  });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
+  const users = me.room.users;
   const userIds = users.map((u) => u.id);
   const currentWeekStart = getWeekStart();
-  const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
+  const pauses = me.room.pauses;
 
   // 8주치를 주마다 따로 조회하지 않고 한 번에 가져와서 주별로 나눈다
   const weekStarts = Array.from(
@@ -25,7 +28,7 @@ export async function GET() {
   );
   const DAY_MS = 24 * 60 * 60 * 1000;
   const oldest = weekStarts[weekStarts.length - 1];
-  const [allCheckins, allSettlements, allExcuses, allRibbons, allMeals] = await Promise.all([
+  const [allCheckins, allSettlements, allExcuses, allRibbons, allMeals, labFines] = await Promise.all([
     // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
     prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
     prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
@@ -36,9 +39,8 @@ export async function GET() {
       where: { userId: { in: userIds }, createdAt: { gte: oldest, lt: currentWeekStart } },
       select: { userId: true, kcal: true, createdAt: true },
     }),
+    labFinesFor(me.roomId, users, weekStarts),
   ]);
-
-  const labFines = await labFinesFor(me.roomId, users, weekStarts);
 
   const weeks = [];
   for (let i = 1; i <= WEEKS_BACK; i++) {

@@ -10,8 +10,7 @@ const NAMES: Record<LabFeature, string> = { weight: "몸무게 인증", meal: "�
 const UNIT: Record<LabFeature, string> = { weight: "", meal: "하루 " };
 
 // 방 두 사람이 합의하는 실험실 벌금 약속. 한쪽이 금액을 제안하고 상대가 수락하면 다음 주부터 적용된다
-async function snapshot(roomId: string, meId: string) {
-  const rows = await prisma.labFineRule.findMany({ where: { roomId } });
+function snapshotOf(rows: { feature: string; amount: number; sinceWeek: Date | null; prevAmount: number | null; prevSinceWeek: Date | null; proposedAmount: number | null; proposedBy: string | null }[], meId: string) {
   return {
     choices: FINE_CHOICES,
     rules: LAB_FEATURES.map((feature) => {
@@ -31,12 +30,17 @@ async function snapshot(roomId: string, meId: string) {
   };
 }
 
+async function snapshot(roomId: string, meId: string) {
+  return snapshotOf(await prisma.labFineRule.findMany({ where: { roomId } }), meId);
+}
+
 export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  const me = await prisma.user.findUnique({ where: { id: userId }, select: { roomId: true } });
+  // 내 방 약속을 내 정보와 같이 한 번에 읽는다 (내 방을 알아낸 뒤 다시 읽으면 한 번 더 왕복한다)
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { room: { select: { labFines: true } } } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  return NextResponse.json(await snapshot(me.roomId, userId));
+  return NextResponse.json(snapshotOf(me.room.labFines, userId));
 }
 
 // action: "propose" (feature, amount) | "respond" (feature, accept) | "cancel" (feature, 내가 보낸 제안 취소)
