@@ -228,7 +228,7 @@ export function MealView({
           <span className="text-base leading-none">›</span>
         </button>
       )}
-      <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
+      <div className="grid grid-cols-8 gap-1.5 text-center text-xs text-[#b4779b] mb-2">
         <div />
         {DAY_LABELS.map((label, i) => (
           <div key={label} className={i === todayIdx ? "font-black text-[#de73a5]" : ""}>
@@ -238,7 +238,7 @@ export function MealView({
       </div>
 
       {(data?.people ?? []).map((p) => (
-        <div key={p.id} className="grid grid-cols-8 gap-1 items-center mb-1">
+        <div key={p.id} className="grid grid-cols-8 gap-1.5 items-center mb-1">
           <div className="text-xs text-[#b4779b] truncate font-semibold">{p.id === meId ? "나" : p.name}</div>
           {DAY_LABELS.map((_, i) => {
             const mine = data!.week.filter((w) => w.userId === p.id && w.day === i);
