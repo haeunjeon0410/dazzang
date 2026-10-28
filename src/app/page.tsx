@@ -591,18 +591,18 @@ export default function Home() {
           // AI를 못 쓰는 상태(실패, 한도 초과)면 무슨 사진인지 몰라서 저장하지 않고 다시 올리게 한다
           setToast(
             data.kind === "limit"
-              ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요. 나중에 다시 올려 주세요`
-              : `분석하지 못했어요${aiFailureText(data.reason) ? ` (${aiFailureText(data.reason)})` : ""}. 잠시 뒤에 다시 올려 주세요`,
+              ? `${data.reason === "monthly" ? "이번 달" : "오늘"} AI 분석을 다 썼어요`
+              : `분석하지 못했어요${aiFailureText(data.reason) ? ` (${aiFailureText(data.reason)})` : ""}. 다시 올려 주세요`,
           );
           return;
         }
         // 체중계/음식/운동 어느 쪽으로도 못 읽었으면 아무것도 올리지 않고 다시 올리게 한다
         if (data?.kind === "unrecognized") {
-          setToast("사진을 인식하지 못했어요. 다시 올려 주세요");
+          setToast("사진을 인식하지 못했어요");
           return;
         }
         // 여기까지 오는 건 운동 사진뿐이다: 운동 인증으로 이어진다
-        if (data?.kind === "workout") setToast("운동 사진으로 읽어서 운동 인증으로 올렸어요");
+        if (data?.kind === "workout") setToast("운동 인증으로 올렸어요");
         setViewMode("workout");
       }
       const [takenAt, dataUrl] = await Promise.all([readTakenAt(file), compressImage(file)]);
@@ -1083,7 +1083,7 @@ export default function Home() {
       {toast && (
         <div
           role="status"
-          className="fixed left-1/2 z-[70] -translate-x-1/2 rounded-full bg-[#4a2540]/90 px-4 py-2 text-sm font-bold text-white shadow-lg"
+          className="fixed left-1/2 z-[70] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-[#4a2540]/90 px-4 py-2 text-sm font-bold text-white shadow-lg"
           style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
         >
           {toast}
