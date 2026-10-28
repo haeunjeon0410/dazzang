@@ -62,7 +62,7 @@ export function ReactionOverlay({
       {reaction ? (
         <span
           key={reaction}
-          className="reaction-pop absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-xl shadow"
+          className="reaction-pop absolute right-2 top-2 flex h-9 w-9 items-center justify-center text-3xl leading-none [text-shadow:0_0_4px_rgba(0,0,0,0.45)]"
           aria-label={`${reaction} 반응`}
         >
           {reaction}
