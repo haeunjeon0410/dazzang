@@ -1083,7 +1083,7 @@ export default function Home() {
       {toast && (
         <div
           role="status"
-          className="fixed left-1/2 z-[70] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-[#4a2540]/90 px-4 py-2 text-sm font-bold text-white shadow-lg"
+          className="fixed left-1/2 z-[70] w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 whitespace-nowrap rounded-full bg-[#4a2540]/90 px-3 py-2 text-[clamp(10px,2.7vw,14px)] font-bold text-white shadow-lg"
           style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
         >
           {toast}
