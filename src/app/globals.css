@@ -18,13 +18,33 @@ body {
 
 /* 배경 그림은 화면에 고정된 별도 층으로 둔다. body에 background-attachment: fixed를 쓰면 스크롤할 때마다 배경을 다시 그려서
    (특히 안드로이드) 버벅거린다. 고정된 층은 그대로 두고 그 위에서 내용만 움직인다 */
-body::before {
+/* 폰처럼 세로로 긴 화면에서 cover는 좌우를 크게 잘라 그림이 확대돼 보인다. 그림(2:3)을 가로에 맞춰 두 층으로 나눠 붙인다:
+   위 층은 창문 쪽, 아래 층은 침대/러그 쪽이고, 가운데는 배경색이 채우도록 안쪽 끝을 부드럽게 지운다 */
+body::before,
+body::after {
   content: "";
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
   z-index: -1;
-  background: url("/assets/bg-room.webp") top center / cover no-repeat;
+  background-image: url("/assets/bg-room.webp");
+  background-repeat: no-repeat;
+  background-size: 100% auto;
   pointer-events: none;
+}
+body::before {
+  top: 0;
+  height: calc(100vw * 1.5 * 0.6);
+  background-position: top;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+body::after {
+  bottom: 0;
+  height: calc(100vw * 1.5 * 0.34);
+  background-position: bottom;
+  -webkit-mask-image: linear-gradient(transparent, #000 35%);
+  mask-image: linear-gradient(transparent, #000 35%);
 }
 
 /* 스크롤바는 보이지 않게 한다 (스크롤은 그대로 된다) */

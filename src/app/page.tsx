@@ -90,7 +90,7 @@ const BANK_SCHEMES: Record<string, string> = {
   토스: "supertoss://",
 };
 
-const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4";
+const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-6";
 // 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
 
 // 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
@@ -800,7 +800,7 @@ export default function Home() {
     <>
       <div
         ref={mainRef}
-        className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 pb-24"
+        className="flex-1 px-8 py-5 max-w-md mx-auto w-full space-y-8 pb-24"
         data-falling={pauseFalling ? "true" : undefined}
         data-paused={isPaused ? "true" : undefined}
         style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom))" }}
