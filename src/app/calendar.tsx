@@ -138,7 +138,7 @@ export function WeekCalendar({
   const selectedReaction = selected ? reactionFor(selected) : null;
 
   return (
-    <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-4">
+    <div className="rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-5">
       {header}
       <div className="grid grid-cols-8 gap-1 text-center text-xs text-[#b4779b] mb-2">
         <div />

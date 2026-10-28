@@ -23,7 +23,8 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: url("/assets/bg-room.webp") top center / cover no-repeat;
+  /* 폰처럼 세로로 긴 화면에서 cover는 좌우를 크게 잘라 그림이 확대돼 보인다. 가로에 맞춰 위에 붙이고 나머지는 배경색이 채운다 */
+  background: url("/assets/bg-room.webp") top center / 100% auto no-repeat;
   pointer-events: none;
 }
 
