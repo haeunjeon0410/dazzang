@@ -9,20 +9,26 @@ export async function GET() {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const me = await prisma.user.findUnique({ where: { id: userId } });
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { room: { include: { users: { include: { rests: true } }, pauses: true } } },
+  });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const users = await prisma.user.findMany({ where: { roomId: me.roomId }, include: { rests: true } });
+  const users = me.room.users;
+  const pauses = me.room.pauses;
   const userIds = users.map((u) => u.id);
 
-  const pauses = await prisma.roomPause.findMany({ where: { roomId: me.roomId } });
+  // 서로 상관없는 조회는 한꺼번에 보낸다 (DB가 멀리 있어서 하나씩 기다리면 느리다)
   // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
-  const checkins = await prisma.checkin.findMany({ where: { userId: { in: userIds } }, select: { userId: true, weekStart: true } });
-  const approvedExcuses = await prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } });
-  const usedRibbons = await prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } });
+  const [checkins, approvedExcuses, usedRibbons, labRules] = await Promise.all([
+    prisma.checkin.findMany({ where: { userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
+    prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } }),
+    prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } }),
+    prisma.labFineRule.findMany({ where: { roomId: me.roomId, amount: { gt: 0 } } }),
+  ]);
 
   // 실험실 벌금: 합의한 주부터 마감된 지난 주까지 (진행 중인 이번 주는 아직 결과가 아니다)
-  const labRules = await prisma.labFineRule.findMany({ where: { roomId: me.roomId, amount: { gt: 0 } } });
   const labWeeks: Date[] = [];
   const since = labRules.map((r) => r.sinceWeek?.getTime()).filter((t): t is number => typeof t === "number");
   if (since.length > 0) {
