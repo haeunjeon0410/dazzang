@@ -268,6 +268,14 @@ export default function Home() {
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+  // 식단 보기는 한 번 띄워 두면 탭을 옮겨도 그대로 두고 숨기기만 한다 (다시 받아오고 그리는 로딩이 없다).
+  // 로그인한 뒤 화면이 한가할 때 미리 띄워 두므로 처음 눌러도 바로 열린다
+  const [dietMounted, setDietMounted] = useState(viewMode === "diet");
+  useEffect(() => {
+    if (dietMounted || !me) return;
+    const t = setTimeout(() => setDietMounted(true), 600);
+    return () => clearTimeout(t);
+  }, [dietMounted, me]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [graphOpen, setGraphOpen] = useState(false);
@@ -1010,15 +1018,18 @@ export default function Home() {
             )}
 
 
-            {viewMode === "diet" ? (
-              <MealView
-                meId={me.id}
-                refreshKey={mealRefresh}
-                header={calendarHeader}
-                onSaved={setToast}
-                onChanged={loadMe}
-              />
-            ) : (
+            {(viewMode === "diet" || dietMounted) && (
+              <div hidden={viewMode !== "diet"}>
+                <MealView
+                  meId={me.id}
+                  refreshKey={mealRefresh}
+                  header={calendarHeader}
+                  onSaved={setToast}
+                  onChanged={loadMe}
+                />
+              </div>
+            )}
+            <div hidden={viewMode === "diet"}>
               <WeekCalendar
                 meId={me.id}
                 header={calendarHeader}
@@ -1028,7 +1039,7 @@ export default function Home() {
                   { userId: otherEntry.userId, name: otherEntry.name, checkins: otherEntry.checkins },
                 ]}
               />
-            )}
+            </div>
 
             <ExcusePanel onResolved={loadWeek} />
           </section>
