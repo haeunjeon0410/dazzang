@@ -449,7 +449,8 @@ export default function Home() {
     const seenId = room?.pauseRequestedUntil ? `${room.inviteToken}:${room.pauseRequestedUntil}` : null;
     // 서버가 수락을 거부하면(만료 등) 연출 없이 끝낸다 — 예전엔 먼저 떨어지고 나서 실패해서 화면만 망가졌다
     setPauseFalling(true);
-    if (!(await roomAction("confirm-pause"))) {
+    const accepted = await roomAction("confirm-pause").catch(() => false);
+    if (!accepted) {
       setPauseFalling(false);
       return;
     }
@@ -620,8 +621,8 @@ export default function Home() {
         body: JSON.stringify({ photoDataUrl: dataUrl, takenAt }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "업로드 실패");
+        const data = await res.json().catch(() => null);
+        alert(data?.error || "업로드 실패");
       } else {
         await loadWeek();
       }
@@ -661,8 +662,12 @@ export default function Home() {
 
   async function copyRoomCode() {
     if (!room?.inviteToken) return;
-    await navigator.clipboard.writeText(room.inviteToken);
-    alert("방 코드가 복사됐어요");
+    try {
+      await navigator.clipboard.writeText(room.inviteToken);
+      alert("방 코드가 복사됐어요");
+    } catch {
+      alert(`복사하지 못했어요. 방 코드: ${room.inviteToken}`);
+    }
   }
 
   async function shareInvite() {
@@ -676,8 +681,12 @@ export default function Home() {
         // 공유 취소 시 복사로 대체
       }
     }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    alert("초대 문구가 복사됐어요");
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      alert("초대 문구가 복사됐어요");
+    } catch {
+      alert("복사하지 못했어요. 방 코드를 직접 알려 주세요");
+    }
   }
 
   function openBankApp() {
@@ -691,8 +700,12 @@ export default function Home() {
 
   async function copyAccount() {
     if (!room?.groupAccountNumber) return;
-    await navigator.clipboard.writeText(room.groupAccountNumber);
-    alert("계좌번호가 복사됐어요");
+    try {
+      await navigator.clipboard.writeText(room.groupAccountNumber);
+      alert("계좌번호가 복사됐어요");
+    } catch {
+      alert(`복사하지 못했어요. 계좌번호: ${room.groupAccountNumber}`);
+    }
   }
 
   async function saveName() {
@@ -700,11 +713,15 @@ export default function Home() {
       alert("이름을 입력해주세요");
       return;
     }
-    await fetch("/api/me", {
+    const res = await fetch("/api/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: nameForm }),
     });
+    if (!res.ok) {
+      alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
+      return;
+    }
     await loadMe();
     alert("저장됐어요");
   }

@@ -88,8 +88,8 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
       setSheetOpen(false);
       await load();
     } else {
-      const data = await res.json();
-      alert(data.error || "요청 실패");
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "요청 실패");
     }
   }
 
@@ -104,8 +104,8 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
       await load();
       onResolved?.();
     } else {
-      const data = await res.json();
-      alert(data.error || "처리 실패");
+      const data = await res.json().catch(() => null);
+      alert(data?.error || "처리 실패");
     }
   }
 

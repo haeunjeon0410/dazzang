@@ -232,7 +232,10 @@ export function Battle({
     setPoking(true);
     try {
       const res = await fetch("/api/poke", { method: "POST" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        alert((await res.json().catch(() => null))?.error || "콕 찌르지 못했어요");
+        return;
+      }
       setPoked(true);
       setPokeConfirmOpen(false);
       try {

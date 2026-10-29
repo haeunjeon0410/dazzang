@@ -37,8 +37,8 @@ export default function JoinRoom() {
       body: JSON.stringify({ userId }),
     });
     if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || "로그인 실패");
+      const data = await res.json().catch(() => null);
+      setError(data?.error || "로그인 실패");
       return;
     }
     router.push("/");
@@ -56,8 +56,8 @@ export default function JoinRoom() {
         body: JSON.stringify({ name: nickname }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "참여 실패");
+        const data = await res.json().catch(() => null);
+        setError(data?.error || "참여 실패");
         return;
       }
       router.push("/");
