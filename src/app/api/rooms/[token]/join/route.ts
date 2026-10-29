@@ -8,9 +8,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     return NextResponse.json({ error: "너무 많이 시도했어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
   }
   const { token } = await params;
-  const { name } = await req.json();
+  const { name } = await req.json().catch(() => ({}));
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "닉네임을 입력해주세요" }, { status: 400 });
+  }
+  if (name.trim().length > 20) {
+    return NextResponse.json({ error: "닉네임은 20자까지 쓸 수 있어요" }, { status: 400 });
   }
 
   const room = await prisma.room.findUnique({ where: { inviteToken: token } });

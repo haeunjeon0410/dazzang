@@ -37,9 +37,12 @@ export async function POST(req: NextRequest) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { reason } = await req.json();
+  const { reason } = await req.json().catch(() => ({}));
   if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
     return NextResponse.json({ error: "사정을 입력해주세요" }, { status: 400 });
+  }
+  if (reason.trim().length > 300) {
+    return NextResponse.json({ error: "사정은 300자까지 쓸 수 있어요" }, { status: 400 });
   }
 
   const weekStart = getWeekStart();

@@ -3,6 +3,9 @@ import crypto from "crypto";
 
 const COOKIE_NAME = "session";
 const SECRET = process.env.SESSION_SECRET || "dev-secret";
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.error("[security] SESSION_SECRET이 설정되지 않았어요. 누구나 로그인 쿠키를 만들 수 있으니 Vercel 환경변수에 꼭 넣어 주세요");
+}
 
 function sign(userId: string): string {
   const hmac = crypto.createHmac("sha256", SECRET).update(userId).digest("hex");

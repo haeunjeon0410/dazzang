@@ -107,6 +107,7 @@ export default function JoinRoom() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="내 닉네임"
+              maxLength={20}
               className="w-full rounded-xl bg-white border-2 border-[#ffd6e8] px-4 py-3 text-center"
             />
             <button

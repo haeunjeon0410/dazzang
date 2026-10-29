@@ -67,7 +67,7 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption } = await req.json();
+  const { name, caption } = await req.json().catch(() => ({}));
 
   // 말풍선 멘트 수정 (User.captions[0]에 하나만 저장, 비우면 인증 횟수별 기본 멘트)
   if (caption !== undefined) {
@@ -84,6 +84,9 @@ export async function PATCH(req: Request) {
 
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "이름을 입력해주세요" }, { status: 400 });
+  }
+  if (name.trim().length > 20) {
+    return NextResponse.json({ error: "이름은 20자까지 쓸 수 있어요" }, { status: 400 });
   }
 
   const updated = await prisma.user.update({

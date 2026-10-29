@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDayRange } from "@/lib/week";
+import { isExternalAuthorized } from "@/lib/external-auth";
 
 // 외부 앱(mypt)이 운동 인증 사진을 읽는 전용 API. 읽기 전용이고 EXTERNAL_TOKEN이 있어야 열린다.
 // 하루 1장만 인정하는 다짱 규칙에 맞게, 날(오전 6시 기준)마다 가장 최근 인증 한 장만 돌려준다.
 export async function GET(req: NextRequest) {
-  const token = process.env.EXTERNAL_TOKEN;
-  if (!token || req.headers.get("authorization") !== `Bearer ${token}`) {
+  if (!isExternalAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const { id } = await params;
-  const { approve, reply } = await req.json();
+  const { approve, reply } = await req.json().catch(() => ({}));
   // 답장은 선택. 비어 있으면 null로 저장
   if (reply !== undefined && reply !== null && typeof reply !== "string") {
     return NextResponse.json({ error: "답장 형식이 올바르지 않아요" }, { status: 400 });

@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const { photoDataUrl, takenAt } = await req.json().catch(() => ({}));
-  if (!photoDataUrl || typeof photoDataUrl !== "string" || !photoDataUrl.startsWith("data:image/")) {
+  if (!photoDataUrl || typeof photoDataUrl !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(photoDataUrl)) {
     return NextResponse.json({ error: "사진이 올바르지 않습니다" }, { status: 400 });
   }
   if (photoDataUrl.length > MAX_PHOTO_BYTES * 1.4) {

@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest) {
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const { action } = body;
 
   // ── 기존: 모임 통장 수정 ──────────────────────────────────────
@@ -55,12 +55,15 @@ export async function PATCH(req: NextRequest) {
   // ── 일시정지 요청 ─────────────────────────────────────────────
   if (action === "request-pause") {
     const weeks = Number(body.weeks);
-    if (!weeks || weeks < 1 || weeks > 8) {
+    if (!Number.isInteger(weeks) || weeks < 1 || weeks > 8) {
       return NextResponse.json({ error: "1~8주 사이로 선택해주세요" }, { status: 400 });
     }
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
     if (!reason) {
       return NextResponse.json({ error: "쉬어가려는 사유를 입력해주세요" }, { status: 400 });
+    }
+    if (reason.length > 200) {
+      return NextResponse.json({ error: "사유는 200자까지 쓸 수 있어요" }, { status: 400 });
     }
     const current = await prisma.room.findUnique({ where: { id: me.roomId } });
     if (current?.pausedUntil && current.pausedUntil > new Date()) {

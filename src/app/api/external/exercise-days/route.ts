@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDayRange } from "@/lib/week";
+import { isExternalAuthorized } from "@/lib/external-auth";
 
 // 외부 앱(uh-money)이 읽는 전용 API. 사용자(들)의 "운동 인증한 날"만 돌려주는 읽기 전용이고,
 // userId는 쉼표로 여러 명을 줄 수 있다 (방마다 닉네임이 달라도 같은 사람이면 합쳐서 센다).
@@ -8,8 +9,7 @@ import { getDayRange } from "@/lib/week";
 // 하루는 오전 6시 기준(getDayRange)이라 그날의 시작 시각(UTC)을 키로 돌려준다.
 // 사정 봐달라하기(Excuse)는 인증이 아니라 벌금 사면이라 일부러 포함하지 않는다.
 export async function GET(req: NextRequest) {
-  const token = process.env.EXTERNAL_TOKEN;
-  if (!token || req.headers.get("authorization") !== `Bearer ${token}`) {
+  if (!isExternalAuthorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

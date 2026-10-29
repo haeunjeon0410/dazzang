@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
 
   const { endpoint, keys } = await req.json().catch(() => ({}));
   const str = (v: unknown) => typeof v === "string" && v.length > 0 && v.length < 1000;
-  if (!str(endpoint) || !str(keys?.p256dh) || !str(keys?.auth)) {
+  if (!str(endpoint) || !str(keys?.p256dh) || !str(keys?.auth) || !/^https:\/\/[^\s/]+\//.test(endpoint)) {
     return NextResponse.json({ error: "구독 정보가 올바르지 않습니다" }, { status: 400 });
   }
 

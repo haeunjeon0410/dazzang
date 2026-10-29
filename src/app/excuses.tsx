@@ -195,6 +195,7 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
               <>
                 <textarea
                   value={reason}
+                  maxLength={300}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="예: 이번 주 여행 가서 운동 못했어요, 대신 다음 주 4번 할게요"
                   className="w-full rounded-xl bg-[#ffeef5] border border-[#ffd6e8] px-3 py-2 text-base"

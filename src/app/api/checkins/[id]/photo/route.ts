@@ -20,20 +20,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // data:image/jpeg;base64,.... 에서 종류와 본문을 나눈다 (본문이 매우 길어서 정규식 대신 위치로 자른다)
   const comma = checkin.photoUrl.indexOf(",");
   const head = checkin.photoUrl.slice(0, comma);
-  const mime = head.match(/^data:(image\/[a-zA-Z+.-]+);base64$/)?.[1];
+  const mime = head.match(/^data:(image\/(?:jpeg|png|webp));base64$/)?.[1];
   if (comma < 0 || !mime) return new NextResponse(null, { status: 404 });
   const original = Buffer.from(checkin.photoUrl.slice(comma + 1), "base64");
-  const cache = "private, max-age=31536000, immutable";
+  // 혹시 스크립트가 든 파일이어도 이 주소를 직접 열어서 실행되지 않게 한다
+  const safe = { "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox" };
 
   // ?w=240 처럼 너비를 주면 작은 그림으로 줄여서 준다. 주간 표의 작은 칸에 원본(수백 KB)을 그대로 보내면 느려서다.
   const w = Math.round(Number(req.nextUrl.searchParams.get("w")));
   if (w >= 64 && w <= 800) {
     try {
       const small = await sharp(original).rotate().resize({ width: w, withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
-      return new NextResponse(small, { headers: { "Content-Type": "image/jpeg", "Cache-Control": cache } });
+      return new NextResponse(small, { headers: { "Content-Type": "image/jpeg", ...safe } });
     } catch (e) {
       console.error("[photo] resize", e instanceof Error ? e.message : e);
     }
   }
-  return new NextResponse(original, { headers: { "Content-Type": mime, "Cache-Control": cache } });
+  return new NextResponse(original, { headers: { "Content-Type": mime, ...safe } });
 }

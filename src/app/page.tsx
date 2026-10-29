@@ -1172,6 +1172,7 @@ export default function Home() {
               <input
                 aria-label="내 이름"
                 placeholder="내 이름"
+                maxLength={20}
                 value={nameForm}
                 onChange={(e) => setNameForm(e.target.value)}
                 className="min-w-0 flex-1 rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
@@ -1208,6 +1209,7 @@ export default function Home() {
                 <input
                   placeholder="쉬어가려는 사유 (예: 여행, 시험기간)"
                   value={pauseReason}
+                  maxLength={200}
                   onChange={(e) => setPauseReason(e.target.value)}
                   className="w-full rounded-lg bg-white border border-[#ffd6e8] px-3 py-2 text-sm"
                 />
