@@ -11,6 +11,11 @@
   --font-sans: var(--font-ongeulip);
 }
 
+/* 확대는 필요 없어서 막는다: 두 손가락 확대와 두 번 탭 확대를 끄고, 스크롤(상하좌우)만 남긴다 */
+html {
+  touch-action: pan-x pan-y;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

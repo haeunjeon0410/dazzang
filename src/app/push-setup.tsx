@@ -15,6 +15,10 @@ export function PushSetup() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+    // 아이폰 사파리는 viewport 설정을 무시하고 두 손가락으로 확대되므로 그 동작(gesturestart)을 직접 막는다
+    const block = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturestart", block);
+    return () => document.removeEventListener("gesturestart", block);
   }, []);
 
   return null;
