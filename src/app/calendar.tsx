@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { reactionOf } from "@/lib/reactions";
+import PhotoViewer from "./photo-viewer";
 import { ReactionOverlay } from "./reaction-overlay";
 
 type CheckinItem = { id: string; photoUrl: string; createdAt: string; userId: string; liked: boolean; reaction?: string | null };
@@ -84,9 +85,9 @@ export function WeekCalendar({
   const [selected, setSelected] = useState<CheckinItem | null>(null);
   // 방금 내가 남긴 반응 (서버 응답을 기다렸다가 주간 기록을 다시 읽기 전에도 바로 보이게)
   const [reactionOverrides, setReactionOverrides] = useState<Record<string, string>>({});
-  // 사진을 누른 횟수 (반응 이모티콘을 다시 터뜨리는 데 쓴다)
-  const [taps, setTaps] = useState(0);
   const [animating, setAnimating] = useState<Set<string>>(new Set());
+  // 원본 사진을 크게 보는 중이면 그 사진 주소
+  const [viewing, setViewing] = useState<string | null>(null);
 
   function reactionFor(c: CheckinItem): string | null {
     return reactionOverrides[c.id] ?? reactionOf(c);
@@ -163,7 +164,6 @@ export function WeekCalendar({
                 key={i}
                 onClick={() => {
                   if (!c) return;
-                  setTaps(0);
                   setSelected(c);
                 }}
                 className={`relative aspect-square rounded-md flex items-center justify-center text-[10px] overflow-hidden ${
@@ -206,7 +206,7 @@ export function WeekCalendar({
             {/* 터지는 이모티콘이 사진 밖으로도 날아가도록 사진 바깥 틀은 자르지 않는다 */}
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={selected.photoUrl} alt="인증샷" onClick={() => setTaps((n) => n + 1)} className="aspect-square w-full rounded-2xl border border-[#ffd6e8] object-cover" />
+              <img src={selected.photoUrl} alt="인증샷" onClick={() => setViewing(selected.photoUrl)} className="aspect-square w-full cursor-zoom-in rounded-2xl border border-[#ffd6e8] object-cover" />
               {selected.userId === meId && (
                 // 식단 사진과 같은, 눈에 띄지 않게 구석에 둔 반투명 지우기 버튼 (오른쪽 위는 친구가 남긴 반응 자리라 왼쪽 위에 둔다)
                 <button
@@ -224,7 +224,6 @@ export function WeekCalendar({
                 mine={selected.userId === meId}
                 reaction={selectedReaction}
                 onPick={(emoji) => react(selected, emoji)}
-                tap={taps}
               />
             </div>
             <div className="flex items-center justify-between">
@@ -240,6 +239,7 @@ export function WeekCalendar({
           </div>
         </div>
       )}
+      {viewing && <PhotoViewer src={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
