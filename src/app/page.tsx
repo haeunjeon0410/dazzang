@@ -58,6 +58,8 @@ type Me = {
   weightPending?: boolean;
   mealToken?: string | null;
   pendingMeals?: number;
+  // 설정에서 식단 인증을 켰는지 (기본 꺼짐)
+  dietEnabled?: boolean;
 };
 type Room = {
   inviteToken: string;
@@ -272,7 +274,7 @@ export default function Home() {
   // 로그인한 뒤 화면이 한가할 때 미리 띄워 두므로 처음 눌러도 바로 열린다
   const [dietMounted, setDietMounted] = useState(viewMode === "diet");
   useEffect(() => {
-    if (dietMounted || !me) return;
+    if (dietMounted || !me?.dietEnabled) return;
     const t = setTimeout(() => setDietMounted(true), 600);
     return () => clearTimeout(t);
   }, [dietMounted, me]);
@@ -554,9 +556,10 @@ export default function Home() {
     if (!file) return;
     setUploading(true);
     try {
-      if (me) {
+      // 식단 인증을 켜고 식단 보기에서 올릴 때만 AI가 사진을 읽는다. 그 밖에는 AI 판단 없이 바로 운동 인증으로 올라간다
+      if (me?.dietEnabled && viewMode === "diet") {
         // AI가 사진을 보고 체중계면 몸무게에, 음식이면 식단에, 운동이면 운동 인증으로 보낸다.
-        // AI가 판단하지 못하면(키 없음/실패/한도 초과) 어디에도 올리지 않고 다시 올리게 한다. 보고 있는 보기(운동 | 식단)는 사진이 갈 곳과 상관없다
+        // AI가 판단하지 못하면(키 없음/실패/한도 초과) 어디에도 올리지 않고 다시 올리게 한다
         const [mealPhoto, shotAt] = await Promise.all([compressImage(file, 1024, 0.7), readTakenAt(file)]);
         const res = await fetch("/api/meals", {
           method: "POST",
@@ -630,6 +633,21 @@ export default function Home() {
       setUploading(false);
       e.target.value = "";
     }
+  }
+
+  // 설정의 식단 인증 켜기/끄기. 끄면 운동 보기로 돌아간다
+  async function toggleDiet(on: boolean) {
+    const res = await fetch("/api/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dietEnabled: on }),
+    });
+    if (!res.ok) {
+      alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
+      return;
+    }
+    if (!on) setViewMode("workout");
+    await loadMe();
   }
 
   async function saveMeal(values: ConfirmValues) {
@@ -785,11 +803,13 @@ export default function Home() {
   const myEntry = weekData?.summary.find((s) => s.userId === me.id);
   const otherEntry = weekData?.summary.find((s) => s.userId !== me.id);
   const hasGroupAccount = !!room?.groupAccountNumber;
-  // 주간 표 카드 맨 위에 제목과 운동 | 식단 전환
+  const dietOn = !!me.dietEnabled;
+  const dietView = dietOn && viewMode === "diet";
+  // 주간 표 카드 맨 위에 제목과 운동 | 식단 전환 (식단을 켠 사람만 전환이 보인다)
   const calendarHeader = (
     <div className="mb-3 flex items-center justify-between">
-      <p className="text-sm font-bold text-[#4a2540]">{viewMode === "diet" ? "먹은 칼로리" : "운동 인증"}</p>
-      <div className="grid w-28 grid-cols-2 gap-0.5 rounded-full bg-[#fff0f6] border border-[#ffd6e8] p-0.5" role="tablist">
+      <p className="text-sm font-bold text-[#4a2540]">{dietView ? "먹은 칼로리" : "운동 인증"}</p>
+      {dietOn && <div className="grid w-28 grid-cols-2 gap-0.5 rounded-full bg-[#fff0f6] border border-[#ffd6e8] p-0.5" role="tablist">
         {([["workout", "운동"], ["diet", "식단"]] as const).map(([mode, label]) => (
           <button
             key={mode}
@@ -817,7 +837,7 @@ export default function Home() {
             )}
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 
@@ -945,7 +965,7 @@ export default function Home() {
           <section className="space-y-3">
             {/* 몸무게 인증을 켰는데 이번 주 인증을 아직 안 했으면 맨 위에 알려준다 (다른 카드와 구분되게 노란 픽셀 테두리).
                 마감 하루 전부터는 빨간색으로 바뀌고 자동 벌금을 알려준다 */}
-            {me.weightPending && !roomPaused && !(me.restUntil && new Date(me.restUntil) > new Date()) && (() => {
+            {dietOn && me.weightPending && !roomPaused && !(me.restUntil && new Date(me.restUntil) > new Date()) && (() => {
               const fineAmount = fines?.rules.find((r) => r.feature === "weight")?.activeAmount ?? 0;
               // 벌금이 꺼져 있으면(약속이 없거나 0원) 안 해도 잃는 게 없으니 배너를 띄우지 않는다
               if (fineAmount <= 0) return null;
@@ -966,7 +986,11 @@ export default function Home() {
                       : "이번 주 몸무게 인증 아직이에요"}
                   </p>
                   <button
-                    onClick={() => uploadInputRef.current?.click()}
+                    onClick={() => {
+                      // 체중계 사진은 식단 보기에서만 AI가 읽는다
+                      setViewMode("diet");
+                      uploadInputRef.current?.click();
+                    }}
                     className="flex-none bg-white px-3 py-1 text-xs font-black text-[#4a2540]"
                     style={{ boxShadow: "0 -2px 0 0 #4a2540, 0 2px 0 0 #4a2540, -2px 0 0 0 #4a2540, 2px 0 0 0 #4a2540" }}
                   >
@@ -1035,8 +1059,8 @@ export default function Home() {
             )}
 
 
-            {(viewMode === "diet" || dietMounted) && (
-              <div hidden={viewMode !== "diet"}>
+            {dietOn && (viewMode === "diet" || dietMounted) && (
+              <div hidden={!dietView}>
                 <MealView
                   meId={me.id}
                   refreshKey={mealRefresh}
@@ -1046,7 +1070,7 @@ export default function Home() {
                 />
               </div>
             )}
-            <div hidden={viewMode === "diet"}>
+            <div hidden={dietView}>
               <WeekCalendar
                 meId={me.id}
                 header={calendarHeader}
@@ -1204,9 +1228,28 @@ export default function Home() {
               <p className="text-sm font-bold text-[#4a2540]">
                 실험실 <span className="ml-1 rounded-full bg-[#ffc72c] px-2 py-0.5 text-[10px] font-bold text-[#6b4a00]">BETA</span>
               </p>
-              <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />
-              <FineSetting feature="weight" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
-              <FineSetting feature="meal" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
+              {/* 식단 인증: 기본은 꺼짐. 켜면 식단 보기가 생기고, 식단 보기에서 올린 사진만 AI가 읽는다 */}
+              <label className="flex items-center justify-between gap-3 rounded-xl bg-white border border-[#ffd6e8] px-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-[#4a2540]">식단 인증</span>
+                  <span className="block text-xs text-[#b4779b]">켜면 식단 보기와 AI 칼로리 분석을 쓸 수 있어요</span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={dietOn}
+                  onChange={(e) => toggleDiet(e.target.checked)}
+                  className="h-5 w-5 flex-none accent-[#de73a5]"
+                  aria-label="식단 인증 켜기"
+                />
+              </label>
+              {dietOn && (
+                <>
+                  <ShortcutSetup token={me.mealToken ?? null} onChanged={loadMe} />
+                  <FineSetting feature="weight" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
+                  <FineSetting feature="meal" data={fines} otherName={otherEntry?.name ?? ""} bothOn={!!otherEntry} onChange={setFines} />
+                </>
+              )}
             </div>
 
             {/* 쉬어가기 요청 */}

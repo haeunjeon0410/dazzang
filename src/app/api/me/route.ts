@@ -37,6 +37,8 @@ export async function GET() {
       // 이번 주 몸무게 인증(체중계 사진)을 아직 안 했는지 (홈 배너용). 식단/몸무게 인증은 모두에게 기본 기능이고, 친구가 들어온 방에서만 띄운다
       weightPending: !!other && weekWeights === 0,
       mealToken: user.mealToken,
+      // 설정에서 켠 사람만 식단 인증을 쓴다 (기본은 꺼짐). 꺼져 있으면 사진은 AI 판단 없이 바로 운동 인증으로 올라간다
+      dietEnabled: user.labMeal,
       // 아이폰으로 올려서 아직 확인하지 않은 식단 수 (식단 탭 숫자 표시용)
       pendingMeals,
     },
@@ -67,7 +69,16 @@ export async function PATCH(req: Request) {
   const userId = await getSessionUserId();
   if (!userId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
-  const { name, caption } = await req.json().catch(() => ({}));
+  const { name, caption, dietEnabled } = await req.json().catch(() => ({}));
+
+  // 식단 인증 켜기/끄기
+  if (dietEnabled !== undefined) {
+    if (typeof dietEnabled !== "boolean") {
+      return NextResponse.json({ error: "설정 형식이 올바르지 않아요" }, { status: 400 });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { labMeal: dietEnabled } });
+    return NextResponse.json({ ok: true });
+  }
 
   // 말풍선 멘트 수정 (User.captions[0]에 하나만 저장, 비우면 인증 횟수별 기본 멘트)
   if (caption !== undefined) {
