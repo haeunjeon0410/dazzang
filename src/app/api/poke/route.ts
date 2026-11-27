@@ -49,7 +49,6 @@ export async function POST() {
 
   const other = await prisma.user.findFirst({
     where: { roomId: me.roomId, id: { not: userId } },
-    include: { subscriptions: true },
   });
   if (!other) return NextResponse.json({ error: "아직 친구가 없어요" }, { status: 400 });
 

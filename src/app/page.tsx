@@ -8,7 +8,6 @@ import { PushToggle } from "./push-setup";
 import { Battle, SleepingFigure } from "./battle";
 import { WeekCalendar } from "./calendar";
 import { ExcusePanel } from "./excuses";
-import type { ConfirmValues } from "./meal-confirm";
 import { readTakenAt } from "@/lib/photo-date";
 import { aiFailureText } from "@/lib/ai-failure";
 import { FineSetting, FineProposalPopup, type FineSnapshot } from "./lab-fine";
@@ -16,7 +15,6 @@ import { CharacterSprite, CharRow, CharPose } from "./sprite";
 
 // 처음 화면에 바로 필요 없는 큰 화면들은 열 때 내려받는다 (첫 로딩에 받는 코드가 줄어든다)
 const MealView = dynamic(() => import("./meals").then((m) => m.MealView));
-const MealConfirm = dynamic(() => import("./meal-confirm").then((m) => m.MealConfirm));
 const ShortcutSetup = dynamic(() => import("./shortcut-setup").then((m) => m.ShortcutSetup));
 const WeightGraph = dynamic(() => import("./weight").then((m) => m.WeightGraph));
 const WhatsNew = dynamic(() => import("./whats-new").then((m) => m.WhatsNew));
@@ -33,6 +31,7 @@ async function compressImage(file: File, maxDim = 1280, quality = 0.75): Promise
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas unsupported");
   ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
   return canvas.toDataURL("image/jpeg", quality);
 }
 
@@ -93,9 +92,7 @@ const BANK_SCHEMES: Record<string, string> = {
 };
 
 const CARD = "rounded-2xl bg-white border border-[#ffd6e8] shadow-sm p-6";
-// 방 코드 입력창에 이 코드를 치면 내 모든 방을 한눈에 보는 전용 화면으로 이동 (나만 아는 코드)
 
-// 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
 const CONFETTI_COLORS = ["#f472b6", "#de73a5", "#ffc72c", "#60a5fa", "#34d399", "#a78bfa"];
 const CONFETTI_PIECES = Array.from({ length: 36 }, (_, i) => ({
   left: `${(i * 97) % 100}%`,
@@ -133,6 +130,7 @@ function Confetti() {
   );
 }
 
+// 주간 결과 팝업을 이미 봤는지는 이 기기에만 기억해두면 충분하다
 const WEEK_SEEN_KEY = "dajjang_seen_week_results";
 // 쉬어가기 시작 연출(카드 떨어지고 흑백)을 이 기기에서 이미 봤는지 (방+종료일 단위)
 const PAUSE_SEEN_KEY = "dajjang_seen_pause_effect";
@@ -260,9 +258,6 @@ export default function Home() {
     }
   });
   const [mealRefresh, setMealRefresh] = useState(0);
-  // 식단 사진을 올리기 전에 AI가 읽은 내용을 확인하고 고치는 창에 띄울 값
-  const [mealConfirm, setMealConfirm] = useState<{ photo: string; initial: ConfirmValues; aiRead: boolean } | null>(null);
-  const [mealSaving, setMealSaving] = useState(false);
   // 식단을 저장한 직후 잠깐 떴다 사라지는 알림
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
@@ -296,16 +291,24 @@ export default function Home() {
   const [stats, setStats] = useState<
     { userId: string; name: string; totalCheckins: number; weeksWon: number; totalWeeks: number; totalFine: number }[] | null
   >(null);
+  const [statsFailed, setStatsFailed] = useState(false);
   const [pauseWeeks, setPauseWeeks] = useState(2);
   const [pauseReason, setPauseReason] = useState("");
   const [weekResultPopup, setWeekResultPopup] = useState<PastWeek | null>(null);
   // 주간 결과 팝업을 띄울지 판단이 끝났는지 (끝나기 전에 훈장 연출이 팝업 뒤에서 먼저 돌지 않도록)
   const [historyReady, setHistoryReady] = useState(false);
+  // 내 정보를 못 받아왔을 때 (인터넷 끊김, 서버 오류). 저장해 둔 화면도 없으면 "다시 시도"를 보여준다
+  const [loadFailed, setLoadFailed] = useState(false);
 
   async function loadMe() {
     loadFines();
-    const res = await fetch("/api/me");
-    const data = await res.json();
+    const res = await fetch("/api/me").catch(() => null);
+    const data = res?.ok ? await res.json().catch(() => null) : null;
+    if (!data) {
+      setLoadFailed(true);
+      return;
+    }
+    setLoadFailed(false);
     // 로그아웃 상태면 남아 있던 저장본을 지운다 (다른 사람 화면이 보이면 안 된다)
     if (data.user) saveScreenCache({ me: data.user, room: data.room ?? null, other: data.other ?? null });
     else clearScreenCache();
@@ -342,20 +345,21 @@ export default function Home() {
   }
 
   async function loadWeek() {
-    const res = await fetch("/api/checkins");
-    if (!res.ok) return;
-    const data = await res.json();
+    const res = await fetch("/api/checkins").catch(() => null);
+    if (!res?.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data) return;
     saveScreenCache({ week: data });
     setWeekData(data);
   }
 
   async function loadHistory() {
-    const res = await fetch("/api/history");
-    if (!res.ok) {
+    const res = await fetch("/api/history").catch(() => null);
+    const data = res?.ok ? await res.json().catch(() => null) : null;
+    if (!data) {
       setHistoryReady(true);
       return;
     }
-    const data = await res.json();
     saveScreenCache({ weeks: data.weeks });
     setPastWeeks(data.weeks);
 
@@ -378,10 +382,26 @@ export default function Home() {
   }
 
   async function loadStats() {
-    const res = await fetch("/api/stats");
-    if (!res.ok) return;
-    const data = await res.json();
+    const res = await fetch("/api/stats").catch(() => null);
+    const data = res?.ok ? await res.json().catch(() => null) : null;
+    if (!data) {
+      setStatsFailed(true);
+      return;
+    }
+    setStatsFailed(false);
     setStats(data.stats);
+  }
+
+  function loadAll() {
+    loadMe();
+    loadWeek();
+    loadHistory();
+  }
+
+  async function logout() {
+    await fetch("/api/logout", { method: "POST" }).catch(() => null);
+    clearScreenCache();
+    location.href = "/";
   }
 
   useEffect(() => {
@@ -409,9 +429,8 @@ export default function Home() {
         setHistoryReady(true);
       }
     }
-    loadMe();
-    loadWeek();
-    loadHistory();
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const incomingPause = !!room?.pauseRequestedBy && room.pauseRequestedBy !== me?.id && !room.pausedUntil;
@@ -451,7 +470,7 @@ export default function Home() {
     const seenId = room?.pauseRequestedUntil ? `${room.inviteToken}:${room.pauseRequestedUntil}` : null;
     // 서버가 수락을 거부하면(만료 등) 연출 없이 끝낸다 — 예전엔 먼저 떨어지고 나서 실패해서 화면만 망가졌다
     setPauseFalling(true);
-    const accepted = await roomAction("confirm-pause").catch(() => false);
+    const accepted = await roomAction("confirm-pause");
     if (!accepted) {
       setPauseFalling(false);
       return;
@@ -471,9 +490,12 @@ export default function Home() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...extra }),
-    });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error || "요청 실패"); return false; }
+    }).catch(() => null);
+    if (!res?.ok) {
+      const data = await res?.json().catch(() => null);
+      alert(data?.error || "요청하지 못했어요. 인터넷 연결을 확인해 주세요");
+      return false;
+    }
     await loadMe();
     return true;
   }
@@ -629,6 +651,14 @@ export default function Home() {
       } else {
         await loadWeek();
       }
+    } catch (err) {
+      console.error("[upload]", err);
+      // fetch가 던지는 오류(TypeError: Failed to fetch 등)는 인터넷 연결 문제, 그 밖에는 사진을 줄이다 난 형식 문제(HEIC 등)다
+      alert(
+        err instanceof TypeError && /fetch|network|load failed/i.test(err.message)
+          ? "올리지 못했어요. 인터넷 연결을 확인하고 다시 해 주세요"
+          : "이 사진을 읽지 못했어요. 다른 사진이나 JPG로 다시 올려 주세요",
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -637,6 +667,11 @@ export default function Home() {
 
   // 설정의 식단 인증 켜기/끄기. 끄면 운동 보기로 돌아간다
   async function toggleDiet(on: boolean) {
+    // 끄면 몸무게/식단 벌금 대상에서 빠진다. 벌금은 볼 때마다 계산해서 지난 주 것도 같이 사라지므로, 약속이 있을 때는 한 번 묻는다
+    const hasLabFine = !!fines?.rules.some((r) => r.amount > 0 || r.activeAmount > 0);
+    if (!on && hasLabFine && !confirm("식단 인증을 끄면 몸무게·식단 벌금에서 빠져요.\n지난 주의 몸무게·식단 벌금 기록도 함께 사라져요 (다시 켜면 돌아와요).\n끌까요?")) {
+      return;
+    }
     const res = await fetch("/api/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -647,30 +682,9 @@ export default function Home() {
       return;
     }
     if (!on) setViewMode("workout");
-    await loadMe();
-  }
-
-  async function saveMeal(values: ConfirmValues) {
-    if (!mealConfirm) return;
-    setMealSaving(true);
-    try {
-      const res = await fetch("/api/meals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photoDataUrl: mealConfirm.photo, mode: "save", analyzed: mealConfirm.aiRead, ...values }),
-      });
-      if (!res.ok) {
-        alert((await res.json().catch(() => null))?.error || "저장하지 못했어요");
-        return;
-      }
-      const saved = await res.json().catch(() => null);
-      setMealConfirm(null);
-      setViewMode("diet");
-      setMealRefresh((n) => n + 1);
-      setToast(`저장했어요 · 약 ${(saved?.meal?.kcal ?? 0).toLocaleString()} kcal`);
-    } finally {
-      setMealSaving(false);
-    }
+    // 켜고 끄면 내 벌금이 달라지므로 이번 주 기록과 지난 기록도 다시 읽는다
+    await Promise.all([loadMe(), loadWeek(), loadHistory()]);
+    setStats(null);
   }
 
   function inviteUrl() {
@@ -759,15 +773,26 @@ export default function Home() {
   }
 
   async function toggleSettled(weekStart: string, userId: string, current: boolean) {
-    await fetch("/api/settlement", {
+    const res = await fetch("/api/settlement", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ weekStart, userId, settled: !current }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) alert("정산 체크를 저장하지 못했어요. 잠시 뒤에 다시 해 주세요");
     await loadHistory();
   }
 
   if (me === undefined) {
+    if (loadFailed) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-[#b4779b]">불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>
+          <button onClick={loadAll} className="rounded-xl bg-[#de73a5] px-5 py-2.5 text-sm font-bold text-white">
+            다시 시도
+          </button>
+        </div>
+      );
+    }
     return <div className="flex-1 flex items-center justify-center text-[#d9a9c4]">불러오는 중...</div>;
   }
 
@@ -867,16 +892,14 @@ export default function Home() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/nav/total.webp" alt="" className="w-6 h-6 object-contain" />
             </button>
-            {(
-              <button
-                onClick={() => setGraphOpen(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
-                aria-label="몸무게 그래프"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/assets/nav/graph.webp" alt="" className="w-5 h-5 object-contain" />
-              </button>
-            )}
+            <button
+              onClick={() => setGraphOpen(true)}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
+              aria-label="몸무게 그래프"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/nav/graph.webp" alt="" className="w-5 h-5 object-contain" />
+            </button>
             <button
               onClick={() => setSettingsOpen(true)}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-[#ffe1ee]"
@@ -910,11 +933,7 @@ export default function Home() {
             <button
               type="button"
               className="paused-card paused-center"
-              onClick={async () => {
-                await fetch("/api/logout", { method: "POST" });
-                clearScreenCache();
-                location.href = "/";
-              }}
+              onClick={logout}
             >
               <span className="flex items-end justify-center gap-2">
                 <SleepingFigure src="/assets/sleep-a.webp" height={64} lift={0} />
@@ -1142,17 +1161,6 @@ export default function Home() {
         </div>
       )}
 
-      {mealConfirm && (
-        <MealConfirm
-          photoUrl={mealConfirm.photo}
-          initial={mealConfirm.initial}
-          aiRead={mealConfirm.aiRead}
-          busy={mealSaving}
-          onSave={saveMeal}
-          onCancel={() => setMealConfirm(null)}
-        />
-      )}
-
       {incomingPause && !pauseFalling && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="celebrate-pop relative w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
@@ -1304,11 +1312,7 @@ export default function Home() {
 
             <div className="pt-3 border-t border-[#ffd6e8] space-y-1">
               <button
-                onClick={async () => {
-                  await fetch("/api/logout", { method: "POST" });
-                clearScreenCache();
-                  location.href = "/";
-                }}
+                onClick={logout}
                 className="w-full rounded-xl bg-[#ffeef5] py-3 text-sm font-semibold text-[#c2679c]"
               >
                 로그아웃 (새 방 만들기로)
@@ -1396,7 +1400,16 @@ export default function Home() {
               ))}
             </div>
 
-            {statsTab === "stats" && !stats && <p className="text-sm text-[#b4779b]">불러오는 중...</p>}
+            {statsTab === "stats" && !stats && (
+              statsFailed ? (
+                <button onClick={loadStats} className="w-full rounded-xl bg-[#fff0f6] py-3 text-sm font-semibold text-[#c2679c]">
+                  불러오지 못했어요. 눌러서 다시 시도
+                </button>
+              ) : (
+                <p className="text-sm text-[#b4779b]">불러오는 중...</p>
+              )
+            )}
+            {statsTab === "history" && !pastWeeks && <p className="text-sm text-[#b4779b]">불러오는 중...</p>}
 
             {statsTab === "history" && (
               <div className="max-h-[55vh] overflow-y-auto">
@@ -1458,7 +1471,7 @@ export default function Home() {
       )}
 
       {/* 친구가 쉬기를 그만두고 다시 도전하기로 했을 때 */}
-      {friendBackName && !weekResultPopup && !mealConfirm && (
+      {friendBackName && !weekResultPopup && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="celebrate-pop w-full max-w-xs bg-white rounded-3xl p-5 space-y-3 text-center shadow-xl">
             <p className="font-bold text-[#4a2540]">{friendBackName}님이 다시 도전해요</p>
@@ -1472,7 +1485,7 @@ export default function Home() {
 
       {/* 친구가 실험실 벌금을 제안했으면 수락/거절을 묻는다 */}
       {(() => {
-        if (!me || !otherEntry || !fines || roomPaused || incomingPause || weekResultPopup || mealConfirm || !historyReady || settingsOpen) return null;
+        if (!me || !otherEntry || !fines || roomPaused || incomingPause || weekResultPopup || !historyReady || settingsOpen) return null;
         const rule = fines.rules.find(
           (r) => r.proposedAmount !== null && !r.proposedByMe,
         );
@@ -1483,7 +1496,7 @@ export default function Home() {
       {/* 업데이트 소식: 다른 팝업이 떠 있을 땐 기다렸다가, 앱을 처음 여는 한 번만 보여준다.
           쉬어가는 방(흑백)에서는 띄우지 않고, 쉬는 게 풀린 뒤 처음 들어왔을 때 보여준다 */}
       <WhatsNew
-        ready={!!me && historyReady && !roomPaused && !weekResultPopup && !incomingPause && !pauseFalling && !mealConfirm}
+        ready={!!me && historyReady && !roomPaused && !weekResultPopup && !incomingPause && !pauseFalling}
       />
 
       {weekResultPopup && (

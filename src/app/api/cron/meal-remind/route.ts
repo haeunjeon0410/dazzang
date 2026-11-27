@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
 
   const pushes: Promise<unknown>[] = [];
   for (const user of users) {
+    // 식단 인증을 꺼둔 사람은 벌금 대상이 아니라서 알리지 않는다
+    if (!user.labMeal) continue;
     // 쉬어가는 방, 혼자 쉬는 사람, 이번 주 사정을 봐준 사람은 알리지 않는다
     if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
     if (isWeekPaused(user.rests, weekStart)) continue;

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (!requesterId) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const { weekStart, userId, settled } = await req.json().catch(() => ({}));
-  if (!weekStart || !userId || Number.isNaN(new Date(weekStart).getTime())) {
+  if (typeof weekStart !== "string" || typeof userId !== "string" || !userId || Number.isNaN(new Date(weekStart).getTime())) {
     return NextResponse.json({ error: "잘못된 요청입니다" }, { status: 400 });
   }
 

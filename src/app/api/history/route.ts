@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { labFinesFor, labFineKey, noLabFine } from "@/lib/lab-fine";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused, hadJoinedBy } from "@/lib/week";
 
 const WEEKS_BACK = 8;
 
@@ -31,12 +31,12 @@ export async function GET() {
   const [allCheckins, allSettlements, allExcuses, allRibbons, allMeals, labFines] = await Promise.all([
     // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
     prisma.checkin.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
-    prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } } }),
-    prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } } }),
-    prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } } }),
+    prisma.settlement.findMany({ where: { weekStart: { in: weekStarts }, userId: { in: userIds } }, select: { userId: true, weekStart: true, settled: true } }),
+    prisma.excuse.findMany({ where: { weekStart: { in: weekStarts }, status: "APPROVED", userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
+    prisma.ribbon.findMany({ where: { usedWeek: { in: weekStarts }, userId: { in: userIds } }, select: { userId: true, usedWeek: true } }),
     // 주별 하루 평균 칼로리를 내려주려고 식단은 칼로리와 시각만 가져온다
     prisma.meal.findMany({
-      where: { userId: { in: userIds }, createdAt: { gte: oldest, lt: currentWeekStart } },
+      where: { userId: { in: userIds }, confirmed: true, createdAt: { gte: oldest, lt: new Date(currentWeekStart.getTime() + 6 * 60 * 60 * 1000) } },
       select: { userId: true, kcal: true, createdAt: true },
     }),
     labFinesFor(me.roomId, users, weekStarts),
@@ -57,7 +57,13 @@ export async function GET() {
     const summary = users.map((u) => {
       const count = checkins.filter((c) => c.userId === u.id).length;
       const ribbonUsed = usedRibbons.some((r) => r.userId === u.id);
-      const pardoned = approvedExcuses.some((e) => e.userId === u.id) || isWeekPaused(u.rests, weekStart) || isWeekPaused(pauses, weekStart) || ribbonUsed;
+      // 이 주가 끝난 뒤에 방에 들어온 사람은 그 주 벌금이 없다 (예전에는 들어오기 전 주에도 0/3 벌금이 떴다)
+      const pardoned =
+        approvedExcuses.some((e) => e.userId === u.id) ||
+        isWeekPaused(u.rests, weekStart) ||
+        isWeekPaused(pauses, weekStart) ||
+        ribbonUsed ||
+        !hadJoinedBy(u, weekStart);
       const shortfall = Math.max(0, REQUIRED_COUNT - count);
       const settlement = settlements.find((s) => s.userId === u.id);
       const rawLab = labFines.get(labFineKey(u.id, weekStart)) ?? noLabFine;

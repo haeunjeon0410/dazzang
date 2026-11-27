@@ -2,7 +2,9 @@
 // - 식단 인증: 하루(오전 6시 기준)에 식단을 하나도 안 올리면 그날 금액 1회. 이미 끝난 날만 센다 (오늘은 아직 올릴 수 있다)
 // 몸무게 인증 벌금 규칙: 방 두 사람이 합의한 금액(LabFineRule)을 주 단위로 적용한다.
 // - 그 주 몸무게 인증을 안 했거나, 바로 전 기록보다 늘었으면 금액 1회 (인증은 했는데 비교할 전 기록이 없으면 없음)
-// - 몸무게 인증을 켠 사람에게만 적용되고, 합의한 다음 주(sinceWeek)부터 적용되어 지난 주는 소급하지 않는다.
+// - 설정에서 식단 인증을 켠 사람(User.labMeal)에게만 적용된다. 꺼둔 사람은 몸무게/식단을 인증할 화면이 없어서 벌금도 없다.
+//   벌금은 저장해 두지 않고 볼 때마다 계산하므로, 끄면 지난 주의 실험실 벌금도 함께 사라지고 다시 켜면 돌아온다.
+// - 합의한 다음 주(sinceWeek)부터 적용되어 지난 주는 소급하지 않는다.
 // - 쉬는 주/사정 봐주기/리본으로 면제되는 것은 부르는 쪽에서 운동 벌금과 똑같이 처리한다.
 import { prisma } from "@/lib/prisma";
 
@@ -18,6 +20,8 @@ export const FINE_CHOICES_BY: Record<LabFeature, number[]> = {
 };
 
 export type LabUser = { id: string };
+// 벌금 계산에는 식단 인증을 켰는지도 필요하다
+export type LabFineUser = LabUser & { labMeal: boolean };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // 하루와 한 주는 오전 6시에 바뀐다 (lib/week.ts와 같다)
@@ -44,13 +48,16 @@ export function labFineKey(userId: string, weekStart: Date): string {
 // 여러 주의 사람별 실험실 벌금. 키는 labFineKey(userId, 주 시작)
 export async function labFinesFor(
   roomId: string,
-  users: LabUser[],
+  users: LabFineUser[],
   weekStarts: Date[],
 ): Promise<Map<string, LabFine>> {
   const out = new Map<string, LabFine>();
   if (weekStarts.length === 0) return out;
   // 친구와 같이 하는 기능이라 두 사람이 모두 있는 방에서만 벌금이 있다
   if (users.length < 2) return out;
+  // 식단 인증을 켠 사람만 벌금 대상이다 (꺼둔 사람은 인증할 방법이 없다)
+  const ids = users.filter((u) => u.labMeal).map((u) => u.id);
+  if (ids.length === 0) return out;
 
   const rules = await prisma.labFineRule.findMany({ where: { roomId } });
   const started = (feature: LabFeature) => {
@@ -61,7 +68,6 @@ export async function labFinesFor(
   const mealRule = started("meal");
   if (!weightRule && !mealRule) return out;
 
-  const ids = users.map((u) => u.id);
   const times = weekStarts.map((w) => w.getTime());
   const maxWeek = Math.max(...times);
   const minWeek = Math.min(...times);

@@ -80,6 +80,14 @@ export async function POST(req: NextRequest) {
   const small = await shrinkPhoto(image);
   const photoUrl = `data:${small?.mimeType ?? mimeType};base64,${(small?.data ?? image).toString("base64")}`;
 
+  // 식단 인증을 꺼둔 사람은 앱과 똑같이 AI 판단 없이 바로 운동 인증으로 올린다 (크레딧도 쓰지 않는다)
+  if (!user.labMeal) {
+    const result = await createCheckin(user.id, photoUrl, await readTakenAt(image));
+    if (!result.ok) return fail(result.error);
+    await sendPushToUser(user, { title: "💪 운동에 올라갔어요", body: "운동 인증으로 올렸어요" }).catch(() => {});
+    return reply(true, "운동에 올라갔어요");
+  }
+
   const quota = await takeAiQuota(user.id, "photo");
   if (quota !== "ok") return fail(`${quotaMessage(quota)}. 나중에 다시 올려 주세요`);
   // 분석이 예기치 않게 터져도 아무 반응이 없게 두지 않고 알림으로 알린다

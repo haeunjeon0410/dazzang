@@ -14,9 +14,12 @@ export async function GET(req: NextRequest) {
 
   const weekStart = getWeekStart();
   const daysLeft = getDaysLeftInWeek();
-  const users = await prisma.user.findMany({ include: { subscriptions: true, room: true, rests: true } });
-  const checkins = await prisma.checkin.findMany({ where: { weekStart } });
-  const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart, status: "APPROVED" } });
+  // 인증 사진 데이터(base64)는 크니까 횟수 세는 데 필요한 칸만 가져온다
+  const [users, checkins, approvedExcuses] = await Promise.all([
+    prisma.user.findMany({ include: { room: true, rests: true } }),
+    prisma.checkin.findMany({ where: { weekStart }, select: { userId: true } }),
+    prisma.excuse.findMany({ where: { weekStart, status: "APPROVED" }, select: { userId: true } }),
+  ]);
   const now = new Date();
   const pushes: Promise<unknown>[] = [];
 
@@ -52,10 +55,14 @@ export async function GET(req: NextRequest) {
 
   // 몸무게 인증: 마감 전날(일요일) 저녁에, 이번 주 몸무게 인증을 안 한 사람에게 알린다. 벌금 약속이 있으면 자동 청구도 알려준다
   if (daysLeft === 1) {
-    const weightRules = await prisma.labFineRule.findMany({ where: { feature: "weight" } });
-    const weightLogs = await prisma.weightLog.findMany({ where: { weekStart }, select: { userId: true } });
+    const [weightRules, weightLogs] = await Promise.all([
+      prisma.labFineRule.findMany({ where: { feature: "weight" } }),
+      prisma.weightLog.findMany({ where: { weekStart }, select: { userId: true } }),
+    ]);
     for (const user of users) {
-      // 몸무게 인증은 모두의 기본 기능이고 친구와 같이 하는 거라, 친구가 들어온 방에서만 알린다
+      // 식단 인증을 꺼둔 사람은 몸무게 벌금 대상이 아니라서 알리지 않는다
+      if (!user.labMeal) continue;
+      // 친구와 같이 하는 거라, 친구가 들어온 방에서만 알린다
       if (users.filter((x) => x.roomId === user.roomId).length < 2) continue;
       if (user.room.pausedUntil && user.room.pausedUntil > now) continue;
       if (isWeekPaused(user.rests, weekStart)) continue;

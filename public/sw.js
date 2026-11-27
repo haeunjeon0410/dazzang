@@ -1,6 +1,12 @@
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  const data = event.data.json();
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    // JSON이 아닌 알림이 와도 버리지 않고 글자 그대로 보여준다
+    data = { title: "다짱", body: event.data.text() };
+  }
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

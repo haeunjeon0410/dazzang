@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
 
   const other = await prisma.user.findFirst({
     where: { roomId: requester.roomId, id: { not: userId } },
-    include: { subscriptions: true },
   });
   if (other) {
     await sendPushToUser(other, {

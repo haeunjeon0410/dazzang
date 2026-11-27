@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/session";
 import { labFinesFor, labFineKey } from "@/lib/lab-fine";
-import { REQUIRED_COUNT, FINE_PER_MISS, getWeekStart, getWeekDeadline, isWeekFinalized, isWeekPaused } from "@/lib/week";
+import { REQUIRED_COUNT, FINE_PER_MISS, getWeekStart, isWeekFinalized, isWeekPaused, hadJoinedBy } from "@/lib/week";
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // 통산전적: 전체 기간 누적 인증 횟수 / 승리한 주 수 / 누적 벌금
 export async function GET() {
@@ -23,20 +25,30 @@ export async function GET() {
   // 사진 데이터는 크니까 횟수 세는 데 필요한 칸만 가져온다
   const [checkins, approvedExcuses, usedRibbons, labRules] = await Promise.all([
     prisma.checkin.findMany({ where: { userId: { in: userIds } }, select: { userId: true, weekStart: true } }),
-    prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" } }),
-    prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } } }),
-    prisma.labFineRule.findMany({ where: { roomId: me.roomId, amount: { gt: 0 } } }),
+    prisma.excuse.findMany({ where: { userId: { in: userIds }, status: "APPROVED" }, select: { userId: true, weekStart: true } }),
+    prisma.ribbon.findMany({ where: { userId: { in: userIds }, usedWeek: { not: null } }, select: { userId: true, usedWeek: true } }),
+    // 지금은 0원으로 바꾼 약속도 읽는다: 바꾸기 전 주들에는 이전 금액(prevAmount)이 적용됐다
+    prisma.labFineRule.findMany({ where: { roomId: me.roomId } }),
   ]);
 
-  // 실험실 벌금: 합의한 주부터 마감된 지난 주까지 (진행 중인 이번 주는 아직 결과가 아니다)
+  // 실험실 벌금: 약속이 처음 시작된 주부터 마감된 지난 주까지 (진행 중인 이번 주는 아직 결과가 아니다).
+  // 주마다 얼마가 적용되는지는 labFinesFor가 따진다 (금액을 바꾸기 전 주는 이전 금액, 약속이 없던 주는 0원)
   const labWeeks: Date[] = [];
-  const since = labRules.map((r) => r.sinceWeek?.getTime()).filter((t): t is number => typeof t === "number");
+  const since = labRules.flatMap((r) => [r.sinceWeek, r.prevSinceWeek]).filter((d): d is Date => !!d).map((d) => d.getTime());
   if (since.length > 0) {
-    for (let t = Math.min(...since); t < getWeekStart().getTime(); t += 7 * 24 * 60 * 60 * 1000) {
-      if (getWeekDeadline(new Date(t)).getTime() < Date.now()) labWeeks.push(new Date(t));
-    }
+    for (let t = Math.min(...since); t < getWeekStart().getTime(); t += WEEK_MS) labWeeks.push(new Date(t));
   }
   const labFines = await labFinesFor(me.roomId, users, labWeeks);
+
+  // 방에서 누구라도 기록(인증, 사정 봐주기, 리본 사용)이 있는 마감된 주가 "진행한 주"다.
+  // 사람마다 따로 세면, 한 번도 인증하지 않은 주가 그 사람의 통산에서 통째로 빠져서 벌금 15,000원이 누락된다
+  const roomWeekKeys = [
+    ...new Set([
+      ...checkins.map((c) => c.weekStart.toISOString()),
+      ...approvedExcuses.map((e) => e.weekStart.toISOString()),
+      ...usedRibbons.map((r) => r.usedWeek!.toISOString()),
+    ]),
+  ].filter((key) => isWeekFinalized(new Date(key)));
 
   const stats = users.map((u) => {
     const myCheckins = checkins.filter((c) => c.userId === u.id);
@@ -49,24 +61,23 @@ export async function GET() {
     const pardonedWeeks = new Set([
       ...approvedExcuses.filter((e) => e.userId === u.id).map((e) => e.weekStart.toISOString()),
       // 리본을 써서 면제한 주도 벌금이 없다
-      ...usedRibbons.filter((r) => r.userId === u.id && r.usedWeek).map((r) => r.usedWeek!.toISOString()),
+      ...usedRibbons.filter((r) => r.userId === u.id).map((r) => r.usedWeek!.toISOString()),
     ]);
-    // 승리/벌금은 마감된 주만 센다 (진행 중인 이번 주는 아직 결과가 아님)
-    const allWeekKeys = new Set(
-      [...byWeek.keys(), ...pardonedWeeks].filter((key) => isWeekFinalized(new Date(key))),
-    );
+    // 벌금이 없는 주: 사면된 주, 혼자 쉰 주, 방 전체가 쉰 주
+    const noFine = (w: Date) => pardonedWeeks.has(w.toISOString()) || isWeekPaused(u.rests, w) || isWeekPaused(pauses, w);
+    // 승리/벌금은 마감된 주만 센다 (진행 중인 이번 주는 아직 결과가 아님). 내가 방에 들어오기 전에 끝난 주는 내 전적이 아니다
+    const myWeekKeys = roomWeekKeys.filter((key) => hadJoinedBy(u, new Date(key)));
 
     let weeksWon = 0;
     let totalFine = 0;
-    for (const key of allWeekKeys) {
+    for (const key of myWeekKeys) {
       const count = byWeek.get(key) ?? 0;
       if (count >= REQUIRED_COUNT) weeksWon++;
-      else if (!pardonedWeeks.has(key) && !isWeekPaused(u.rests, new Date(key)) && !isWeekPaused(pauses, new Date(key))) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
+      else if (!noFine(new Date(key))) totalFine += (REQUIRED_COUNT - count) * FINE_PER_MISS;
     }
 
     for (const w of labWeeks) {
-      const key = w.toISOString();
-      if (pardonedWeeks.has(key) || isWeekPaused(u.rests, w) || isWeekPaused(pauses, w)) continue;
+      if (noFine(w) || !hadJoinedBy(u, w)) continue;
       totalFine += labFines.get(labFineKey(u.id, w))?.total ?? 0;
     }
 
@@ -75,7 +86,7 @@ export async function GET() {
       name: u.name,
       totalCheckins: myCheckins.length,
       weeksWon,
-      totalWeeks: allWeekKeys.size,
+      totalWeeks: myWeekKeys.length,
       totalFine,
     };
   });

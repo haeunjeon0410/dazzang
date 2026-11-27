@@ -49,7 +49,7 @@ const mealView = (m: {
 });
 
 // 이번 주 식단. 주 전체는 날짜별 칼로리 합계만, 사진이 든 목록은 고른 날(day=0 월 ~ 6 일, 기본 오늘) 것만 내려보낸다.
-// 방의 두 사람 것이 같이 내려가고, 실험실을 켠 사람만 볼 수 있다.
+// 방의 두 사람 것이 같이 내려간다.
 // 단축어로 올라와 아직 확인하지 않은 초안은 올린 본인에게만 보이고 주간 합계에도 들어가지 않는다.
 // ?pending=1 이면 내 확인 대기 초안만 사진과 함께 돌려준다
 export async function GET(req: Request) {
@@ -66,7 +66,9 @@ export async function GET(req: Request) {
       take: 10,
       omit: { photoUrl: true },
     });
-    return NextResponse.json({ drafts: drafts.map((m) => mealView(m, me.name)) });
+    // 사진은 주가 바뀌면 지워진다 (cron/cleanup). 지난 주에 올라온 초안은 사진 없이 내려보낸다
+    const thisWeekFrom = getWeekStart().getTime() + DAY_RESET_MS;
+    return NextResponse.json({ drafts: drafts.map((m) => mealView(m, me.name, m.createdAt.getTime() < thisWeekFrom)) });
   }
 
   const weekStart = getWeekStart();
@@ -103,11 +105,6 @@ export async function GET(req: Request) {
     kcal: m.kcal ?? 0,
   }));
 
-  const gone = new Set(
-    meals.length
-      ? (await prisma.meal.findMany({ where: { id: { in: meals.map((m) => m.id) }, photoUrl: "" }, select: { id: true } })).map((m) => m.id)
-      : [],
-  );
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
   return NextResponse.json({
     // 나를 먼저
@@ -115,7 +112,8 @@ export async function GET(req: Request) {
     week,
     day,
     pendingCount,
-    meals: meals.map((m) => mealView(m, nameOf.get(m.userId) ?? "", gone.has(m.id))),
+    // 이 목록은 이번 주 것뿐이라 사진이 지워진 식단이 없다 (사진은 주가 바뀐 뒤에 지운다)
+    meals: meals.map((m) => mealView(m, nameOf.get(m.userId) ?? "")),
   });
 }
 

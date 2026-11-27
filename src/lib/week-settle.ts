@@ -1,15 +1,15 @@
 // 지난 주 정산 중 "리본" 부분 (획득 + 사용). 주 마감(월요일 오전 6시)이 지나면 바로 반영되게,
 // 월요일 오전 9시 정산 작업(finalize)과 앱을 열 때(settleLastWeekLazily) 양쪽에서 같은 코드를 쓴다.
 // 두 번 돌려도 같은 결과가 나오게 만들어져 있다 (리본은 사람·주마다 하나, 이미 쓴 주는 다시 쓰지 않는다).
-import type { Checkin, Excuse, PushSubscription, User, UserRest } from "@prisma/client";
+import type { Checkin, Excuse, User, UserRest } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { labFinesFor, labFineKey, type LabFine } from "@/lib/lab-fine";
-import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, REQUIRED_COUNT, FINE_PER_MISS, isWeekPaused, hadJoinedBy } from "@/lib/week";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type SettleUser = User & { rests: UserRest[]; subscriptions: PushSubscription[] };
+export type SettleUser = User & { rests: UserRest[] };
 export type SettleResult = {
   user: SettleUser;
   count: number;
@@ -36,7 +36,8 @@ export async function settleRoomWeek(
     const count = checkins.filter((c) => c.userId === u.id).length;
     const excused = approvedExcuses.some((e) => e.userId === u.id);
     const resting = isWeekPaused(u.rests, lastWeekStart);
-    const pardoned = excused || resting;
+    // 이 주가 끝난 뒤에 들어온 사람은 그 주 벌금이 없다
+    const pardoned = excused || resting || !hadJoinedBy(u, lastWeekStart);
     const shortfall = Math.max(0, REQUIRED_COUNT - count);
     return {
       user: u,
@@ -119,7 +120,7 @@ export async function settleLastWeekLazily(roomId: string): Promise<void> {
 
     const room = await prisma.room.findUnique({
       where: { id: roomId },
-      include: { pauses: true, users: { include: { subscriptions: true, rests: true } } },
+      include: { pauses: true, users: { include: { rests: true } } },
     });
     if (!room) return;
     // 방이 생기기 전 주, 방 전체가 쉬는 주는 정산하지 않는다 (9시 정산 작업과 같은 규칙)

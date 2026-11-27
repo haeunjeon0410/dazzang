@@ -13,8 +13,6 @@ export async function POST(req: NextRequest) {
   if (tooManyRequests(`rooms:${clientIp(req)}`, 10, 60 * 60_000)) {
     return NextResponse.json({ error: "방을 너무 많이 만들었어요. 잠시 뒤에 다시 해주세요" }, { status: 429 });
   }
-  await req.json().catch(() => ({}));
-
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const room = await prisma.room.create({ data: { inviteToken: createRoomCode() } });

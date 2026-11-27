@@ -1,5 +1,5 @@
 // 실험실 식단 인증: 음식 사진을 숙명여대 API 게이트웨이(BAZE, OpenAI 호환)의 GPT-6 Luna로 분석해 칼로리를 추정한다.
-// 키가 없거나 호출이 실패하면 null을 돌려주고, 호출한 쪽이 다시 올리게 안내한다.
+// 키가 없거나 호출이 실패하면 분석 결과 없이 이유(failure)를 돌려주고, 호출한 쪽이 다시 올리게 안내한다.
 // 환경변수는 mypt와 같은 BAZE_* 이름을 쓴다 (예전 GATEWAY_* 이름도 그대로 받는다):
 //   BAZE_API_KEY (필수), BAZE_BASE_URL (선택), BAZE_IMAGE_MODEL (선택, 기본 gpt-6-luna)
 import { addCredits } from "@/lib/ai-quota";
@@ -142,10 +142,6 @@ async function callOnce(key: string, dataUrl: string, maxTokens: number, timeout
   return typeof text === "string" ? text.trim() : "";
 }
 
-export async function analyzeMealPhoto(dataUrl: string): Promise<MealAnalysis | null> {
-  return (await analyzeMealPhotoDetailed(dataUrl)).analysis;
-}
-
 // 분석이 안 됐을 때 왜 안 됐는지(failure)도 같이 돌려준다: no-key | gateway-<HTTP 코드> | timeout | network | unreadable
 export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analysis: MealAnalysis | null; failure?: string }> {
   const key = aiKey();
@@ -173,6 +169,9 @@ export async function analyzeMealPhotoDetailed(dataUrl: string): Promise<{ analy
       const name = e instanceof Error ? e.name : "";
       failure = name === "TimeoutError" || name === "AbortError" ? "timeout" : msg.startsWith("gateway ") ? msg.replace(" ", "-") : "network";
       console.error("[meal] gateway", msg);
+      // 키가 거절됐거나(401/403) 요청이 너무 많거나(429) 요청 자체가 잘못된(4xx) 경우는 다시 보내도 똑같이 실패한다.
+      // 기다리는 시간만 늘고 게이트웨이에 부담만 주므로 바로 끝낸다 (서버 오류 5xx, 시간 초과, 연결 실패만 한 번 더 시도)
+      if (/^gateway-4\d\d$/.test(failure)) break;
     }
   }
   return { analysis: null, failure };
@@ -209,9 +208,9 @@ export async function estimateKcals(names: string[]): Promise<number[] | null> {
     if (!res.ok) throw new Error(`gateway ${res.status}`);
     const data = await res.json();
     if (data?.usage) {
-    console.info("[meal] usage", JSON.stringify(data.usage));
-    await addCredits(data.usage.prompt_tokens, data.usage.completion_tokens);
-  }
+      console.info("[meal] usage", JSON.stringify(data.usage));
+      await addCredits(data.usage.prompt_tokens, data.usage.completion_tokens);
+    }
     const text = data?.choices?.[0]?.message?.content;
     const parsed = typeof text === "string" ? (extractJson(text) as { kcals?: unknown } | null) : null;
     const k = parsed?.kcals;

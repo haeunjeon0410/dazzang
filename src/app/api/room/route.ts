@@ -34,7 +34,6 @@ export async function PATCH(req: NextRequest) {
   const findOther = () =>
     prisma.user.findFirst({
       where: { roomId: me.roomId, id: { not: userId } },
-      include: { subscriptions: true },
     });
 
   // ── 혼자 쉬기 취소 ────────────────────────────────────────────
@@ -97,8 +96,9 @@ export async function PATCH(req: NextRequest) {
     if (before?.pausedUntil && before.pausedUntil > new Date()) {
       return NextResponse.json({ error: "쉬어가기는 시작되면 취소할 수 없어요" }, { status: 400 });
     }
-    await prisma.room.update({
-      where: { id: me.roomId },
+    // 두 번 눌러도 한 번만 처리되게, 아직 같은 요청이 남아 있을 때만 정리한다 (안 그러면 혼자 쉬는 기간이 두 번 생긴다)
+    const cleared = await prisma.room.updateMany({
+      where: { id: me.roomId, pauseRequestedBy: before?.pauseRequestedBy ?? null },
       data: {
         pauseRequestedBy: null,
         pauseRequestedUntil: null,
@@ -106,6 +106,7 @@ export async function PATCH(req: NextRequest) {
         pausedUntil: null,
       },
     });
+    if (cleared.count === 0) return NextResponse.json({ ok: true });
 
     // 상대방 요청을 거절한 경우에만 알림 (내가 낸 요청을 스스로 취소한 건 조용히)
     const rejected = !!before?.pauseRequestedBy && before.pauseRequestedBy !== userId;

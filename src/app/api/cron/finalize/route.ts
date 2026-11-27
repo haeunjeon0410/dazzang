@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { sendPushToUser } from "@/lib/push";
 import { labFineKey } from "@/lib/lab-fine";
 import { settleRoomWeek } from "@/lib/week-settle";
-import { getWeekStart, formatResumeDate, REQUIRED_COUNT, isWeekPaused } from "@/lib/week";
+import { getWeekStart, getWeekDeadline, formatResumeDate, REQUIRED_COUNT, isWeekPaused } from "@/lib/week";
 
 // 외부 스케줄러가 매주 월요일 09:00 KST에 호출 -> 지난 주 결과를 양쪽에 확정 통보
 // (마감은 월요일 06:00이지만, 새벽 알림으로 잠 깨우지 않도록 아침 9시에 보낸다)
@@ -14,9 +14,12 @@ export async function GET(req: NextRequest) {
   }
 
   const lastWeekStart = new Date(getWeekStart().getTime() - 7 * 24 * 60 * 60 * 1000);
-  const rooms = await prisma.room.findMany({ include: { pauses: true, users: { include: { subscriptions: true, rests: true } } } });
-  const checkins = await prisma.checkin.findMany({ where: { weekStart: lastWeekStart } });
-  const approvedExcuses = await prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" } });
+  // 인증 사진 데이터(base64)는 크니까 횟수 세는 데 필요한 칸만 가져온다 (통째로 읽으면 한 주 사진 전부가 메모리에 올라온다)
+  const [rooms, checkins, approvedExcuses] = await Promise.all([
+    prisma.room.findMany({ include: { pauses: true, users: { include: { rests: true } } } }),
+    prisma.checkin.findMany({ where: { weekStart: lastWeekStart }, select: { userId: true } }),
+    prisma.excuse.findMany({ where: { weekStart: lastWeekStart, status: "APPROVED" }, select: { userId: true } }),
+  ]);
 
   const allResults: { name: string; count: number; fine: number }[] = [];
 
@@ -39,6 +42,9 @@ export async function GET(req: NextRequest) {
       }
       await prisma.room.update({ where: { id: room.id }, data: { pausedUntil: null, pauseReason: null } });
     }
+
+    // 지난 주 마감 뒤에 생긴 방은 지난 주 결과가 없다 (앱을 열 때의 정산과 같은 규칙)
+    if (getWeekDeadline(lastWeekStart).getTime() <= room.createdAt.getTime()) continue;
 
     // 지난 주가 정지 기간에 포함되면 마감 스킵
     if ((room.pausedUntil && room.pausedUntil > lastWeekStart) || isWeekPaused(room.pauses, lastWeekStart)) continue;

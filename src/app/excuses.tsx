@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { CharacterSprite, CharRow, CharPose } from "./sprite";
 import { EXCUSE_REPLY_MAX_LEN } from "@/lib/excuse";
 
@@ -41,7 +41,7 @@ function markSeen(id: string) {
   }
 }
 
-export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => void; sideButton?: ReactNode }) {
+export function ExcusePanel({ onResolved }: { onResolved?: () => void }) {
   const [mine, setMine] = useState<Excuse[]>([]);
   const [incoming, setIncoming] = useState<Excuse[]>([]);
   const [reason, setReason] = useState("");
@@ -52,11 +52,14 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
   const [resultPopup, setResultPopup] = useState<Excuse | null>(null);
   // 받은 요청별 답장 입력값 (선택)
   const [replies, setReplies] = useState<Record<string, string>>({});
+  // 보내는 중 (버튼을 연달아 눌러 두 번 보내지 않게)
+  const [busy, setBusy] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/excuses");
-    if (!res.ok) return;
-    const data = await res.json();
+    const res = await fetch("/api/excuses").catch(() => null);
+    if (!res?.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data) return;
     setMine(data.mine);
     setIncoming(data.incoming);
     setUsedThisMonth(!!data.usedThisMonth);
@@ -76,36 +79,49 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
   }, []);
 
   async function submit() {
-    if (!reason.trim()) return;
+    if (!reason.trim() || busy) return;
     setConfirmOpen(false);
-    const res = await fetch("/api/excuses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    if (res.ok) {
-      setReason("");
-      setSheetOpen(false);
-      await load();
-    } else {
-      const data = await res.json().catch(() => null);
-      alert(data?.error || "요청 실패");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/excuses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      }).catch(() => null);
+      if (res?.ok) {
+        setReason("");
+        setSheetOpen(false);
+        await load();
+      } else {
+        const data = await res?.json().catch(() => null);
+        alert(data?.error || "요청을 보내지 못했어요. 인터넷 연결을 확인해 주세요");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
   async function respond(id: string, approve: boolean) {
-    const res = await fetch(`/api/excuses/${id}/respond`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approve, reply: replies[id] ?? "" }),
-    });
-    if (res.ok) {
-      setReplies((prev) => ({ ...prev, [id]: "" }));
-      await load();
-      onResolved?.();
-    } else {
-      const data = await res.json().catch(() => null);
-      alert(data?.error || "처리 실패");
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/excuses/${id}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approve, reply: replies[id] ?? "" }),
+      }).catch(() => null);
+      if (res?.ok) {
+        setReplies((prev) => ({ ...prev, [id]: "" }));
+        await load();
+        onResolved?.();
+      } else {
+        const data = await res?.json().catch(() => null);
+        alert(data?.error || "처리하지 못했어요. 인터넷 연결을 확인해 주세요");
+        // 이미 처리된 요청이면 목록을 새로 읽어 화면에서 치운다
+        await load();
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -136,13 +152,15 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
               <div className="flex gap-2">
                 <button
                   onClick={() => respond(e.id, true)}
-                  className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold"
+                  disabled={busy}
+                  className="flex-1 rounded-lg bg-[#2f9e44] text-white py-1.5 text-sm font-bold disabled:opacity-50"
                 >
                   허락하기
                 </button>
                 <button
                   onClick={() => respond(e.id, false)}
-                  className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b]"
+                  disabled={busy}
+                  className="flex-1 rounded-lg bg-white border border-[#ffd6e8] py-1.5 text-sm text-[#b4779b] disabled:opacity-50"
                 >
                   거절하기
                 </button>
@@ -152,7 +170,7 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
         </div>
       )}
 
-      <div className={sideButton ? "grid grid-cols-2 gap-2" : "grid grid-cols-1"}>
+      <div className="grid grid-cols-1">
         <button
           onClick={() => setSheetOpen(true)}
           className="flex items-center gap-1.5 rounded-2xl bg-white border border-[#ffd6e8] shadow-sm px-3 py-3 text-left"
@@ -165,9 +183,8 @@ export function ExcusePanel({ onResolved, sideButton }: { onResolved?: () => voi
               <span className="block text-[10px] text-[#b4779b]">최근 요청: {STATUS_LABEL[latestMine.status]}</span>
             )}
           </span>
-          {!sideButton && <span className="text-[#de73a5] text-lg leading-none">›</span>}
+          <span className="text-[#de73a5] text-lg leading-none">›</span>
         </button>
-        {sideButton}
       </div>
 
       {sheetOpen && (

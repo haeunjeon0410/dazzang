@@ -27,6 +27,10 @@ const qtyText = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(1));
 const keyOf = (r: { name: string; qty: number; unit: string }) => `${r.name.trim()}\u0001${r.qty}\u0001${r.unit}`;
 const queryOf = (r: { name: string }) => r.name.trim();
 
+// 이번에 앱을 연 동안 이미 칼로리를 구한 이름은 다시 묻지 않는다.
+// 이름을 고쳤다가 되돌리거나, 같은 음식을 다른 끼니에 또 적을 때 AI를 한 번 더 부르지 않아 크레딧을 아낀다
+const kcalCache = new Map<string, number>();
+
 // 마지막 글자에 받침이 있으면 "과", 없으면 "와" (한글이 아니면 "와")
 function withParticle(word: string): string {
   const code = word.charCodeAt(word.length - 1) - 0xac00;
@@ -96,23 +100,31 @@ export function MealConfirm({
     if (!names.some(Boolean)) return;
     const t = setTimeout(async () => {
       const asked = names.map((n, i) => ({ n, i })).filter((x) => x.n);
-      let kcals: number[] | null = null;
-      try {
-        const res = await fetch("/api/meals/estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ names: asked.map((x) => x.n) }),
-        });
-        if (res.ok) kcals = (await res.json()).kcals;
-      } catch {
-        kcals = null;
+      // 아직 모르는 이름만 묻는다 (같은 이름이 두 줄이면 한 번만)
+      const unknown = [...new Set(asked.map((x) => x.n).filter((n) => !kcalCache.has(n)))];
+      if (unknown.length > 0) {
+        try {
+          const res = await fetch("/api/meals/estimate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ names: unknown }),
+          });
+          const got: unknown = res.ok ? (await res.json()).kcals : null;
+          if (Array.isArray(got) && got.length === unknown.length) {
+            // 0은 "못 구했다"는 뜻이라 기억하지 않는다 (다음에 다시 물어볼 수 있게)
+            unknown.forEach((n, i) => typeof got[i] === "number" && got[i] > 0 && kcalCache.set(n, got[i]));
+          }
+        } catch {
+          // 못 구한 이름은 아래에서 0으로 남아 "칼로리를 못 구했어요"가 뜬다
+        }
       }
+      const kcals = asked.map((x) => kcalCache.get(x.n) ?? 0);
       if (!alive.current) return;
       setRows((prev) =>
         prev.map((r, idx) => {
           const k = asked.findIndex((x) => x.i === idx && x.n === queryOf(r));
           // 양까지 붙여서 물었으니 돌아온 칼로리가 그 양 전체의 칼로리다
-          return k < 0 ? r : { ...r, kcal: kcals ? Math.round(kcals[k]) : 0, est: keyOf(r), kcalKnown: !!kcals && kcals[k] > 0 };
+          return k < 0 ? r : { ...r, kcal: Math.round(kcals[k]), est: keyOf(r), kcalKnown: kcals[k] > 0 };
         }),
       );
     }, 700);

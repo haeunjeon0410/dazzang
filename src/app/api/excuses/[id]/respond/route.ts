@@ -34,18 +34,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "이미 처리된 요청입니다" }, { status: 400 });
   }
 
-  const updated = await prisma.excuse.update({
-    where: { id },
-    data: { status: approve ? "APPROVED" : "REJECTED", resolvedAt: new Date(), reply: replyText || null },
+  // 허락/거절을 동시에 두 번 눌러도 먼저 들어온 하나만 처리되게, 아직 대기 중일 때만 바꾼다
+  const status = approve === true ? "APPROVED" : "REJECTED";
+  const updated = await prisma.excuse.updateMany({
+    where: { id, status: "PENDING" },
+    data: { status, resolvedAt: new Date(), reply: replyText || null },
   });
+  if (updated.count === 0) return NextResponse.json({ error: "이미 처리된 요청입니다" }, { status: 400 });
 
-  const requester = await prisma.user.findUnique({ where: { id: excuse.userId }, include: { subscriptions: true } });
-  if (requester) {
-    await sendPushToUser(requester, {
-      title: approve ? "사정 봐달라하기 요청이 허락됐어요" : "사정 봐달라하기 요청이 거절됐어요",
-      body: replyText ? `${me.name}: "${replyText}"` : `친구가 요청을 ${approve ? "허락" : "거절"}했어요`,
-    });
-  }
+  // 알림이 안 가도 처리는 끝난 것이다
+  await sendPushToUser(excuse.user, {
+    title: approve === true ? "사정 봐달라하기 요청이 허락됐어요" : "사정 봐달라하기 요청이 거절됐어요",
+    body: replyText ? `${me.name}: "${replyText}"` : `친구가 요청을 ${approve === true ? "허락" : "거절"}했어요`,
+  }).catch(() => {});
 
-  return NextResponse.json({ excuse: updated });
+  return NextResponse.json({ ok: true, status });
 }

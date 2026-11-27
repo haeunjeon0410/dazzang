@@ -65,20 +65,25 @@ function Chart({ logs }: { logs: WeightData["logs"] }) {
 // 헤더의 그래프 버튼으로 여는 몸무게 창: 최근 5주 기록과 지난주 대비 변화를 보여준다
 export function WeightGraph({ fineAmount, onClose }: { fineAmount: number; onClose: () => void }) {
   const [data, setData] = useState<WeightData | null>(null);
+  // 기록을 못 받아왔을 때. 예전에는 아무 창도 안 떠서 버튼이 고장 난 것처럼 보였다
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
     fetch("/api/weight")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: WeightData | null) => alive && d?.enabled && setData(d))
-      .catch(() => {});
+      .then((d: WeightData | null) => {
+        if (!alive) return;
+        if (d?.enabled) setData(d);
+        else setFailed(true);
+      })
+      .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
     };
   }, []);
 
-  if (!data) return null;
-  const latest = data.logs[0];
+  const latest = data?.logs[0];
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -95,7 +100,9 @@ export function WeightGraph({ fineAmount, onClose }: { fineAmount: number; onClo
           {fineAmount > 0 && <span className="ml-1.5 text-[11px] font-semibold text-[#b4779b]">늘거나 안 하면 벌금 {fineAmount.toLocaleString()}원</span>}
         </p>
 
-        {latest ? (
+        {!data ? (
+          <p className="py-8 text-center text-sm text-[#b4779b]">{failed ? "불러오지 못했어요. 잠시 뒤에 다시 열어 주세요" : "불러오는 중..."}</p>
+        ) : latest ? (
           <>
             <div className="flex items-end justify-between gap-2">
               <p className="text-2xl font-black leading-none text-[#4a2540]">

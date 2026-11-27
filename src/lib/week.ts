@@ -4,8 +4,7 @@
 // DB에 저장되는 weekStart 키는 예전과 같은 "월요일 00:00 KST"를 그대로 쓴다 (기존 기록과 호환).
 // 실제 주가 시작되는 시각은 weekStart + 6시간이다.
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-export const DAY_RESET_HOUR = 6;
-const RESET_OFFSET_MS = DAY_RESET_HOUR * 60 * 60 * 1000;
+const RESET_OFFSET_MS = 6 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // 리셋 시각만큼 당겨서 KST 달력 날짜로 본다 (예: 화요일 새벽 2시 → 월요일)
@@ -59,13 +58,6 @@ export function getDaysLeftInWeek(date: Date = new Date()): number {
   return 8 - isoDay;
 }
 
-export function formatWeekLabel(weekStart: Date): string {
-  const kst = new Date(weekStart.getTime() + KST_OFFSET_MS);
-  const end = new Date(kst.getTime() + 6 * DAY_MS);
-  const fmt = (d: Date) => `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-  return `${fmt(kst)} ~ ${fmt(end)}`;
-}
-
 // 쉬어가기 종료(재개) 월요일 키를 "10/19(월)" 형태로
 export function formatResumeDate(resumeWeekStart: Date): string {
   const kst = new Date(resumeWeekStart.getTime() + KST_OFFSET_MS);
@@ -84,6 +76,12 @@ export function formatPauseEnd(resumeWeekStart: Date): string {
 export function isWeekPaused(pauses: { fromWeek: Date; untilWeek: Date }[], weekStart: Date): boolean {
   const t = weekStart.getTime();
   return pauses.some((p) => t >= p.fromWeek.getTime() && t < p.untilWeek.getTime());
+}
+
+// 그 주가 끝나기 전에 방에 들어와 있었는지. 친구가 나중에 들어온 방에서, 들어오기 전 주까지 벌금이 매겨지지 않게 한다
+// (들어온 주는 도중에 들어왔어도 그 주부터 센다. 방을 만든 주를 세는 것과 같은 규칙)
+export function hadJoinedBy(user: { createdAt: Date }, weekStart: Date): boolean {
+  return getWeekDeadline(weekStart).getTime() > user.createdAt.getTime();
 }
 
 export const REQUIRED_COUNT = 3;

@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
   // 합의는 친구가 들어온 방에서만 할 수 있다
   const other = await prisma.user.findFirst({
     where: { roomId: me.roomId, id: { not: userId } },
-    include: { subscriptions: true },
   });
   if (!other) return NextResponse.json({ error: "친구가 들어온 뒤에 정할 수 있어요" }, { status: 400 });
 
